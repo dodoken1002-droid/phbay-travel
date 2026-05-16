@@ -75,6 +75,40 @@ def ensure_db():
             print(f'[DB INIT] {e}')
 
 
+# ─── 健康檢查（診斷用，不含敏感資訊） ──────────────────────
+@app.route('/api/health')
+def health():
+    db_url = os.environ.get('DATABASE_URL', '')
+    db_status = 'not_set'
+    db_error  = None
+    table_exists = False
+
+    if db_url:
+        db_status = 'url_found'
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute("SELECT to_regclass('public.contacts') AS t")
+            row = cur.fetchone()
+            table_exists = row['t'] is not None
+            cur.close()
+            conn.close()
+            db_status = 'connected'
+        except Exception as e:
+            db_error = str(e)
+            db_status = 'error'
+
+    return jsonify(
+        ok=True,
+        db_url_set=bool(db_url),
+        db_url_prefix=db_url[:25] + '...' if db_url else '',
+        db_status=db_status,
+        db_error=db_error,
+        table_contacts=table_exists,
+        python_version=os.popen('python --version 2>&1').read().strip(),
+    )
+
+
 # ─── 靜態頁面路由 ──────────────────────────────────────────
 @app.route('/')
 def index():
