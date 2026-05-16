@@ -267,10 +267,10 @@ function renderTourCard(tour) {
     ? `<img src="${tour.image_url}" alt="${tour.title}" loading="lazy" />`
     : `<img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80" alt="${tour.title}" loading="lazy" />`;
 
-  // 多出發地價格列
+  // 多出發地價格列（DB 格式：{label, value}）
   const pricesHtml = Array.isArray(tour.prices) && tour.prices.length
     ? `<div class="tour-prices">${tour.prices.map(p =>
-        `<div class="price-row"><span class="price-from">${p.from}</span><span class="price-val">${p.price}</span></div>`
+        `<div class="price-row"><span class="price-from">${p.label ?? p.from ?? ''}</span><span class="price-val">${p.value ?? p.price ?? ''}</span></div>`
       ).join('')}</div>` : '';
 
   const priceMetaHtml = (!tour.prices || !tour.prices.length) && tour.price_display
@@ -316,7 +316,7 @@ function renderTourModal(tour) {
   if (Array.isArray(tour.prices) && tour.prices.length) {
     priceSection = `<h4><i class="fas fa-tag"></i> 出發地 × 價格</h4>
       <table class="price-table">
-        ${tour.prices.map(p => `<tr><td>${p.from}</td><td class="price-highlight">${p.price}</td></tr>`).join('')}
+        ${tour.prices.map(p => `<tr><td>${p.label ?? p.from ?? ''}</td><td class="price-highlight">${p.value ?? p.price ?? ''}</td></tr>`).join('')}
       </table>`;
   } else if (tour.price_display) {
     priceSection = `<h4><i class="fas fa-tag"></i> 價格</h4><p>${tour.price_display}</p>`;
