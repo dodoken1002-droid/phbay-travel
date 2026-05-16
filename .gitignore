@@ -1,0 +1,33 @@
+# 環境變數（絕對不能上傳！）
+.env
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Claude Code 設定（不需上傳）
+.claude/
+
+# 測試輸出
+*.log

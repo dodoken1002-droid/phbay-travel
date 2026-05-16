@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>潮旅國際旅行社 | 澎湖深度旅遊專家</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════
+       上方固定 Banner（捲動不消失）
+       如需修改文字，直接修改以下 <marquee> 或 <span> 內容
+  ════════════════════════════════════════════════ -->
+  <div class="top-banner" id="top-banner">
+    <div class="banner-inner">
+      <span class="banner-text">
+        潮旅國際旅行社｜負責人：唐瑋汝｜交觀乙第1864號｜澎品保0188號｜電話：06-9271288｜官方LINE：@phbay2018
+      </span>
+      <!-- 重複文字讓跑馬燈效果無縫 -->
+      <span class="banner-text" aria-hidden="true">
+        潮旅國際旅行社｜負責人：唐瑋汝｜交觀乙第1864號｜澎品保0188號｜電話：06-9271288｜官方LINE：@phbay2018
+      </span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       主要導覽列
+  ════════════════════════════════════════════════ -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-container">
+      <a href="#home" class="nav-logo">
+        <i class="fas fa-water"></i> 潮旅國際旅行社
+      </a>
+      <!-- 手機版漢堡選單按鈕 -->
+      <button class="nav-toggle" id="nav-toggle" aria-label="開啟選單">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="#home">首頁</a></li>
+        <li><a href="#tours">行程介紹</a></li>
+        <li><a href="#about">關於我們</a></li>
+        <li><a href="#contact">聯絡我們</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════════════════════════════════
+       首頁主視覺 (Hero Section)
+       修改主標題、副標請找 <h1> 與 <p class="hero-subtitle">
+  ════════════════════════════════════════════════ -->
+  <section class="hero" id="home">
+    <div class="hero-overlay"></div>
+    <div class="hero-content">
+      <h1 class="hero-title">潮旅國際旅行社</h1>
+      <p class="hero-subtitle">帶你玩出不一樣的澎湖旅行</p>
+      <p class="hero-tagline">在地深度 × 親子友善 × 永續海洋</p>
+      <div class="hero-buttons">
+        <a href="#tours" class="btn btn-primary">
+          <i class="fas fa-map-marked-alt"></i> 查看推薦行程
+        </a>
+        <a href="#contact" class="btn btn-outline">
+          <i class="fas fa-comment-dots"></i> 立即諮詢
+        </a>
+      </div>
+    </div>
+    <!-- 向下滾動指示箭頭 -->
+    <div class="hero-scroll-hint">
+      <i class="fas fa-chevron-down"></i>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════
+       特色標語區（三大亮點）
+  ════════════════════════════════════════════════ -->
+  <section class="features">
+    <div class="container">
+      <div class="features-grid">
+        <div class="feature-item">
+          <i class="fas fa-map-pin"></i>
+          <h3>在地深度旅遊</h3>
+          <p>澎湖人帶你玩澎湖，走訪不為人知的秘境與故事</p>
+        </div>
+        <div class="feature-item">
+          <i class="fas fa-child"></i>
+          <h3>親子友善設計</h3>
+          <p>細心安排每個細節，讓全家大小都能安心享受</p>
+        </div>
+        <div class="feature-item">
+          <i class="fas fa-leaf"></i>
+          <h3>永續海洋理念</h3>
+          <p>愛護澎湖海洋生態，把美麗留給下一代</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════
+       行程分類 Tab 選單
+       如需新增分類，在 .tab-buttons 加 <button>，
+       並在 .tab-panels 加對應 <div data-tab="...">
+  ════════════════════════════════════════════════ -->
+  <section class="tours" id="tours">
+    <div class="container">
+      <div class="section-header">
+        <h2>精選行程</h2>
+        <p>量身打造每一趟澎湖旅程</p>
+      </div>
+
+      <!-- 行程分類 Tab -->
+      <div class="tab-buttons" role="tablist">
+        <button class="tab-btn active" data-tab="featured" role="tab">
+          <i class="fas fa-star"></i> 官方合作特色行程
+        </button>
+        <button class="tab-btn" data-tab="2d1n" role="tab">
+          <i class="fas fa-sun"></i> 兩天一夜
+        </button>
+        <button class="tab-btn" data-tab="3d2n" role="tab">
+          <i class="fas fa-umbrella-beach"></i> 三天兩夜
+        </button>
+        <button class="tab-btn" data-tab="4d3n" role="tab">
+          <i class="fas fa-ship"></i> 四天三夜
+        </button>
+      </div>
+
+      <!-- ─── Tab 內容：官方合作特色行程 ─── -->
+      <!--
+        ★ 修改行程卡片說明：
+        每張卡片對應一個 .tour-card，結構如下：
+          .tour-badge    → 標籤（如「最受歡迎」）
+          .tour-image    → 圖片（修改 src 換成你的圖片路徑）
+          .tour-title    → 行程名稱
+          .tour-desc     → 簡短介紹
+          .tour-meta     → 適合對象、天數、價格等資訊
+      -->
+      <div class="tab-panel active" data-panel="featured">
+        <div class="tours-grid">
+
+          <!-- 卡片 1：澎湖經典三日遊 -->
+          <div class="tour-card" data-aos="fade-up">
+            <div class="tour-badge popular">最受歡迎</div>
+            <div class="tour-image">
+              <img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80" alt="澎湖經典三日遊" loading="lazy" />
+              <div class="tour-overlay">
+                <span class="tour-days"><i class="fas fa-clock"></i> 3天2夜</span>
+              </div>
+            </div>
+            <div class="tour-body">
+              <h3 class="tour-title">澎湖經典三日遊</h3>
+              <p class="tour-desc">走訪北寮奎壁山、跨海大橋、七美雙心石滬，感受澎湖最具代表性的自然與人文風景。</p>
+              <div class="tour-meta">
+                <span class="meta-item"><i class="fas fa-users"></i> 親子 / 情侶 / 家庭</span>
+                <span class="meta-item"><i class="fas fa-calendar"></i> 3天2夜</span>
+                <span class="meta-item price"><i class="fas fa-tag"></i> NT$ 8,800 起 / 人</span>
+              </div>
+              <button class="btn btn-card" onclick="openModal('tour1')">
+                查看詳情 <i class="fas fa-arrow-right"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- 卡片 2：親子海島體驗行程 -->
+          <div class="tour-card" data-aos="fade-up" data-aos-delay="100">
+            <div class="tour-badge family">親子首選</div>
+            <div class="tour-image">
+              <img src="https://images.unsplash.com/photo-1519046904884-53103b34b206?w=600&q=80" alt="親子海島體驗行程" loading="lazy" />
+              <div class="tour-overlay">
+                <span class="tour-days"><i class="fas fa-clock"></i> 3天2夜</span>
+              </div>
+            </div>
+            <div class="tour-body">
+              <h3 class="tour-title">親子海島體驗行程</h3>
+              <p class="tour-desc">專為家庭設計，包含潮間帶生態導覽、DIY貝殼彩繪、淺水浮潛等，讓孩子與海洋親密接觸。</p>
+              <div class="tour-meta">
+                <span class="meta-item"><i class="fas fa-users"></i> 親子家庭 / 小孩友善</span>
+                <span class="meta-item"><i class="fas fa-calendar"></i> 3天2夜</span>
+                <span class="meta-item price"><i class="fas fa-tag"></i> NT$ 9,500 起 / 人</span>
+              </div>
+              <button class="btn btn-card" onclick="openModal('tour2')">
+                查看詳情 <i class="fas fa-arrow-right"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- 卡片 3：望安永續生態旅行 -->
+          <div class="tour-card" data-aos="fade-up" data-aos-delay="200">
+            <div class="tour-badge eco">生態特色</div>
+            <div class="tour-image">
+              <img src="https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=600&q=80" alt="望安永續生態旅行" loading="lazy" />
+              <div class="tour-overlay">
+                <span class="tour-days"><i class="fas fa-clock"></i> 4天3夜</span>
+              </div>
+            </div>
+            <div class="tour-body">
+              <h3 class="tour-title">望安永續生態旅行</h3>
+              <p class="tour-desc">前往望安島探索綠蠵龜產卵保護區、花宅聚落古厝文化，深入感受離島純樸的生命力。</p>
+              <div class="tour-meta">
+                <span class="meta-item"><i class="fas fa-users"></i> 自然愛好者 / 生態旅遊</span>
+                <span class="meta-item"><i class="fas fa-calendar"></i> 4天3夜</span>
+                <span class="meta-item price"><i class="fas fa-tag"></i> NT$ 12,800 起 / 人</span>
+              </div>
+              <button class="btn btn-card" onclick="openModal('tour3')">
+                查看詳情 <i class="fas fa-arrow-right"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- 卡片 4：SUP × 浮潛 × 海洋體驗 -->
+          <div class="tour-card" data-aos="fade-up" data-aos-delay="300">
+            <div class="tour-badge adventure">冒險首選</div>
+            <div class="tour-image">
+              <img src="https://images.unsplash.com/photo-1506953823976-52e1fdc0149a?w=600&q=80" alt="SUP 浮潛海洋體驗" loading="lazy" />
+              <div class="tour-overlay">
+                <span class="tour-days"><i class="fas fa-clock"></i> 2天1夜</span>
+              </div>
+            </div>
+            <div class="tour-body">
+              <h3 class="tour-title">SUP × 浮潛 × 海洋體驗</h3>
+              <p class="tour-desc">站上SUP立槳衝浪板，探索清澈珊瑚礁，浮潛看魚群，用最直接的方式與澎湖海洋相遇。</p>
+              <div class="tour-meta">
+                <span class="meta-item"><i class="fas fa-users"></i> 年輕族群 / 運動愛好者</span>
+                <span class="meta-item"><i class="fas fa-calendar"></i> 2天1夜</span>
+                <span class="meta-item price"><i class="fas fa-tag"></i> NT$ 5,800 起 / 人</span>
+              </div>
+              <button class="btn btn-card" onclick="openModal('tour4')">
+                查看詳情 <i class="fas fa-arrow-right"></i>
+              </button>
+            </div>
+          </div>
+
+        </div><!-- end tours-grid -->
+      </div><!-- end tab-panel featured -->
+
+      <!-- ─── Tab 內容：兩天一夜 ─── -->
+      <div class="tab-panel" data-panel="2d1n">
+        <div class="tours-grid">
+          <div class="tour-card">
+            <div class="tour-badge adventure">衝浪體驗</div>
+            <div class="tour-image">
+              <img src="https://images.unsplash.com/photo-1506953823976-52e1fdc0149a?w=600&q=80" alt="兩天一夜海洋探索" loading="lazy" />
+              <div class="tour-overlay">
+                <span class="tour-days"><i class="fas fa-clock"></i> 2天1夜</span>
+              </div>
+            </div>
+            <div class="tour-body">
+              <h3 class="tour-title">SUP × 浮潛 × 海洋體驗</h3>
+              <p class="tour-desc">最快速感受澎湖海洋魅力的方式，SUP立槳、浮潛看魚，輕鬆愉快的短假期。</p>
+              <div class="tour-meta">
+                <span class="meta-item"><i class="fas fa-users"></i> 所有年齡</span>
+                <span class="meta-item"><i class="fas fa-calendar"></i> 2天1夜</span>
+                <span class="meta-item price"><i class="fas fa-tag"></i> NT$ 5,800 起 / 人</span>
+              </div>
+              <button class="btn btn-card" onclick="openModal('tour4')">查看詳情 <i class="fas fa-arrow-right"></i></button>
+            </div>
+          </div>
+          <div class="tour-card">
+            <div class="tour-image">
+              <img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80" alt="澎湖日出快閃" loading="lazy" />
+              <div class="tour-overlay">
+                <span class="tour-days"><i class="fas fa-clock"></i> 2天1夜</span>
+              </div>
+            </div>
+            <div class="tour-body">
+              <h3 class="tour-title">澎湖日出快閃之旅</h3>
+              <p class="tour-desc">搭早班船出發，抵達澎湖後直奔秘境沙灘，看星空日出，隔日輕鬆返台。</p>
+              <div class="tour-meta">
+                <span class="meta-item"><i class="fas fa-users"></i> 情侶 / 朋友揪團</span>
+                <span class="meta-item"><i class="fas fa-calendar"></i> 2天1夜</span>
+                <span class="meta-item price"><i class="fas fa-tag"></i> NT$ 4,500 起 / 人</span>
+              </div>
+              <button class="btn btn-card" onclick="alert('詳情頁面準備中，歡迎 LINE 諮詢！')">查看詳情 <i class="fas fa-arrow-right"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── Tab 內容：三天兩夜 ─── -->
+      <div class="tab-panel" data-panel="3d2n">
+        <div class="tours-grid">
+          <div class="tour-card">
+            <div class="tour-badge popular">最受歡迎</div>
+            <div class="tour-image">
+              <img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80" alt="澎湖經典三日遊" loading="lazy" />
+              <div class="tour-overlay">
+                <span class="tour-days"><i class="fas fa-clock"></i> 3天2夜</span>
+              </div>
+            </div>
+            <div class="tour-body">
+              <h3 class="tour-title">澎湖經典三日遊</h3>
+              <p class="tour-desc">走訪奎壁山、跨海大橋、七美雙心石滬，感受澎湖最具代表性的風景。</p>
+              <div class="tour-meta">
+                <span class="meta-item"><i class="fas fa-users"></i> 親子 / 情侶 / 家庭</span>
+                <span class="meta-item"><i class="fas fa-calendar"></i> 3天2夜</span>
+                <span class="meta-item price"><i class="fas fa-tag"></i> NT$ 8,800 起 / 人</span>
+              </div>
+              <button class="btn btn-card" onclick="openModal('tour1')">查看詳情 <i class="fas fa-arrow-right"></i></button>
+            </div>
+          </div>
+          <div class="tour-card">
+            <div class="tour-badge family">親子首選</div>
+            <div class="tour-image">
+              <img src="https://images.unsplash.com/photo-1519046904884-53103b34b206?w=600&q=80" alt="親子海島體驗" loading="lazy" />
+              <div class="tour-overlay">
+                <span class="tour-days"><i class="fas fa-clock"></i> 3天2夜</span>
+              </div>
+            </div>
+            <div class="tour-body">
+              <h3 class="tour-title">親子海島體驗行程</h3>
+              <p class="tour-desc">專為家庭設計，潮間帶導覽、DIY彩繪、淺水浮潛，讓孩子與海洋親密接觸。</p>
+              <div class="tour-meta">
+                <span class="meta-item"><i class="fas fa-users"></i> 親子家庭</span>
+                <span class="meta-item"><i class="fas fa-calendar"></i> 3天2夜</span>
+                <span class="meta-item price"><i class="fas fa-tag"></i> NT$ 9,500 起 / 人</span>
+              </div>
+              <button class="btn btn-card" onclick="openModal('tour2')">查看詳情 <i class="fas fa-arrow-right"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── Tab 內容：四天三夜 ─── -->
+      <div class="tab-panel" data-panel="4d3n">
+        <div class="tours-grid">
+          <div class="tour-card">
+            <div class="tour-badge eco">生態特色</div>
+            <div class="tour-image">
+              <img src="https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=600&q=80" alt="望安永續生態旅行" loading="lazy" />
+              <div class="tour-overlay">
+                <span class="tour-days"><i class="fas fa-clock"></i> 4天3夜</span>
+              </div>
+            </div>
+            <div class="tour-body">
+              <h3 class="tour-title">望安永續生態旅行</h3>
+              <p class="tour-desc">前往望安島探索綠蠵龜保護區、花宅聚落，深入感受離島純樸的生命力。</p>
+              <div class="tour-meta">
+                <span class="meta-item"><i class="fas fa-users"></i> 自然愛好者</span>
+                <span class="meta-item"><i class="fas fa-calendar"></i> 4天3夜</span>
+                <span class="meta-item price"><i class="fas fa-tag"></i> NT$ 12,800 起 / 人</span>
+              </div>
+              <button class="btn btn-card" onclick="openModal('tour3')">查看詳情 <i class="fas fa-arrow-right"></i></button>
+            </div>
+          </div>
+          <div class="tour-card">
+            <div class="tour-image">
+              <img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80" alt="澎湖深度探索" loading="lazy" />
+              <div class="tour-overlay">
+                <span class="tour-days"><i class="fas fa-clock"></i> 4天3夜</span>
+              </div>
+            </div>
+            <div class="tour-body">
+              <h3 class="tour-title">澎湖深度探索之旅</h3>
+              <p class="tour-desc">從本島到離島，北海玄武岩、南海七美，再加入夜釣體驗，把澎湖玩透透。</p>
+              <div class="tour-meta">
+                <span class="meta-item"><i class="fas fa-users"></i> 深度旅遊愛好者</span>
+                <span class="meta-item"><i class="fas fa-calendar"></i> 4天3夜</span>
+                <span class="meta-item price"><i class="fas fa-tag"></i> NT$ 14,500 起 / 人</span>
+              </div>
+              <button class="btn btn-card" onclick="alert('詳情頁面準備中，歡迎 LINE 諮詢！')">查看詳情 <i class="fas fa-arrow-right"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end container -->
+  </section>
+
+  <!-- ═══════════════════════════════════════════════
+       關於我們
+       修改介紹文字請找 .about-text 區塊
+  ════════════════════════════════════════════════ -->
+  <section class="about" id="about">
+    <div class="container">
+      <div class="about-grid">
+        <div class="about-image">
+          <img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=700&q=80" alt="澎湖海景" />
+          <div class="about-image-badge">
+            <span class="badge-number">10+</span>
+            <span class="badge-label">年澎湖旅遊經驗</span>
+          </div>
+        </div>
+        <div class="about-text">
+          <div class="section-header left">
+            <h2>關於我們</h2>
+            <p>潮旅國際旅行社</p>
+          </div>
+          <p>潮旅國際旅行社是一家以<strong>澎湖在地深度旅遊</strong>為核心的旅行社，我們相信旅行不只是打卡，而是一段讓心靈留白的美好時光。</p>
+          <p>我們專注於<strong>親子旅行、海洋體驗與永續旅遊</strong>，每一條行程都由在地嚮導親自規劃，走進一般觀光客看不到的澎湖風情。</p>
+          <p>從浮潛、SUP、潮間帶生態到望安綠蠵龜保育，我們帶你用最深刻的方式，認識這片藍色寶島。</p>
+          <div class="about-stats">
+            <div class="stat-item">
+              <span class="stat-number">500+</span>
+              <span class="stat-label">服務旅客</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number">20+</span>
+              <span class="stat-label">精選行程</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number">98%</span>
+              <span class="stat-label">滿意度</span>
+            </div>
+          </div>
+          <!-- 證照資訊 -->
+          <div class="license-info">
+            <i class="fas fa-certificate"></i>
+            <span>交觀乙第1864號｜澎品保0188號</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════
+       聯絡我們
+       修改電話、LINE、Email 請找對應的 <a> 連結
+       表單欄位可在 <form> 中新增或修改
+  ════════════════════════════════════════════════ -->
+  <section class="contact" id="contact">
+    <div class="container">
+      <div class="section-header">
+        <h2>聯絡我們</h2>
+        <p>有任何問題或想了解更多行程，歡迎透過以下方式聯繫</p>
+      </div>
+      <div class="contact-grid">
+
+        <!-- 聯絡資訊卡 -->
+        <div class="contact-info">
+          <h3>聯絡方式</h3>
+          <!-- LINE 按鈕：修改 href 為你的 LINE OA 連結 -->
+          <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" class="contact-btn line">
+            <i class="fab fa-line"></i>
+            <div>
+              <span class="btn-label">LINE 官方諮詢</span>
+              <span class="btn-sub">@phbay2018</span>
+            </div>
+          </a>
+          <!-- 電話 -->
+          <a href="tel:06-9271288" class="contact-btn phone">
+            <i class="fas fa-phone"></i>
+            <div>
+              <span class="btn-label">電話諮詢</span>
+              <span class="btn-sub">06-9271288</span>
+            </div>
+          </a>
+          <!-- Email：修改為你的實際信箱 -->
+          <a href="mailto:phbay2018@gmail.com" class="contact-btn email">
+            <i class="fas fa-envelope"></i>
+            <div>
+              <span class="btn-label">Email 信箱</span>
+              <span class="btn-sub">phbay2018@gmail.com</span>
+            </div>
+          </a>
+          <div class="contact-hours">
+            <i class="fas fa-clock"></i>
+            <span>服務時間：週一至週日 09:00 - 18:00</span>
+          </div>
+        </div>
+
+        <!-- 諮詢表單 -->
+        <div class="contact-form-wrapper">
+          <h3>線上諮詢表單</h3>
+          <!--
+            表單說明：
+            - action 預設為 "#"（前端模擬）
+            - 若要串接後端，請將 action 改為你的 API 網址
+            - 欄位 name 屬性對應資料庫欄位，可依需求修改
+          -->
+          <form class="contact-form" id="contact-form" action="#" method="POST">
+            <div class="form-row">
+              <!-- 姓名 -->
+              <div class="form-group">
+                <label for="name"><i class="fas fa-user"></i> 姓名 <span class="required">*</span></label>
+                <input type="text" id="name" name="name" placeholder="請輸入您的姓名" required />
+              </div>
+              <!-- 電話 -->
+              <div class="form-group">
+                <label for="phone"><i class="fas fa-phone"></i> 聯絡電話 <span class="required">*</span></label>
+                <input type="tel" id="phone" name="phone" placeholder="例：0912-345-678" required />
+              </div>
+            </div>
+            <div class="form-row">
+              <!-- 想去日期 -->
+              <div class="form-group">
+                <label for="travel-date"><i class="fas fa-calendar"></i> 想去日期 <span class="required">*</span></label>
+                <input type="date" id="travel-date" name="travel_date" required />
+              </div>
+              <!-- 人數 -->
+              <div class="form-group">
+                <label for="people"><i class="fas fa-users"></i> 旅遊人數 <span class="required">*</span></label>
+                <select id="people" name="people" required>
+                  <option value="">請選擇人數</option>
+                  <option value="1-2">1 - 2 人</option>
+                  <option value="3-5">3 - 5 人</option>
+                  <option value="6-10">6 - 10 人</option>
+                  <option value="11+">11 人以上（團體）</option>
+                </select>
+              </div>
+            </div>
+            <!-- 有興趣的行程 -->
+            <div class="form-group">
+              <label for="tour-interest"><i class="fas fa-map"></i> 有興趣的行程</label>
+              <select id="tour-interest" name="tour_interest">
+                <option value="">請選擇行程（可不填）</option>
+                <option value="classic3d">澎湖經典三日遊</option>
+                <option value="family3d">親子海島體驗行程</option>
+                <option value="eco4d">望安永續生態旅行</option>
+                <option value="sup2d">SUP × 浮潛 × 海洋體驗</option>
+                <option value="other">其他（請在備註說明）</option>
+              </select>
+            </div>
+            <!-- 備註 -->
+            <div class="form-group">
+              <label for="notes"><i class="fas fa-sticky-note"></i> 備註 / 特殊需求</label>
+              <textarea id="notes" name="notes" rows="4" placeholder="例：有嬰兒車、素食需求、慶生安排等..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-submit">
+              <i class="fas fa-paper-plane"></i> 送出諮詢
+            </button>
+          </form>
+          <!-- 表單成功提示（預設隱藏） -->
+          <div class="form-success" id="form-success" style="display:none;">
+            <i class="fas fa-check-circle"></i>
+            <p>諮詢已送出！我們將於一個工作日內與您聯繫。</p>
+            <p>也可直接加 LINE：<strong>@phbay2018</strong> 獲得更快速的回覆。</p>
+          </div>
+        </div>
+
+      </div><!-- end contact-grid -->
+    </div><!-- end container -->
+  </section>
+
+  <!-- ═══════════════════════════════════════════════
+       下方固定 Banner（捲動不消失）
+       修改文字請直接修改 <span> 內容
+  ════════════════════════════════════════════════ -->
+  <div class="bottom-banner" id="bottom-banner">
+    <span>潮旅國際旅行社｜專業澎湖旅遊行程規劃</span>
+    <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" class="banner-line-btn">
+      <i class="fab fa-line"></i> 立即加入 LINE
+    </a>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <h3><i class="fas fa-water"></i> 潮旅國際旅行社</h3>
+          <p>帶你玩出不一樣的澎湖旅行</p>
+          <p class="footer-license">交觀乙第1864號｜澎品保0188號</p>
+        </div>
+        <div class="footer-links">
+          <h4>快速連結</h4>
+          <ul>
+            <li><a href="#home">首頁</a></li>
+            <li><a href="#tours">行程介紹</a></li>
+            <li><a href="#about">關於我們</a></li>
+            <li><a href="#contact">聯絡我們</a></li>
+          </ul>
+        </div>
+        <div class="footer-contact">
+          <h4>聯絡資訊</h4>
+          <p><i class="fas fa-phone"></i> 06-9271288</p>
+          <p><i class="fab fa-line"></i> @phbay2018</p>
+          <p><i class="fas fa-user"></i> 負責人：唐瑋汝</p>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>© 2025 潮旅國際旅行社 All Rights Reserved.</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ═══════════════════════════════════════════════
+       行程詳情 Modal（彈出視窗）
+       如需修改各行程詳情，請找對應的 data-modal="tourN"
+  ════════════════════════════════════════════════ -->
+  <!-- Modal 背景遮罩 -->
+  <div class="modal-overlay" id="modal-overlay" onclick="closeModal()"></div>
+
+  <!-- Modal：行程 1 澎湖經典三日遊 -->
+  <div class="modal" id="modal-tour1">
+    <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+    <div class="modal-header">
+      <h2>澎湖經典三日遊</h2>
+      <span class="modal-tag">3天2夜｜NT$ 8,800 起</span>
+    </div>
+    <div class="modal-body">
+      <h4>行程亮點</h4>
+      <ul>
+        <li>Day 1：馬公市區散策、天后宮、觀音亭夕陽</li>
+        <li>Day 2：奎壁山摩西分海、跨海大橋、吉貝島浮潛</li>
+        <li>Day 3：七美雙心石滬、南海秘境，返回馬公</li>
+      </ul>
+      <h4>費用包含</h4>
+      <p>住宿2晚（雙人房）、每日早餐、景點門票、專業導遊、接送服務</p>
+      <h4>注意事項</h4>
+      <p>機票/船票需自行購買，行程依天候調整，導遊保有微調權利</p>
+      <a href="#contact" class="btn btn-primary" onclick="closeModal()">
+        <i class="fas fa-comment-dots"></i> 我要諮詢這個行程
+      </a>
+    </div>
+  </div>
+
+  <!-- Modal：行程 2 親子海島體驗 -->
+  <div class="modal" id="modal-tour2">
+    <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+    <div class="modal-header">
+      <h2>親子海島體驗行程</h2>
+      <span class="modal-tag">3天2夜｜NT$ 9,500 起</span>
+    </div>
+    <div class="modal-body">
+      <h4>行程亮點</h4>
+      <ul>
+        <li>Day 1：潮間帶生態導覽、夜間螢火蟲生態觀察</li>
+        <li>Day 2：淺水浮潛體驗、DIY貝殼彩繪工作坊</li>
+        <li>Day 3：海灘淨灘活動、海洋小故事講座</li>
+      </ul>
+      <h4>費用包含</h4>
+      <p>住宿2晚（家庭房）、每日早餐、專業兒童安全裝備、親子導遊</p>
+      <h4>適合對象</h4>
+      <p>建議小孩年齡 4歲以上，均有專業救生員隨行保護</p>
+      <a href="#contact" class="btn btn-primary" onclick="closeModal()">
+        <i class="fas fa-comment-dots"></i> 我要諮詢這個行程
+      </a>
+    </div>
+  </div>
+
+  <!-- Modal：行程 3 望安永續生態旅行 -->
+  <div class="modal" id="modal-tour3">
+    <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+    <div class="modal-header">
+      <h2>望安永續生態旅行</h2>
+      <span class="modal-tag">4天3夜｜NT$ 12,800 起</span>
+    </div>
+    <div class="modal-body">
+      <h4>行程亮點</h4>
+      <ul>
+        <li>Day 1：澎湖本島精華景點</li>
+        <li>Day 2：搭船前往望安島，花宅聚落古厝文化導覽</li>
+        <li>Day 3：綠蠵龜產卵保護區解說、手工藝工坊體驗</li>
+        <li>Day 4：返回馬公，自由活動後搭船/飛機離島</li>
+      </ul>
+      <h4>費用包含</h4>
+      <p>住宿3晚、每日早餐、望安船票、專業生態導遊、保育捐款</p>
+      <h4>永續理念</h4>
+      <p>此行程每位旅客均捐出部分費用支持望安綠蠵龜保育計畫</p>
+      <a href="#contact" class="btn btn-primary" onclick="closeModal()">
+        <i class="fas fa-comment-dots"></i> 我要諮詢這個行程
+      </a>
+    </div>
+  </div>
+
+  <!-- Modal：行程 4 SUP 浮潛海洋體驗 -->
+  <div class="modal" id="modal-tour4">
+    <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+    <div class="modal-header">
+      <h2>SUP × 浮潛 × 海洋體驗</h2>
+      <span class="modal-tag">2天1夜｜NT$ 5,800 起</span>
+    </div>
+    <div class="modal-body">
+      <h4>行程亮點</h4>
+      <ul>
+        <li>Day 1：SUP立槳衝浪板體驗（含教練指導）、夕陽海灘BBQ</li>
+        <li>Day 2：珊瑚礁浮潛、水上摩托車體驗、返程</li>
+      </ul>
+      <h4>費用包含</h4>
+      <p>住宿1晚、早餐、SUP裝備租借、浮潛裝備、救生衣、專業教練</p>
+      <h4>注意事項</h4>
+      <p>建議具備基本游泳能力，不會游泳者需穿著救生衣全程配合</p>
+      <a href="#contact" class="btn btn-primary" onclick="closeModal()">
+        <i class="fas fa-comment-dots"></i> 我要諮詢這個行程
+      </a>
+    </div>
+  </div>
+
+  <!-- 回到頂部按鈕 -->
+  <button class="back-to-top" id="back-to-top" onclick="scrollToTop()" aria-label="回到頂部">
+    <i class="fas fa-chevron-up"></i>
+  </button>
+
+  <script src="script.js"></script>
+</body>
+</html>
