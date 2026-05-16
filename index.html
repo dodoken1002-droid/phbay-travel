@@ -138,6 +138,42 @@
       <div class="tab-panel active" data-panel="featured">
         <div class="tours-grid">
 
+          <!-- ★ 卡片 0：2026 跟著海龜漫旅（主打行程）
+               修改此卡片請更新以下欄位：
+               - .tour-title     行程名稱
+               - .tour-desc      簡介
+               - .meta-item      適合對象、天數、價格
+               - onclick         對應的 Modal ID（tour5）
+          -->
+          <div class="tour-card tour-card--hero" data-aos="fade-up">
+            <div class="tour-badge badge-2026">2026 主打</div>
+            <div class="tour-image">
+              <img src="https://images.unsplash.com/photo-1583212292454-1fe6229603b7?w=600&q=80" alt="2026跟著海龜漫旅" loading="lazy" />
+              <div class="tour-overlay">
+                <span class="tour-days"><i class="fas fa-clock"></i> 4天3夜</span>
+              </div>
+            </div>
+            <div class="tour-body">
+              <div class="tour-year-badge">2026</div>
+              <h3 class="tour-title">🐢 跟著海龜漫旅</h3>
+              <p class="tour-desc">今年夏天，把自己交給海。4天3夜望安深度 × 海島體驗 × 永續旅遊，兩人成行說走就走！</p>
+              <!-- 多出發地價格 -->
+              <div class="tour-prices">
+                <div class="price-row"><span class="price-from">✈ 松山</span><span class="price-val">NT$ 9,999起</span></div>
+                <div class="price-row"><span class="price-from">✈ 台中</span><span class="price-val">NT$ 8,999起</span></div>
+                <div class="price-row"><span class="price-from">✈ 高雄</span><span class="price-val">NT$ 7,999起</span></div>
+                <div class="price-row"><span class="price-from">🚢 嘉義船</span><span class="price-val">NT$ 6,999起</span></div>
+              </div>
+              <div class="tour-meta">
+                <span class="meta-item"><i class="fas fa-users"></i> 兩人成行 / 親子 / 情侶</span>
+                <span class="meta-item"><i class="fas fa-calendar"></i> 4天3夜</span>
+              </div>
+              <button class="btn btn-card btn-card--hero" onclick="openModal('tour5')">
+                查看詳情 <i class="fas fa-arrow-right"></i>
+              </button>
+            </div>
+          </div>
+
           <!-- 卡片 1：澎湖經典三日遊 -->
           <div class="tour-card" data-aos="fade-up">
             <div class="tour-badge popular">最受歡迎</div>
@@ -323,6 +359,31 @@
       <!-- ─── Tab 內容：四天三夜 ─── -->
       <div class="tab-panel" data-panel="4d3n">
         <div class="tours-grid">
+          <!-- 2026 跟著海龜漫旅（同步顯示） -->
+          <div class="tour-card tour-card--hero">
+            <div class="tour-badge badge-2026">2026 主打</div>
+            <div class="tour-image">
+              <img src="https://images.unsplash.com/photo-1583212292454-1fe6229603b7?w=600&q=80" alt="2026跟著海龜漫旅" loading="lazy" />
+              <div class="tour-overlay">
+                <span class="tour-days"><i class="fas fa-clock"></i> 4天3夜</span>
+              </div>
+            </div>
+            <div class="tour-body">
+              <h3 class="tour-title">🐢 跟著海龜漫旅</h3>
+              <p class="tour-desc">今年夏天，把自己交給海。4天3夜望安深度 × 海島體驗 × 永續旅遊，兩人成行說走就走！</p>
+              <div class="tour-prices">
+                <div class="price-row"><span class="price-from">✈ 松山</span><span class="price-val">NT$ 9,999起</span></div>
+                <div class="price-row"><span class="price-from">✈ 台中</span><span class="price-val">NT$ 8,999起</span></div>
+                <div class="price-row"><span class="price-from">✈ 高雄</span><span class="price-val">NT$ 7,999起</span></div>
+                <div class="price-row"><span class="price-from">🚢 嘉義船</span><span class="price-val">NT$ 6,999起</span></div>
+              </div>
+              <div class="tour-meta">
+                <span class="meta-item"><i class="fas fa-users"></i> 兩人成行 / 親子 / 情侶</span>
+                <span class="meta-item"><i class="fas fa-calendar"></i> 4天3夜</span>
+              </div>
+              <button class="btn btn-card btn-card--hero" onclick="openModal('tour5')">查看詳情 <i class="fas fa-arrow-right"></i></button>
+            </div>
+          </div>
           <div class="tour-card">
             <div class="tour-badge eco">生態特色</div>
             <div class="tour-image">
@@ -672,6 +733,114 @@
       <p>建議具備基本游泳能力，不會游泳者需穿著救生衣全程配合</p>
       <a href="#contact" class="btn btn-primary" onclick="closeModal()">
         <i class="fas fa-comment-dots"></i> 我要諮詢這個行程
+      </a>
+    </div>
+  </div>
+
+  <!-- Modal：行程 5 — 2026 跟著海龜漫旅
+       修改此 Modal 請找對應的 Day 區塊與價格表格
+  -->
+  <div class="modal modal--turtle" id="modal-tour5">
+    <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+    <div class="modal-header modal-header--turtle">
+      <div class="modal-header-content">
+        <span class="modal-year">2026</span>
+        <h2>🐢 跟著海龜漫旅</h2>
+        <p class="modal-subtitle">今年夏天，把自己交給海。</p>
+        <span class="modal-tag">4天3夜 × 望安深度 × 海島體驗 × 永續旅遊</span>
+      </div>
+    </div>
+    <div class="modal-body">
+
+      <!-- 出發地價格表 -->
+      <h4><i class="fas fa-tag"></i> 出發地 × 價格（2人成行｜晚鳥優惠）</h4>
+      <table class="price-table">
+        <tr><td>✈ 松山出發</td><td class="price-highlight">NT$ 9,999 起 / 人</td></tr>
+        <tr><td>✈ 台中出發</td><td class="price-highlight">NT$ 8,999 起 / 人</td></tr>
+        <tr><td>✈ 高雄出發</td><td class="price-highlight">NT$ 7,999 起 / 人</td></tr>
+        <tr><td>🚢 嘉義搭船</td><td class="price-highlight">NT$ 6,999 起 / 人</td></tr>
+      </table>
+
+      <!-- 出發日期 -->
+      <h4><i class="fas fa-calendar-alt"></i> 出發日期</h4>
+      <div class="date-chips">
+        <span class="date-chip">6/12（五）－ 6/15（一）</span>
+        <span class="date-chip">6/26（五）－ 6/29（一）</span>
+        <span class="date-chip">7/10（五）－ 7/13（一）</span>
+        <span class="date-chip">7/24（五）－ 7/27（一）</span>
+      </div>
+
+      <!-- 行程亮點 -->
+      <h4><i class="fas fa-star"></i> 行程亮點</h4>
+      <ul>
+        <li>🐢 走進海龜的家，綠蠵龜保育中心導覽</li>
+        <li>🤿 浮潛 × 珊瑚礁生態探索</li>
+        <li>🏡 望安花宅深度走讀 × 黑糖糕 DIY</li>
+        <li>🌙 夜間照海（依潮汐調整，備案：天台山觀星）</li>
+        <li>🍽 在地風味 × 山海味餐食體驗</li>
+      </ul>
+
+      <!-- Day by Day -->
+      <h4><i class="fas fa-map-signs"></i> 行程規劃</h4>
+      <div class="day-blocks">
+        <div class="day-block">
+          <div class="day-label">DAY 1</div>
+          <div class="day-content">
+            <strong>抵達澎湖 × 海島開場</strong>
+            <ul>
+              <li>抵達澎湖</li>
+              <li>市區觀光（觀音亭 / 海邊景點）</li>
+              <li>自由活動 × 晚餐自理</li>
+            </ul>
+          </div>
+        </div>
+        <div class="day-block">
+          <div class="day-label">DAY 2</div>
+          <div class="day-content">
+            <strong>望安深度探索</strong>
+            <ul>
+              <li>搭船前往望安</li>
+              <li>綠蠵龜保育中心導覽</li>
+              <li>山海味午餐</li>
+              <li>珊瑚礁介紹 × 浮潛體驗</li>
+              <li>在地風味晚餐</li>
+              <li>夜間照海（依潮汐調整，如無法前往則改天台山觀星或其他方案）</li>
+            </ul>
+          </div>
+        </div>
+        <div class="day-block">
+          <div class="day-label">DAY 3</div>
+          <div class="day-content">
+            <strong>慢島生活體驗</strong>
+            <ul>
+              <li>晨間海島漫遊（早餐自理）</li>
+              <li>花宅走讀 × 黑糖糕 DIY</li>
+              <li>午餐（自理）</li>
+              <li>小禮遇</li>
+              <li>返回澎湖本島</li>
+            </ul>
+          </div>
+        </div>
+        <div class="day-block">
+          <div class="day-label">DAY 4</div>
+          <div class="day-content">
+            <strong>經典澎湖一次收</strong>
+            <ul>
+              <li>澎湖跨海大橋</li>
+              <li>經典景點巡禮</li>
+              <li>返程</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-notice">
+        <i class="fas fa-exclamation-circle"></i>
+        <span>名額有限，熱門行程盡早預定！兩人成行即可出發，好友、親子、情侶說走就走。</span>
+      </div>
+
+      <a href="#contact" class="btn btn-primary" onclick="closeModal()">
+        <i class="fas fa-comment-dots"></i> 立即諮詢這個行程
       </a>
     </div>
   </div>

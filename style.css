@@ -725,6 +725,155 @@ ul { list-style: none; }
 .form-success p { margin-bottom: 8px; }
 
 /* ═══════════════════════════════════════════════
+   2026 跟著海龜漫旅 — 特殊卡片樣式
+════════════════════════════════════════════════ */
+
+/* 2026 角標 */
+.tour-badge.badge-2026 {
+  background: linear-gradient(135deg, #e85c3a, #c0392b);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  box-shadow: 0 2px 8px rgba(232,92,58,0.4);
+}
+
+/* 主打卡片外框強調 */
+.tour-card--hero {
+  border: 2px solid transparent;
+  background: linear-gradient(var(--white), var(--white)) padding-box,
+              linear-gradient(135deg, #e85c3a, var(--blue-main)) border-box;
+}
+
+/* 年份小標 */
+.tour-year-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 900;
+  color: #e85c3a;
+  letter-spacing: 0.12em;
+  margin-bottom: 4px;
+}
+
+/* 出發地價格列表 */
+.tour-prices {
+  background: var(--blue-pale);
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.price-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.84rem;
+}
+.price-from { color: var(--text-mid); }
+.price-val  { font-weight: 700; color: #e85c3a; }
+
+/* 主打卡片按鈕 */
+.btn-card--hero {
+  background: linear-gradient(135deg, #e85c3a, #c0392b) !important;
+  color: var(--white) !important;
+  border-color: transparent !important;
+}
+.btn-card--hero:hover {
+  opacity: 0.9;
+  transform: translateY(-2px);
+}
+
+/* ── Modal：海龜漫旅特殊 header ── */
+.modal-header--turtle {
+  background: linear-gradient(135deg, #0d4f7c, #1a6b9e, #2ea86e);
+}
+.modal-year {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  background: rgba(255,255,255,0.2);
+  padding: 3px 10px;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  color: rgba(255,255,255,0.95);
+}
+.modal-subtitle {
+  font-size: 1rem;
+  opacity: 0.9;
+  margin: 4px 0 8px;
+}
+
+/* 價格表格 */
+.price-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 4px;
+  font-size: 0.92rem;
+}
+.price-table tr { border-bottom: 1px solid var(--sand-dark); }
+.price-table td { padding: 8px 12px; }
+.price-table tr:last-child { border-bottom: none; }
+.price-highlight { font-weight: 700; color: #e85c3a; text-align: right; }
+
+/* 出發日期 chips */
+.date-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.date-chip {
+  background: var(--blue-pale);
+  color: var(--blue-dark);
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 1px solid var(--blue-light);
+}
+
+/* Day by Day 區塊 */
+.day-blocks { display: flex; flex-direction: column; gap: 12px; margin-bottom: 4px; }
+.day-block {
+  display: flex;
+  gap: 14px;
+  background: var(--sand);
+  border-radius: 10px;
+  padding: 14px;
+  align-items: flex-start;
+}
+.day-label {
+  background: var(--blue-main);
+  color: var(--white);
+  font-weight: 900;
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: 0.04em;
+}
+.day-content { flex: 1; font-size: 0.88rem; color: var(--text-mid); }
+.day-content strong { color: var(--blue-dark); display: block; margin-bottom: 6px; }
+.day-content ul { padding-left: 16px; }
+.day-content li { list-style: disc; margin-bottom: 3px; }
+
+/* 注意事項框 */
+.modal-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #fff8e1;
+  border-left: 4px solid #f6c90e;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 16px 0;
+  font-size: 0.88rem;
+  color: #7d6608;
+}
+.modal-notice i { flex-shrink: 0; margin-top: 2px; color: #f6c90e; }
+
+/* ═══════════════════════════════════════════════
    下方固定 Banner
 ════════════════════════════════════════════════ */
 .bottom-banner {
