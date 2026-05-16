@@ -13,6 +13,9 @@ DELETE /api/admin/tours/<id>→ 刪除行程
 
 import os
 import json
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from flask import Flask, send_from_directory, request, jsonify
 import psycopg2
 import psycopg2.extras
@@ -487,6 +490,41 @@ def admin_delete_tour(tour_id):
         return jsonify(ok=False, error=str(e)), 500
 
 
+# ─── 寄送諮詢通知信 ────────────────────────────────────────
+def send_contact_email(data):
+    sender    = os.environ.get('EMAIL_USER', '')
+    password  = os.environ.get('EMAIL_PASS', '')
+    recipient = 'dodoken1002@phbay.net'
+    if not sender or not password:
+        print('[EMAIL] 未設定 EMAIL_USER / EMAIL_PASS，跳過寄信')
+        return
+
+    body = f"""潮旅國際旅行社 — 新諮詢通知
+
+姓名：{data.get('name', '')}
+電話：{data.get('phone', '')}
+旅遊日期：{data.get('travel_date', '')}
+人數：{data.get('people', '')} 人
+感興趣行程：{data.get('tour_interest', '（未填）')}
+備註：{data.get('notes', '（未填）')}
+
+請盡快與客戶聯繫。
+"""
+    msg = MIMEMultipart()
+    msg['From']    = f'潮旅國際旅行社 <{sender}>'
+    msg['To']      = recipient
+    msg['Subject'] = f'【新諮詢】{data.get("name", "")} — {data.get("travel_date", "")}'
+    msg.attach(MIMEText(body, 'plain', 'utf-8'))
+
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=10) as server:
+            server.login(sender, password)
+            server.sendmail(sender, recipient, msg.as_string())
+        print(f'[EMAIL] 通知信已寄出至 {recipient}')
+    except Exception as e:
+        print(f'[EMAIL] 寄信失敗（不影響表單儲存）：{e}')
+
+
 # ─── 諮詢表單 ──────────────────────────────────────────────
 @app.route('/api/contact', methods=['POST'])
 def submit_contact():
@@ -505,6 +543,7 @@ def submit_contact():
               data.get('tour_interest',''), data.get('notes','')))
         row = cur.fetchone()
         conn.commit(); cur.close(); conn.close()
+        send_contact_email(data)   # 寄通知信（失敗不影響回傳）
         return jsonify(ok=True, id=row['id'], created_at=str(row['created_at']))
     except Exception as e:
         return jsonify(ok=False, error='伺服器錯誤，請稍後再試'), 500
