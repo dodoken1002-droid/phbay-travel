@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>潮旅國際旅行社 — 管理後台</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+<style>
+/* ── 全域 ── */
+:root {
+  --blue:#1a6b9e; --blue-dk:#0d4f7c; --sand:#f5ede0;
+  --white:#fff; --mid:#4a5568; --light:#f7fafc;
+  --red:#e53e3e; --green:#38a169; --orange:#dd6b20;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif;
+     background:#f0f4f8;color:#2d3748;font-size:14px}
+a{text-decoration:none;color:inherit}
+/* ── 上方 Header ── */
+.admin-header{
+  background:linear-gradient(90deg,var(--blue-dk),var(--blue));
+  color:#fff;padding:0 24px;height:56px;display:flex;align-items:center;
+  justify-content:space-between;position:sticky;top:0;z-index:100;
+  box-shadow:0 2px 8px rgba(0,0,0,.2)
+}
+.admin-header h1{font-size:1.05rem;font-weight:800;display:flex;gap:8px;align-items:center}
+.header-actions{display:flex;gap:8px;align-items:center}
+.header-tag{font-size:.75rem;opacity:.7;background:rgba(255,255,255,.15);
+  padding:2px 10px;border-radius:20px}
+/* ── Tab 導覽 ── */
+.tab-nav{background:#fff;border-bottom:2px solid #e2e8f0;
+  display:flex;padding:0 24px;gap:4px}
+.tab-nav button{padding:12px 20px;border:none;background:none;cursor:pointer;
+  font-weight:600;color:var(--mid);border-bottom:3px solid transparent;
+  margin-bottom:-2px;transition:.2s}
+.tab-nav button.active{color:var(--blue);border-bottom-color:var(--blue)}
+/* ── 主內容 ── */
+.admin-body{max-width:1200px;margin:0 auto;padding:24px}
+.tab-content{display:none}.tab-content.active{display:block}
+/* ── 工具列 ── */
+.toolbar{display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:16px;flex-wrap:wrap;gap:8px}
+.toolbar h2{font-size:1.1rem;font-weight:700;color:var(--blue-dk)}
+.toolbar-right{display:flex;gap:8px;align-items:center}
+/* ── 按鈕 ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;
+  border-radius:8px;font-size:.88rem;font-weight:600;cursor:pointer;
+  border:none;transition:.2s}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-primary:hover{background:var(--blue-dk)}
+.btn-danger{background:var(--red);color:#fff}
+.btn-danger:hover{opacity:.85}
+.btn-warning{background:var(--orange);color:#fff}
+.btn-warning:hover{opacity:.85}
+.btn-success{background:var(--green);color:#fff}
+.btn-success:hover{opacity:.85}
+.btn-ghost{background:#e2e8f0;color:var(--mid)}
+.btn-ghost:hover{background:#cbd5e0}
+.btn-sm{padding:5px 10px;font-size:.78rem}
+/* ── 行程列表 Table ── */
+.tour-table{width:100%;border-collapse:collapse;background:#fff;
+  border-radius:12px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.08)}
+.tour-table th{background:var(--blue-dk);color:#fff;padding:10px 14px;
+  text-align:left;font-size:.82rem;font-weight:700}
+.tour-table td{padding:10px 14px;border-bottom:1px solid #edf2f7;
+  vertical-align:middle}
+.tour-table tr:last-child td{border-bottom:none}
+.tour-table tr:hover td{background:#f7fafc}
+.badge{display:inline-block;padding:2px 10px;border-radius:20px;
+  font-size:.72rem;font-weight:700}
+.badge-active{background:#c6f6d5;color:#276749}
+.badge-inactive{background:#fed7d7;color:#9b2c2c}
+.tab-chip{display:inline-block;background:#ebf8ff;color:#2b6cb0;
+  border-radius:12px;padding:2px 8px;font-size:.72rem;margin:2px}
+.drag-handle{cursor:grab;color:#cbd5e0;padding:0 4px}
+/* ── 卡片 (諮詢列表) ── */
+.contact-card{background:#fff;border-radius:10px;padding:16px;
+  box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:12px;
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px}
+.contact-field label{font-size:.72rem;color:var(--mid);display:block;margin-bottom:2px}
+.contact-field span{font-weight:600;font-size:.88rem}
+/* ── Modal 彈窗 ── */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);
+  z-index:200;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal-box{background:#fff;border-radius:16px;width:min(780px,96vw);
+  max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.modal-head{background:linear-gradient(135deg,var(--blue-dk),var(--blue));
+  color:#fff;padding:20px 24px;border-radius:16px 16px 0 0;
+  display:flex;justify-content:space-between;align-items:center}
+.modal-head h3{font-size:1.1rem}
+.modal-body-inner{padding:24px}
+/* ── 表單 ── */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group.full{grid-column:1/-1}
+.form-group label{font-size:.82rem;font-weight:700;color:var(--blue-dk)}
+.form-group input,.form-group select,.form-group textarea{
+  padding:9px 12px;border:2px solid #e2e8f0;border-radius:8px;
+  font-size:.9rem;font-family:inherit;outline:none;transition:.2s}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{
+  border-color:var(--blue)}
+.form-group textarea{min-height:80px;resize:vertical}
+.form-section{margin:16px 0 8px;font-size:.85rem;font-weight:800;
+  color:var(--blue-dk);border-bottom:2px solid #e2e8f0;padding-bottom:4px}
+/* ── Tab 勾選 ── */
+.checkbox-group{display:flex;gap:12px;flex-wrap:wrap}
+.checkbox-label{display:flex;align-items:center;gap:6px;cursor:pointer;
+  font-size:.88rem;font-weight:600}
+.checkbox-label input{width:16px;height:16px;cursor:pointer}
+/* ── Prices 多行 ── */
+.price-rows{display:flex;flex-direction:column;gap:6px}
+.price-row-input{display:flex;gap:6px;align-items:center}
+.price-row-input input{flex:1}
+.price-row-input button{flex-shrink:0}
+/* ── 圖片預覽 ── */
+.img-preview{width:100%;height:140px;object-fit:cover;border-radius:8px;
+  border:2px solid #e2e8f0;margin-top:6px;display:none}
+/* ── 通知 Toast ── */
+.toast{position:fixed;bottom:24px;right:24px;background:#2d3748;color:#fff;
+  padding:12px 20px;border-radius:10px;font-size:.9rem;z-index:999;
+  opacity:0;transform:translateY(10px);transition:.3s;pointer-events:none}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.success{background:var(--green)}
+.toast.error{background:var(--red)}
+/* ── 登入畫面 ── */
+.login-screen{display:flex;min-height:100vh;align-items:center;
+  justify-content:center;background:linear-gradient(135deg,#0d4f7c,#1a6b9e)}
+.login-box{background:#fff;border-radius:20px;padding:40px;
+  width:min(400px,92vw);box-shadow:0 20px 60px rgba(0,0,0,.3);text-align:center}
+.login-box h2{font-size:1.4rem;font-weight:800;color:var(--blue-dk);margin-bottom:6px}
+.login-box p{color:var(--mid);margin-bottom:24px;font-size:.9rem}
+.login-input{width:100%;padding:12px 16px;border:2px solid #e2e8f0;
+  border-radius:10px;font-size:1rem;margin-bottom:12px;outline:none}
+.login-input:focus{border-color:var(--blue)}
+/* ── 統計卡 ── */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:16px;margin-bottom:24px}
+.stat-card{background:#fff;border-radius:12px;padding:20px;
+  box-shadow:0 1px 6px rgba(0,0,0,.08);text-align:center}
+.stat-card .num{font-size:2rem;font-weight:900;color:var(--blue)}
+.stat-card .lbl{font-size:.82rem;color:var(--mid);margin-top:4px}
+/* ── 搜尋框 ── */
+.search-input{padding:8px 14px;border:2px solid #e2e8f0;border-radius:8px;
+  font-size:.88rem;width:200px;outline:none}
+.search-input:focus{border-color:var(--blue)}
+@media(max-width:640px){
+  .form-grid{grid-template-columns:1fr}
+  .admin-header h1 span{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════
+     登入畫面
+══════════════════════════════════ -->
+<div class="login-screen" id="login-screen">
+  <div class="login-box">
+    <div style="font-size:2.5rem;margin-bottom:12px">🌊</div>
+    <h2>潮旅國際旅行社</h2>
+    <p>管理後台 — 請輸入管理員密鑰</p>
+    <input class="login-input" type="password" id="login-key" placeholder="輸入 ADMIN_KEY" />
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px"
+      onclick="doLogin()"><i class="fas fa-sign-in-alt"></i> 登入</button>
+    <p id="login-err" style="color:#e53e3e;font-size:.82rem;margin-top:8px;display:none">
+      密鑰錯誤，請重試</p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     管理介面（登入後顯示）
+══════════════════════════════════ -->
+<div id="admin-app" style="display:none">
+  <header class="admin-header">
+    <h1><i class="fas fa-water"></i> <span>潮旅國際旅行社</span> 管理後台</h1>
+    <div class="header-actions">
+      <a href="/" target="_blank" class="btn btn-ghost btn-sm">
+        <i class="fas fa-external-link-alt"></i> 前往網站
+      </a>
+      <button class="btn btn-ghost btn-sm" onclick="doLogout()">
+        <i class="fas fa-sign-out-alt"></i> 登出
+      </button>
+    </div>
+  </header>
+
+  <nav class="tab-nav">
+    <button class="active" onclick="switchTab('tours',this)">
+      <i class="fas fa-map-marked-alt"></i> 行程管理
+    </button>
+    <button onclick="switchTab('contacts',this)">
+      <i class="fas fa-envelope"></i> 諮詢紀錄
+    </button>
+  </nav>
+
+  <div class="admin-body">
+
+    <!-- ── 行程管理 ── -->
+    <div class="tab-content active" id="tab-tours">
+      <div class="toolbar">
+        <h2>行程列表</h2>
+        <div class="toolbar-right">
+          <input class="search-input" type="text" id="tour-search"
+            placeholder="🔍 搜尋行程名稱" oninput="filterTours()" />
+          <button class="btn btn-primary" onclick="openTourForm()">
+            <i class="fas fa-plus"></i> 新增行程
+          </button>
+        </div>
+      </div>
+
+      <div id="tour-stats" class="stats-row"></div>
+
+      <table class="tour-table" id="tour-table">
+        <thead>
+          <tr>
+            <th style="width:40px">#</th>
+            <th>行程名稱</th>
+            <th>顯示分類</th>
+            <th>天數</th>
+            <th>價格</th>
+            <th>狀態</th>
+            <th style="width:120px">操作</th>
+          </tr>
+        </thead>
+        <tbody id="tour-tbody">
+          <tr><td colspan="7" style="text-align:center;padding:30px;color:#a0aec0">
+            載入中…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── 諮詢紀錄 ── -->
+    <div class="tab-content" id="tab-contacts">
+      <div class="toolbar">
+        <h2>諮詢紀錄</h2>
+        <button class="btn btn-primary" onclick="loadContacts()">
+          <i class="fas fa-sync"></i> 重新整理
+        </button>
+      </div>
+      <div id="contacts-list">載入中…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     行程新增 / 編輯 Modal
+══════════════════════════════════ -->
+<div class="modal-bg" id="tour-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="modal-title">新增行程</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeTourModal()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="modal-body-inner">
+      <input type="hidden" id="f-id" />
+
+      <!-- 基本資訊 -->
+      <div class="form-section">基本資訊</div>
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>行程名稱 *</label>
+          <input type="text" id="f-title" placeholder="例：澎湖經典三日遊" />
+        </div>
+        <div class="form-group full">
+          <label>簡介說明</label>
+          <textarea id="f-desc" placeholder="一到兩句描述這個行程的特色"></textarea>
+        </div>
+        <div class="form-group full">
+          <label>封面圖片 URL</label>
+          <input type="url" id="f-image" placeholder="https://..." oninput="previewImg()" />
+          <img id="img-preview" class="img-preview" alt="預覽" />
+        </div>
+      </div>
+
+      <!-- 分類設定 -->
+      <div class="form-section">顯示分類（可多選）</div>
+      <div class="checkbox-group" id="f-tabs-group">
+        <label class="checkbox-label"><input type="checkbox" value="featured" /> ⭐ 官方合作特色行程</label>
+        <label class="checkbox-label"><input type="checkbox" value="2d1n" /> ☀ 兩天一夜</label>
+        <label class="checkbox-label"><input type="checkbox" value="3d2n" /> 🏖 三天兩夜</label>
+        <label class="checkbox-label"><input type="checkbox" value="4d3n" /> 🚢 四天三夜</label>
+      </div>
+
+      <!-- 標籤與天數 -->
+      <div class="form-section">卡片標籤與規格</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>角標文字</label>
+          <input type="text" id="f-badge-text" placeholder="例：最受歡迎" />
+        </div>
+        <div class="form-group">
+          <label>角標樣式</label>
+          <select id="f-badge-class">
+            <option value="">（無角標）</option>
+            <option value="popular">🔴 最受歡迎</option>
+            <option value="family">🟠 親子首選</option>
+            <option value="eco">🟢 生態特色</option>
+            <option value="adventure">🟣 冒險首選</option>
+            <option value="badge-2026">🔥 2026 主打</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>適合對象</label>
+          <input type="text" id="f-suitable" placeholder="例：親子 / 情侶 / 家庭" />
+        </div>
+        <div class="form-group">
+          <label>天數</label>
+          <input type="text" id="f-duration" placeholder="例：3天2夜" />
+        </div>
+        <div class="form-group">
+          <label>價格顯示（一般行程）</label>
+          <input type="text" id="f-price" placeholder="例：NT$ 8,800 起 / 人" />
+        </div>
+        <div class="form-group">
+          <label>排列順序（數字小=前面）</label>
+          <input type="number" id="f-sort" value="99" />
+        </div>
+        <div class="form-group">
+          <label>是否啟用</label>
+          <select id="f-active">
+            <option value="true">✅ 啟用（顯示在網站）</option>
+            <option value="false">❌ 停用（隱藏）</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>主打卡片樣式（多出發地）</label>
+          <select id="f-hero">
+            <option value="false">一般卡片</option>
+            <option value="true">主打卡片（顯示多出發地價格）</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 多出發地價格（主打行程用） -->
+      <div class="form-section">多出發地價格（主打行程）</div>
+      <div id="prices-container" class="price-rows"></div>
+      <button class="btn btn-ghost btn-sm" onclick="addPriceRow()" style="margin-top:6px">
+        <i class="fas fa-plus"></i> 加一筆出發地
+      </button>
+
+      <!-- Modal 詳細內容 -->
+      <div class="form-section">查看詳情 Modal 內容</div>
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>行程亮點（每行一條）</label>
+          <textarea id="f-highlights" rows="5"
+            placeholder="🐢 走進海龜的家&#10;🤿 浮潛 × 珊瑚礁&#10;🏡 花宅深度走讀"></textarea>
+        </div>
+        <div class="form-group full">
+          <label>出發日期（每行一個梯次，空白則不顯示）</label>
+          <textarea id="f-dates" rows="4"
+            placeholder="6/12（五）－ 6/15（一）&#10;6/26（五）－ 6/29（一）"></textarea>
+        </div>
+        <div class="form-group full">
+          <label>費用包含</label>
+          <textarea id="f-includes" rows="2"
+            placeholder="住宿2晚、每日早餐、景點門票、專業導遊…"></textarea>
+        </div>
+        <div class="form-group full">
+          <label>注意事項</label>
+          <textarea id="f-notes" rows="2"
+            placeholder="機票/船票需自行購買，行程依天候調整…"></textarea>
+        </div>
+        <div class="form-group full">
+          <label>行程規劃（Day 1~N，每天格式：<br>
+            <code>DAY 1|抵達澎湖 × 海島開場|抵達澎湖;市區觀光;晚餐自理</code>
+            ，每天一行）</label>
+          <textarea id="f-days" rows="6"
+            placeholder="DAY 1|抵達澎湖 × 海島開場|抵達澎湖;市區觀光;晚餐自理&#10;DAY 2|望安深度探索|搭船前往望安;浮潛體驗;在地晚餐"></textarea>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:20px">
+        <button class="btn btn-ghost" onclick="closeTourModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveTour()">
+          <i class="fas fa-save"></i> 儲存行程
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast 通知 -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ══════════════════════════════════════
+   全域狀態
+══════════════════════════════════════ */
+let ADMIN_KEY = '';
+let allTours  = [];
+
+/* ══════════════════════════════════════
+   登入 / 登出
+══════════════════════════════════════ */
+function doLogin() {
+  const key = document.getElementById('login-key').value.trim();
+  if (!key) return;
+  // 先用 /api/admin/tours?key=xxx 驗證
+  fetch(`/api/admin/tours?key=${encodeURIComponent(key)}`)
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) {
+        ADMIN_KEY = key;
+        sessionStorage.setItem('admin_key', key);
+        showAdmin();
+      } else {
+        document.getElementById('login-err').style.display = 'block';
+      }
+    })
+    .catch(() => { document.getElementById('login-err').style.display = 'block'; });
+}
+function doLogout() {
+  sessionStorage.removeItem('admin_key');
+  location.reload();
+}
+function showAdmin() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('admin-app').style.display = 'block';
+  loadTours();
+}
+// 頁面載入：嘗試從 sessionStorage 恢復登入
+(function() {
+  const k = sessionStorage.getItem('admin_key');
+  if (k) { ADMIN_KEY = k; showAdmin(); }
+})();
+// Enter 鍵登入
+document.getElementById('login-key').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+/* ══════════════════════════════════════
+   Tab 切換
+══════════════════════════════════════ */
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'contacts') loadContacts();
+}
+
+/* ══════════════════════════════════════
+   行程 CRUD
+══════════════════════════════════════ */
+function loadTours() {
+  fetch(`/api/admin/tours?key=${encodeURIComponent(ADMIN_KEY)}`)
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) return;
+      allTours = d.tours;
+      renderTourTable(allTours);
+      renderStats(allTours);
+    });
+}
+
+function renderStats(tours) {
+  const active = tours.filter(t => t.is_active).length;
+  document.getElementById('tour-stats').innerHTML = `
+    <div class="stat-card"><div class="num">${tours.length}</div><div class="lbl">全部行程</div></div>
+    <div class="stat-card"><div class="num">${active}</div><div class="lbl">啟用中</div></div>
+    <div class="stat-card"><div class="num">${tours.length - active}</div><div class="lbl">已停用</div></div>`;
+}
+
+// tab 名稱對應
+const TAB_NAMES = { featured:'特色行程', '2d1n':'兩天一夜', '3d2n':'三天兩夜', '4d3n':'四天三夜' };
+
+function renderTourTable(tours) {
+  const tbody = document.getElementById('tour-tbody');
+  if (!tours.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#a0aec0">尚無行程</td></tr>';
+    return;
+  }
+  tbody.innerHTML = tours.map(t => `
+    <tr>
+      <td><span class="drag-handle" title="排序">⠿</span> ${t.sort_order}</td>
+      <td>
+        <strong>${t.title}</strong>
+        ${t.badge_text ? `<span class="tab-chip">${t.badge_text}</span>` : ''}
+      </td>
+      <td>${(t.tabs||['featured']).map(tb=>`<span class="tab-chip">${TAB_NAMES[tb]||tb}</span>`).join('')}</td>
+      <td>${t.duration||'—'}</td>
+      <td>${t.price_display||'—'}</td>
+      <td><span class="badge ${t.is_active?'badge-active':'badge-inactive'}">
+        ${t.is_active?'啟用':'停用'}</span></td>
+      <td style="display:flex;gap:4px">
+        <button class="btn btn-warning btn-sm" onclick="editTour(${t.id})">
+          <i class="fas fa-edit"></i>
+        </button>
+        <button class="btn btn-danger btn-sm" onclick="deleteTour(${t.id},'${t.title.replace(/'/g,"\\'")}')">
+          <i class="fas fa-trash"></i>
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+function filterTours() {
+  const q = document.getElementById('tour-search').value.toLowerCase();
+  renderTourTable(allTours.filter(t => t.title.toLowerCase().includes(q)));
+}
+
+/* ── 開啟新增表單 ── */
+function openTourForm() {
+  document.getElementById('modal-title').textContent = '新增行程';
+  document.getElementById('f-id').value = '';
+  resetForm();
+  document.getElementById('tour-modal').classList.add('open');
+}
+
+/* ── 編輯行程 ── */
+function editTour(id) {
+  const t = allTours.find(x => x.id === id);
+  if (!t) return;
+  document.getElementById('modal-title').textContent = '編輯行程';
+  document.getElementById('f-id').value = id;
+
+  document.getElementById('f-title').value      = t.title || '';
+  document.getElementById('f-desc').value       = t.description || '';
+  document.getElementById('f-image').value      = t.image_url || '';
+  document.getElementById('f-badge-text').value = t.badge_text || '';
+  document.getElementById('f-badge-class').value= t.badge_class || '';
+  document.getElementById('f-suitable').value   = t.suitable_for || '';
+  document.getElementById('f-duration').value   = t.duration || '';
+  document.getElementById('f-price').value      = t.price_display || '';
+  document.getElementById('f-sort').value       = t.sort_order ?? 99;
+  document.getElementById('f-active').value     = String(t.is_active !== false);
+  document.getElementById('f-hero').value       = String(!!t.is_hero);
+
+  // tabs checkboxes
+  document.querySelectorAll('#f-tabs-group input').forEach(cb => {
+    cb.checked = (t.tabs||[]).includes(cb.value);
+  });
+
+  // prices
+  renderPriceInputs(t.prices || []);
+
+  // modal_data
+  const md = t.modal_data || {};
+  document.getElementById('f-highlights').value =
+    (md.highlights || []).join('\n');
+  document.getElementById('f-dates').value =
+    (md.dates || []).join('\n');
+  document.getElementById('f-includes').value = md.includes || '';
+  document.getElementById('f-notes').value    = md.notes || '';
+
+  // days: format as "DAY 1|Title|item1;item2"
+  document.getElementById('f-days').value =
+    (md.days || []).map(d =>
+      `${d.label}|${d.title}|${(d.items||[]).join(';')}`
+    ).join('\n');
+
+  previewImg();
+  document.getElementById('tour-modal').classList.add('open');
+}
+
+/* ── 重置表單 ── */
+function resetForm() {
+  ['f-title','f-desc','f-image','f-badge-text','f-suitable',
+   'f-duration','f-price','f-highlights','f-dates','f-includes','f-notes','f-days']
+    .forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-sort').value      = '99';
+  document.getElementById('f-active').value    = 'true';
+  document.getElementById('f-hero').value      = 'false';
+  document.getElementById('f-badge-class').value = '';
+  document.querySelectorAll('#f-tabs-group input').forEach(cb => cb.checked = false);
+  document.getElementById('prices-container').innerHTML = '';
+  document.getElementById('img-preview').style.display = 'none';
+}
+
+/* ── 關閉 Modal ── */
+function closeTourModal() {
+  document.getElementById('tour-modal').classList.remove('open');
+}
+
+/* ── 儲存行程 ── */
+function saveTour() {
+  const id    = document.getElementById('f-id').value;
+  const title = document.getElementById('f-title').value.trim();
+  if (!title) { showToast('請輸入行程名稱', 'error'); return; }
+
+  const tabs = Array.from(document.querySelectorAll('#f-tabs-group input:checked'))
+                    .map(cb => cb.value);
+  if (!tabs.length) { showToast('請至少選一個顯示分類', 'error'); return; }
+
+  // 解析 prices
+  const priceInputs = document.querySelectorAll('.price-row-input');
+  const prices = Array.from(priceInputs).map(row => ({
+    label: row.querySelector('.p-label').value.trim(),
+    value: row.querySelector('.p-value').value.trim(),
+  })).filter(p => p.label || p.value);
+
+  // 解析 modal_data
+  const highlights = document.getElementById('f-highlights').value
+    .split('\n').map(s => s.trim()).filter(Boolean);
+  const dates = document.getElementById('f-dates').value
+    .split('\n').map(s => s.trim()).filter(Boolean);
+  const daysRaw = document.getElementById('f-days').value
+    .split('\n').map(s => s.trim()).filter(Boolean);
+  const days = daysRaw.map(line => {
+    const [label, titlePart, itemsPart] = line.split('|');
+    return {
+      label: label?.trim() || '',
+      title: titlePart?.trim() || '',
+      items: (itemsPart || '').split(';').map(s => s.trim()).filter(Boolean),
+    };
+  });
+
+  const payload = {
+    tabs,
+    badge_text:   document.getElementById('f-badge-text').value.trim(),
+    badge_class:  document.getElementById('f-badge-class').value,
+    image_url:    document.getElementById('f-image').value.trim(),
+    title,
+    description:  document.getElementById('f-desc').value.trim(),
+    suitable_for: document.getElementById('f-suitable').value.trim(),
+    duration:     document.getElementById('f-duration').value.trim(),
+    price_display:document.getElementById('f-price').value.trim(),
+    is_hero:      document.getElementById('f-hero').value === 'true',
+    prices,
+    modal_data: {
+      highlights, dates, days,
+      includes: document.getElementById('f-includes').value.trim(),
+      notes:    document.getElementById('f-notes').value.trim(),
+    },
+    sort_order: parseInt(document.getElementById('f-sort').value) || 99,
+    is_active:  document.getElementById('f-active').value === 'true',
+    _key: ADMIN_KEY,
+  };
+
+  const url    = id ? `/api/admin/tours/${id}` : '/api/admin/tours';
+  const method = id ? 'PUT' : 'POST';
+
+  fetch(`${url}?key=${encodeURIComponent(ADMIN_KEY)}`, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) {
+        showToast(id ? '行程已更新 ✅' : '行程已新增 ✅', 'success');
+        closeTourModal();
+        loadTours();
+      } else {
+        showToast('儲存失敗：' + d.error, 'error');
+      }
+    });
+}
+
+/* ── 刪除行程 ── */
+function deleteTour(id, name) {
+  if (!confirm(`確定要刪除「${name}」嗎？此操作無法復原。`)) return;
+  fetch(`/api/admin/tours/${id}?key=${encodeURIComponent(ADMIN_KEY)}`, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) { showToast('行程已刪除', 'success'); loadTours(); }
+      else showToast('刪除失敗', 'error');
+    });
+}
+
+/* ── 出發地價格列 ── */
+function renderPriceInputs(prices) {
+  const c = document.getElementById('prices-container');
+  c.innerHTML = '';
+  prices.forEach(p => addPriceRow(p.label, p.value));
+}
+function addPriceRow(label = '', value = '') {
+  const c   = document.getElementById('prices-container');
+  const row = document.createElement('div');
+  row.className = 'price-row-input';
+  row.innerHTML = `
+    <input class="p-label" type="text" placeholder="例：✈ 松山出發" value="${label}" style="flex:1.2" />
+    <input class="p-value" type="text" placeholder="例：NT$ 9,999 起 / 人" value="${value}" style="flex:2" />
+    <button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()">
+      <i class="fas fa-times"></i>
+    </button>`;
+  c.appendChild(row);
+}
+
+/* ── 圖片預覽 ── */
+function previewImg() {
+  const url = document.getElementById('f-image').value.trim();
+  const img = document.getElementById('img-preview');
+  if (url) { img.src = url; img.style.display = 'block'; }
+  else img.style.display = 'none';
+}
+
+/* ══════════════════════════════════════
+   諮詢紀錄
+══════════════════════════════════════ */
+function loadContacts() {
+  document.getElementById('contacts-list').innerHTML = '載入中…';
+  fetch(`/api/contacts?key=${encodeURIComponent(ADMIN_KEY)}`)
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) { document.getElementById('contacts-list').innerHTML = '載入失敗'; return; }
+      if (!d.contacts.length) {
+        document.getElementById('contacts-list').innerHTML =
+          '<p style="color:#a0aec0;text-align:center;padding:40px">尚無諮詢紀錄</p>';
+        return;
+      }
+      const tourMap = {
+        classic3d:'澎湖經典三日遊', family3d:'親子海島體驗', eco4d:'望安永續生態',
+        sup2d:'SUP × 浮潛', other:'其他',
+      };
+      document.getElementById('contacts-list').innerHTML = d.contacts.map(c => `
+        <div class="contact-card">
+          <div class="contact-field"><label>姓名</label><span>${c.name}</span></div>
+          <div class="contact-field"><label>電話</label><span>${c.phone}</span></div>
+          <div class="contact-field"><label>旅遊日期</label><span>${c.travel_date||'—'}</span></div>
+          <div class="contact-field"><label>人數</label><span>${c.people||'—'}</span></div>
+          <div class="contact-field"><label>行程</label>
+            <span>${tourMap[c.tour_interest]||c.tour_interest||'—'}</span></div>
+          <div class="contact-field"><label>備註</label><span>${c.notes||'—'}</span></div>
+          <div class="contact-field"><label>送出時間</label>
+            <span style="font-size:.78rem">${c.created_at}</span></div>
+        </div>`).join('');
+    });
+}
+
+/* ══════════════════════════════════════
+   Toast 通知
+══════════════════════════════════════ */
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>

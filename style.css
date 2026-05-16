@@ -103,25 +103,26 @@ ul { list-style: none; }
   letter-spacing: 0.03em;
 }
 
-/* 跑馬燈動畫容器 */
-.banner-inner {
+/* 靜態公司資訊列 */
+.banner-static {
   display: flex;
-  white-space: nowrap;
-  animation: marquee 28s linear infinite;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  width: 100%;
+  padding: 0 16px;
 }
-.banner-text {
-  padding-right: 80px;
-  flex-shrink: 0;
-}
-
-@keyframes marquee {
-  0%   { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+.banner-sep {
+  opacity: 0.5;
 }
 
-/* 暫停跑馬燈（hover）*/
-.top-banner:hover .banner-inner {
-  animation-play-state: paused;
+/* 行程載入中提示 */
+.tours-loading {
+  text-align: center;
+  padding: 60px 0;
+  color: var(--text-light);
+  font-size: 1rem;
 }
 
 /* ═══════════════════════════════════════════════

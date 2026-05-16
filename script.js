@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initTabs();
   initContactForm();
   initScrollEffects();
+  loadTours();
 });
 
 /* ═══════════════════════════════════════════════
@@ -196,6 +197,160 @@ function scrollToTop() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 window.scrollToTop = scrollToTop;
+
+/* ═══════════════════════════════════════════════
+   動態行程載入
+════════════════════════════════════════════════ */
+async function loadTours() {
+  try {
+    const res = await fetch('/api/tours');
+    if (!res.ok) throw new Error('API error');
+    const grouped = await res.json(); // { featured: [...], "2d1n": [...], ... }
+
+    // 清除所有 loading 指示器
+    document.querySelectorAll('.tours-loading').forEach(el => el.remove());
+
+    // 清空並填充每個 tab 的 grid
+    ['featured', '2d1n', '3d2n', '4d3n'].forEach(tab => {
+      const grid = document.getElementById(`grid-${tab}`);
+      if (!grid) return;
+      const tours = grouped[tab] || [];
+      tours.forEach(tour => {
+        grid.appendChild(renderTourCard(tour));
+        renderTourModal(tour);
+      });
+    });
+  } catch (err) {
+    console.error('loadTours 失敗:', err);
+    document.querySelectorAll('.tours-loading').forEach(el => {
+      el.innerHTML = '<i class="fas fa-exclamation-circle"></i> 行程載入失敗，請稍後再試。';
+    });
+  }
+}
+
+function renderTourCard(tour) {
+  const card = document.createElement('div');
+  const isHero = tour.is_hero;
+  card.className = 'tour-card' + (isHero ? ' tour-card--hero' : '');
+
+  const badgeHtml = tour.badge_text
+    ? `<div class="tour-badge ${tour.badge_class || ''}">${tour.badge_text}</div>` : '';
+
+  const imgHtml = tour.image_url
+    ? `<img src="${tour.image_url}" alt="${tour.title}" loading="lazy" />`
+    : `<img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80" alt="${tour.title}" loading="lazy" />`;
+
+  // 多出發地價格列
+  const pricesHtml = Array.isArray(tour.prices) && tour.prices.length
+    ? `<div class="tour-prices">${tour.prices.map(p =>
+        `<div class="price-row"><span class="price-from">${p.from}</span><span class="price-val">${p.price}</span></div>`
+      ).join('')}</div>` : '';
+
+  const priceMetaHtml = (!tour.prices || !tour.prices.length) && tour.price_display
+    ? `<span class="meta-item price"><i class="fas fa-tag"></i> ${tour.price_display}</span>` : '';
+
+  const btnClass = isHero ? 'btn btn-card btn-card--hero' : 'btn btn-card';
+
+  card.innerHTML = `
+    ${badgeHtml}
+    <div class="tour-image">
+      ${imgHtml}
+      <div class="tour-overlay">
+        <span class="tour-days"><i class="fas fa-clock"></i> ${tour.duration || ''}</span>
+      </div>
+    </div>
+    <div class="tour-body">
+      ${isHero ? '<div class="tour-year-badge">2026</div>' : ''}
+      <h3 class="tour-title">${tour.title}</h3>
+      <p class="tour-desc">${tour.description || ''}</p>
+      ${pricesHtml}
+      <div class="tour-meta">
+        ${tour.suitable_for ? `<span class="meta-item"><i class="fas fa-users"></i> ${tour.suitable_for}</span>` : ''}
+        ${tour.duration ? `<span class="meta-item"><i class="fas fa-calendar"></i> ${tour.duration}</span>` : ''}
+        ${priceMetaHtml}
+      </div>
+      <button class="${btnClass}" onclick="openModal('db-${tour.id}')">
+        查看詳情 <i class="fas fa-arrow-right"></i>
+      </button>
+    </div>`;
+  return card;
+}
+
+function renderTourModal(tour) {
+  const md = tour.modal_data || {};
+  const container = document.getElementById('modal-container');
+
+  const modalEl = document.createElement('div');
+  modalEl.className = 'modal' + (tour.is_hero ? ' modal--turtle' : '');
+  modalEl.id = `modal-db-${tour.id}`;
+
+  // Prices table or tag
+  let priceSection = '';
+  if (Array.isArray(tour.prices) && tour.prices.length) {
+    priceSection = `<h4><i class="fas fa-tag"></i> 出發地 × 價格</h4>
+      <table class="price-table">
+        ${tour.prices.map(p => `<tr><td>${p.from}</td><td class="price-highlight">${p.price}</td></tr>`).join('')}
+      </table>`;
+  } else if (tour.price_display) {
+    priceSection = `<h4><i class="fas fa-tag"></i> 價格</h4><p>${tour.price_display}</p>`;
+  }
+
+  // Dates
+  const datesHtml = md.dates && md.dates.length
+    ? `<h4><i class="fas fa-calendar-alt"></i> 出發日期</h4>
+       <div class="date-chips">${md.dates.map(d => `<span class="date-chip">${d}</span>`).join('')}</div>` : '';
+
+  // Highlights
+  const hlHtml = md.highlights && md.highlights.length
+    ? `<h4><i class="fas fa-star"></i> 行程亮點</h4>
+       <ul>${md.highlights.map(h => `<li>${h}</li>`).join('')}</ul>` : '';
+
+  // Day by day
+  let daysHtml = '';
+  if (md.days && md.days.length) {
+    daysHtml = `<h4><i class="fas fa-map-signs"></i> 行程規劃</h4><div class="day-blocks">
+      ${md.days.map(d => `
+        <div class="day-block">
+          <div class="day-label">${d.label}</div>
+          <div class="day-content">
+            <strong>${d.title}</strong>
+            <ul>${(d.items || []).map(i => `<li>${i}</li>`).join('')}</ul>
+          </div>
+        </div>`).join('')}
+    </div>`;
+  }
+
+  // Includes / notes
+  const includesHtml = md.includes ? `<h4><i class="fas fa-check-circle"></i> 費用包含</h4><p>${md.includes}</p>` : '';
+  const notesHtml    = md.notes   ? `<h4><i class="fas fa-exclamation-circle"></i> 注意事項</h4><p>${md.notes}</p>` : '';
+
+  const headerClass = tour.is_hero ? 'modal-header modal-header--turtle' : 'modal-header';
+  const headerInner = tour.is_hero
+    ? `<div class="modal-header-content">
+        <span class="modal-year">2026</span>
+        <h2>${tour.title}</h2>
+        <span class="modal-tag">${tour.duration || ''} × 望安深度 × 海島體驗 × 永續旅遊</span>
+       </div>`
+    : `<h2>${tour.title}</h2>
+       <span class="modal-tag">${tour.duration || ''}${tour.price_display ? '｜' + tour.price_display : ''}</span>`;
+
+  modalEl.innerHTML = `
+    <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+    <div class="${headerClass}">${headerInner}</div>
+    <div class="modal-body">
+      ${priceSection}
+      ${datesHtml}
+      ${hlHtml}
+      ${daysHtml}
+      ${includesHtml}
+      ${notesHtml}
+      <a href="#contact" class="btn btn-primary" onclick="closeModal()">
+        <i class="fas fa-comment-dots"></i> 我要諮詢這個行程
+      </a>
+    </div>`;
+
+  container.appendChild(modalEl);
+}
 
 /* ─── 工具函式 ─── */
 function delay(ms) {
