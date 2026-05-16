@@ -114,8 +114,8 @@ window.closeModal = closeModal;
    若要串接後端，將 handleFormSubmit 改為
    fetch('/api/contact', { method:'POST', body: formData })
 ════════════════════════════════════════════════ */
-const FLIGHT_CITIES = ['台北松山', '台中', '高雄', '嘉義'];
-const BOAT_CITIES   = ['嘉義布袋', '台中梧棲', '高雄'];
+const FLIGHT_CITIES = ['台北松山機場', '台中清泉崗機場', '嘉義水上機場', '台南仁德機場', '高雄小港機場'];
+const BOAT_CITIES   = ['嘉義布袋港', '高雄鼓山一號碼頭'];
 
 function toggleDeparture(transport) {
   const sel = document.getElementById('departure');
@@ -231,7 +231,8 @@ async function loadTours() {
   try {
     const res = await fetch('/api/tours');
     if (!res.ok) throw new Error('API error');
-    const grouped = await res.json(); // { featured: [...], "2d1n": [...], ... }
+    const json    = await res.json();
+    const grouped = json.tours || {}; // API: { ok: true, tours: { featured: [...], ... } }
 
     // 清除所有 loading 指示器
     document.querySelectorAll('.tours-loading').forEach(el => el.remove());
