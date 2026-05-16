@@ -655,11 +655,29 @@ ul { list-style: none; }
   box-shadow: var(--shadow-hover);
 }
 .contact-btn i { font-size: 1.5rem; }
-.contact-btn.line  { background: #06c755; color: var(--white); }
-.contact-btn.phone { background: var(--blue-main); color: var(--white); }
-.contact-btn.email { background: var(--blue-pale); color: var(--blue-dark); }
+.contact-btn.line      { background: #06c755; color: var(--white); }
+.contact-btn.phone     { background: var(--blue-main); color: var(--white); }
+.contact-btn.email     { background: var(--blue-pale); color: var(--blue-dark); }
+.contact-btn.facebook  { background: #1877f2; color: var(--white); }
+.contact-btn.instagram { background: linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888); color: var(--white); }
 .btn-label { display: block; font-weight: 700; line-height: 1.3; }
 .btn-sub   { display: block; font-size: 0.82rem; opacity: 0.85; }
+
+/* Radio 選項群組 */
+.radio-group { display: flex; gap: 24px; padding: 10px 0; }
+.radio-label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 500; }
+.radio-label input[type="radio"] { accent-color: var(--blue-main); width: 16px; height: 16px; cursor: pointer; }
+
+/* Footer 社群圖示 */
+.footer-social { display: flex; gap: 12px; margin-top: 14px; }
+.footer-social a {
+  display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(255,255,255,0.12);
+  color: var(--white); font-size: 1rem;
+  transition: var(--transition);
+}
+.footer-social a:hover { background: var(--blue-light); transform: translateY(-2px); }
 
 .contact-hours {
   display: flex;

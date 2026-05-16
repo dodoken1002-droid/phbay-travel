@@ -233,17 +233,33 @@
               <span class="btn-sub">06-9271288</span>
             </div>
           </a>
-          <!-- Email：修改為你的實際信箱 -->
-          <a href="mailto:phbay2018@gmail.com" class="contact-btn email">
+          <!-- Email -->
+          <a href="mailto:dodoken1002@phbay.net" class="contact-btn email">
             <i class="fas fa-envelope"></i>
             <div>
               <span class="btn-label">Email 信箱</span>
-              <span class="btn-sub">phbay2018@gmail.com</span>
+              <span class="btn-sub">dodoken1002@phbay.net</span>
+            </div>
+          </a>
+          <!-- FB -->
+          <a href="https://www.facebook.com/phbay2018" target="_blank" class="contact-btn facebook">
+            <i class="fab fa-facebook-f"></i>
+            <div>
+              <span class="btn-label">Facebook</span>
+              <span class="btn-sub">phbay2018</span>
+            </div>
+          </a>
+          <!-- IG -->
+          <a href="https://www.instagram.com/phbay_2021/" target="_blank" class="contact-btn instagram">
+            <i class="fab fa-instagram"></i>
+            <div>
+              <span class="btn-label">Instagram</span>
+              <span class="btn-sub">phbay_2021</span>
             </div>
           </a>
           <div class="contact-hours">
             <i class="fas fa-clock"></i>
-            <span>服務時間：週一至週日 09:00 - 18:00</span>
+            <span>服務時間：週一至週五 08:30–17:30<br>（週六、日及國定假日休假）</span>
           </div>
         </div>
 
@@ -269,13 +285,19 @@
                 <input type="tel" id="phone" name="phone" placeholder="例：0912-345-678" required />
               </div>
             </div>
+            <!-- 旅遊日期區間 -->
             <div class="form-row">
-              <!-- 想去日期 -->
               <div class="form-group">
-                <label for="travel-date"><i class="fas fa-calendar"></i> 想去日期 <span class="required">*</span></label>
-                <input type="date" id="travel-date" name="travel_date" required />
+                <label for="travel-date-start"><i class="fas fa-calendar-alt"></i> 預計出發日 <span class="required">*</span></label>
+                <input type="date" id="travel-date-start" name="travel_date" required />
               </div>
-              <!-- 人數 -->
+              <div class="form-group">
+                <label for="travel-date-end"><i class="fas fa-calendar-check"></i> 預計回程日 <span class="required">*</span></label>
+                <input type="date" id="travel-date-end" name="travel_date_end" required />
+              </div>
+            </div>
+            <!-- 人數 + 預算 -->
+            <div class="form-row">
               <div class="form-group">
                 <label for="people"><i class="fas fa-users"></i> 旅遊人數 <span class="required">*</span></label>
                 <select id="people" name="people" required>
@@ -284,6 +306,37 @@
                   <option value="3-5">3 - 5 人</option>
                   <option value="6-10">6 - 10 人</option>
                   <option value="11+">11 人以上（團體）</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="budget"><i class="fas fa-wallet"></i> 每人預算</label>
+                <select id="budget" name="budget">
+                  <option value="">請選擇預算範圍</option>
+                  <option value="under5000">NT$ 5,000 以下</option>
+                  <option value="5000-8000">NT$ 5,000 – 8,000</option>
+                  <option value="8000-12000">NT$ 8,000 – 12,000</option>
+                  <option value="12000-18000">NT$ 12,000 – 18,000</option>
+                  <option value="18000+">NT$ 18,000 以上</option>
+                </select>
+              </div>
+            </div>
+            <!-- 交通方式 + 出發地 -->
+            <div class="form-row">
+              <div class="form-group">
+                <label><i class="fas fa-plane"></i> 往返交通方式 <span class="required">*</span></label>
+                <div class="radio-group">
+                  <label class="radio-label">
+                    <input type="radio" name="transport" value="飛機" required onchange="toggleDeparture(this.value)" /> 搭飛機
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="transport" value="搭船" onchange="toggleDeparture(this.value)" /> 搭船
+                  </label>
+                </div>
+              </div>
+              <div class="form-group" id="departure-group">
+                <label for="departure"><i class="fas fa-map-marker-alt"></i> 出發地</label>
+                <select id="departure" name="departure_city">
+                  <option value="">請先選擇交通方式</option>
                 </select>
               </div>
             </div>
@@ -296,6 +349,7 @@
                 <option value="family3d">親子海島體驗行程</option>
                 <option value="eco4d">望安永續生態旅行</option>
                 <option value="sup2d">SUP × 浮潛 × 海洋體驗</option>
+                <option value="turtle4d">2026 跟著海龜漫旅</option>
                 <option value="other">其他（請在備註說明）</option>
               </select>
             </div>
@@ -352,8 +406,14 @@
         <div class="footer-contact">
           <h4>聯絡資訊</h4>
           <p><i class="fas fa-phone"></i> 06-9271288</p>
-          <p><i class="fab fa-line"></i> @phbay2018</p>
+          <p><i class="fas fa-envelope"></i> dodoken1002@phbay.net</p>
           <p><i class="fas fa-user"></i> 負責人：唐瑋汝</p>
+          <p><i class="fas fa-clock"></i> 週一至週五 08:30–17:30</p>
+          <div class="footer-social">
+            <a href="https://www.facebook.com/phbay2018" target="_blank" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
+            <a href="https://www.instagram.com/phbay_2021/" target="_blank" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+            <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" aria-label="LINE"><i class="fab fa-line"></i></a>
+          </div>
         </div>
       </div>
       <div class="footer-bottom">

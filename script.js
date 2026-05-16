@@ -114,10 +114,36 @@ window.closeModal = closeModal;
    若要串接後端，將 handleFormSubmit 改為
    fetch('/api/contact', { method:'POST', body: formData })
 ════════════════════════════════════════════════ */
+const FLIGHT_CITIES = ['台北松山', '台中', '高雄', '嘉義'];
+const BOAT_CITIES   = ['嘉義布袋', '台中梧棲', '高雄'];
+
+function toggleDeparture(transport) {
+  const sel = document.getElementById('departure');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">請選擇出發地</option>';
+  const cities = transport === '飛機' ? FLIGHT_CITIES : BOAT_CITIES;
+  cities.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    sel.appendChild(opt);
+  });
+}
+window.toggleDeparture = toggleDeparture;
+
 function initContactForm() {
   const form    = document.getElementById('contact-form');
   const success = document.getElementById('form-success');
   if (!form) return;
+
+  // 日期區間：回程不能早於出發日
+  const startInput = document.getElementById('travel-date-start');
+  const endInput   = document.getElementById('travel-date-end');
+  if (startInput && endInput) {
+    startInput.addEventListener('change', () => {
+      endInput.min = startInput.value;
+      if (endInput.value && endInput.value < startInput.value) endInput.value = '';
+    });
+  }
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -127,7 +153,7 @@ function initContactForm() {
     const data = Object.fromEntries(formData.entries());
 
     // 基本驗證
-    if (!data.name || !data.phone || !data.travel_date || !data.people) {
+    if (!data.name || !data.phone || !data.travel_date || !data.travel_date_end || !data.people || !data.transport) {
       showFormError('請填寫所有必填欄位（標示 * 的欄位）');
       return;
     }

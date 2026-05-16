@@ -55,14 +55,18 @@ def init_db():
     # contacts 資料表
     cur.execute("""
         CREATE TABLE IF NOT EXISTS contacts (
-            id           SERIAL PRIMARY KEY,
-            name         VARCHAR(100) NOT NULL,
-            phone        VARCHAR(50)  NOT NULL,
-            travel_date  DATE,
-            people       VARCHAR(20),
-            tour_interest VARCHAR(100),
-            notes        TEXT,
-            created_at   TIMESTAMP DEFAULT NOW()
+            id              SERIAL PRIMARY KEY,
+            name            VARCHAR(100) NOT NULL,
+            phone           VARCHAR(50)  NOT NULL,
+            travel_date     DATE,
+            travel_date_end DATE,
+            people          VARCHAR(20),
+            budget          VARCHAR(30),
+            transport       VARCHAR(20),
+            departure_city  VARCHAR(50),
+            tour_interest   VARCHAR(100),
+            notes           TEXT,
+            created_at      TIMESTAMP DEFAULT NOW()
         )
     """)
 
@@ -505,8 +509,12 @@ def send_contact_email(data):
 
 姓名：{data.get('name', '')}
 電話：{data.get('phone', '')}
-旅遊日期：{data.get('travel_date', '')}
-人數：{data.get('people', '')} 人
+出發日：{data.get('travel_date', '')}
+回程日：{data.get('travel_date_end', '')}
+旅遊人數：{data.get('people', '')} 人
+每人預算：{data.get('budget', '（未填）')}
+交通方式：{data.get('transport', '（未填）')}
+出發地：{data.get('departure_city', '（未填）')}
 感興趣行程：{data.get('tour_interest', '（未填）')}
 備註：{data.get('notes', '（未填）')}
 
@@ -515,7 +523,7 @@ def send_contact_email(data):
     msg = MIMEMultipart()
     msg['From']    = f'潮旅國際旅行社 <{sender}>'
     msg['To']      = recipient
-    msg['Subject'] = f'【新諮詢】{data.get("name", "")} — {data.get("travel_date", "")}'
+    msg['Subject'] = f'【新諮詢】{data.get("name", "")} — {data.get("travel_date", "")} ~ {data.get("travel_date_end", "")}'
     msg.attach(MIMEText(body, 'plain', 'utf-8'))
 
     try:
@@ -531,7 +539,7 @@ def send_contact_email(data):
 @app.route('/api/contact', methods=['POST'])
 def submit_contact():
     data = request.get_json(force=True, silent=True) or {}
-    required = ['name', 'phone', 'travel_date', 'people']
+    required = ['name', 'phone', 'travel_date', 'travel_date_end', 'people', 'transport']
     missing = [f for f in required if not data.get(f)]
     if missing:
         return jsonify(ok=False, error=f'缺少必填欄位：{", ".join(missing)}'), 400
@@ -539,10 +547,12 @@ def submit_contact():
         conn = get_db()
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO contacts (name,phone,travel_date,people,tour_interest,notes)
-            VALUES (%s,%s,%s,%s,%s,%s) RETURNING id, created_at
-        """, (data['name'], data['phone'], data['travel_date'], data['people'],
-              data.get('tour_interest',''), data.get('notes','')))
+            INSERT INTO contacts
+              (name,phone,travel_date,travel_date_end,people,budget,transport,departure_city,tour_interest,notes)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id, created_at
+        """, (data['name'], data['phone'], data['travel_date'], data['travel_date_end'],
+              data['people'], data.get('budget',''), data['transport'],
+              data.get('departure_city',''), data.get('tour_interest',''), data.get('notes','')))
         row = cur.fetchone()
         conn.commit(); cur.close(); conn.close()
         send_contact_email(data)   # 寄通知信（失敗不影響回傳）
@@ -564,7 +574,8 @@ def list_contacts():
         result = []
         for r in rows:
             r = dict(r)
-            if r.get('travel_date'): r['travel_date'] = str(r['travel_date'])
+            if r.get('travel_date'):     r['travel_date']     = str(r['travel_date'])
+            if r.get('travel_date_end'): r['travel_date_end'] = str(r['travel_date_end'])
             if r.get('created_at'): r['created_at'] = str(r['created_at'])
             result.append(r)
         return jsonify(ok=True, contacts=result)
