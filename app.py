@@ -19,6 +19,8 @@ load_dotenv()
 app = Flask(__name__, static_folder='.', static_url_path='')
 
 # ─── 資料庫連線 ───────────────────────────────────────────
+# 標記：資料表是否已初始化（避免每次 request 都重複建立）
+_db_initialized = False
 def get_db():
     """取得 PostgreSQL 連線。Railway 會提供 DATABASE_URL 環境變數。"""
     database_url = os.environ.get('DATABASE_URL')
@@ -52,6 +54,27 @@ def init_db():
     print('[DB] contacts 資料表已就緒')
 
 
+# gunicorn 啟動時也會執行此區塊（模組層級），確保資料表存在
+# 即使 DATABASE_URL 尚未注入也不中斷服務，等第一次 request 再重試
+try:
+    with app.app_context():
+        init_db()
+except Exception as _e:
+    print(f'[警告] 啟動時無法初始化 DB，將於首次請求重試：{_e}')
+
+
+# 每次 request 前確保資料表存在（DATABASE_URL 延遲注入時的保險）
+@app.before_request
+def ensure_db():
+    global _db_initialized
+    if not _db_initialized:
+        try:
+            init_db()
+            _db_initialized = True
+        except Exception as e:
+            print(f'[DB INIT] {e}')
+
+
 # ─── 靜態頁面路由 ──────────────────────────────────────────
 @app.route('/')
 def index():
@@ -66,7 +89,8 @@ def submit_contact():
     接收 JSON，驗證必填欄位後寫入 PostgreSQL。
     回傳 { "ok": true } 或 { "ok": false, "error": "..." }
     """
-    data = request.get_json(silent=True) or {}
+    # force=True：即使 Content-Type 不完全符合也強制解析 JSON
+    data = request.get_json(force=True, silent=True) or {}
 
     # 必填欄位驗證
     required = ['name', 'phone', 'travel_date', 'people']
