@@ -494,6 +494,8 @@ def admin_delete_tour(tour_id):
 def send_contact_email(data):
     sender    = os.environ.get('EMAIL_USER', '')
     password  = os.environ.get('EMAIL_PASS', '')
+    smtp_host = os.environ.get('SMTP_HOST', 'smtpout.secureserver.net')
+    smtp_port = int(os.environ.get('SMTP_PORT', '465'))
     recipient = 'dodoken1002@phbay.net'
     if not sender or not password:
         print('[EMAIL] 未設定 EMAIL_USER / EMAIL_PASS，跳過寄信')
@@ -517,7 +519,7 @@ def send_contact_email(data):
     msg.attach(MIMEText(body, 'plain', 'utf-8'))
 
     try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=10) as server:
+        with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as server:
             server.login(sender, password)
             server.sendmail(sender, recipient, msg.as_string())
         print(f'[EMAIL] 通知信已寄出至 {recipient}')
