@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initContactForm();
   initScrollEffects();
   loadTours();
+  initQuiz();
 });
 
 /* ═══════════════════════════════════════════════
@@ -378,6 +379,166 @@ function renderTourModal(tour) {
 
   container.appendChild(modalEl);
 }
+
+/* ═══════════════════════════════════════════════
+   行程心理測驗
+════════════════════════════════════════════════ */
+const QUIZ_QUESTIONS = [
+  {
+    icon: '🧳',
+    q: '這次旅遊，你和誰一起來澎湖？',
+    options: [
+      { icon:'💑', text:'情侶 / 好朋友', sub:'兩人同行說走就走',   scores:{ turtle:2, classic:2, sup:1 } },
+      { icon:'👨‍👩‍👧‍👦', text:'親子 / 全家出遊', sub:'帶著孩子一起探索',  scores:{ family:4 } },
+      { icon:'🎒', text:'一個人',         sub:'自由自在的獨旅',   scores:{ eco:3, sup:2 } },
+      { icon:'🎉', text:'一群朋友 / 揪團', sub:'人多更熱鬧',      scores:{ classic:3, turtle:1, sup:2 } },
+    ]
+  },
+  {
+    icon: '🌊',
+    q: '最想在澎湖體驗哪一件事？',
+    options: [
+      { icon:'🤿', text:'浮潛、SUP 水上活動',   sub:'直接跳進海裡玩',        scores:{ sup:4, turtle:1 } },
+      { icon:'🐢', text:'海龜保育 × 生態探索', sub:'深入自然、有意義的旅行', scores:{ turtle:4, eco:3 } },
+      { icon:'🏡', text:'古厝文化 × 在地美食', sub:'慢遊、感受澎湖生活',     scores:{ classic:3, turtle:2 } },
+      { icon:'🌅', text:'拍美照、看夕陽',       sub:'輕鬆放空最重要',         scores:{ classic:2, family:2 } },
+    ]
+  },
+  {
+    icon: '📅',
+    q: '這次打算在澎湖待幾天？',
+    options: [
+      { icon:'⚡', text:'2 天 1 夜',  sub:'週末快閃，說走就走',  scores:{ sup:4 } },
+      { icon:'☀️', text:'3 天 2 夜',  sub:'剛剛好，不趕又充實', scores:{ classic:3, family:3 } },
+      { icon:'🌊', text:'4 天 3 夜',  sub:'深度慢遊，玩個夠',   scores:{ turtle:4, eco:3 } },
+      { icon:'🤔', text:'還沒決定',   sub:'看推薦再決定',        scores:{ classic:1, turtle:1, family:1 } },
+    ]
+  },
+  {
+    icon: '💰',
+    q: '每人預算大概是？',
+    options: [
+      { icon:'💵', text:'NT$ 7,000 以下',   sub:'輕鬆玩就好',         scores:{ sup:4 } },
+      { icon:'💳', text:'NT$ 7,000–10,000', sub:'合理預算，體驗豐富',  scores:{ classic:3, family:3, sup:1 } },
+      { icon:'🌟', text:'NT$ 10,000–15,000',sub:'值得的體驗不計較',    scores:{ turtle:4, classic:1 } },
+      { icon:'👑', text:'不設限',            sub:'最棒的體驗最重要',    scores:{ eco:4, turtle:2 } },
+    ]
+  },
+];
+
+const QUIZ_RESULTS = {
+  sup: {
+    type: '海洋冒險家 🤿',
+    desc: '你熱愛刺激、說走就走，短假期也要玩得盡興！站上 SUP 衝浪板、浮潛看珊瑚礁，用最直接的方式感受澎湖海洋的魅力。',
+    tour: { name:'SUP × 浮潛 × 海洋體驗', duration:'2天1夜', price:'NT$ 5,800 起', img:'https://images.unsplash.com/photo-1506953823976-52e1fdc0149a?w=400&q=80', interest:'sup2d' },
+  },
+  classic: {
+    type: '澎湖經典探索者 🌅',
+    desc: '你喜歡豐富多元的旅遊體驗，奎壁山摩西分海、跨海大橋、七美雙心石滬……澎湖的經典美景一次都不想錯過！',
+    tour: { name:'澎湖經典三日遊', duration:'3天2夜', price:'NT$ 8,800 起', img:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=80', interest:'classic3d' },
+  },
+  family: {
+    type: '親子海島守護者 👨‍👩‍👧',
+    desc: '家人的笑容是旅途中最美的風景！安全、溫馨又有趣的行程，讓孩子與海洋親密接觸，留下一家人最珍貴的回憶。',
+    tour: { name:'親子海島體驗行程', duration:'3天2夜', price:'NT$ 9,500 起', img:'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=400&q=80', interest:'family3d' },
+  },
+  turtle: {
+    type: '海龜慢旅實踐者 🐢',
+    desc: '你重視旅遊的深度與意義，不只是走馬看花。跟著海龜走進望安的山與海，體驗永續旅遊的美好，這趟旅行將改變你對澎湖的想像！',
+    tour: { name:'🐢 2026 跟著海龜漫旅', duration:'4天3夜', price:'NT$ 6,999 起', img:'https://images.unsplash.com/photo-1583212292454-1fe6229603b7?w=400&q=80', interest:'turtle4d' },
+  },
+  eco: {
+    type: '永續生態旅行者 🌿',
+    desc: '你是真正熱愛大自然、有深度的旅人。望安綠蠵龜保護區、花宅古厝聚落……離開澎湖時，你帶走的不只是美照，更是滿滿的感動與故事。',
+    tour: { name:'望安永續生態旅行', duration:'4天3夜', price:'NT$ 12,800 起', img:'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=400&q=80', interest:'eco4d' },
+  },
+};
+
+let quizAnswers = [];
+
+function initQuiz() {
+  quizAnswers = [];
+  renderQuizQuestion(0);
+}
+window.initQuiz = initQuiz;
+
+function renderQuizQuestion(idx) {
+  const wrap = document.getElementById('quiz-wrap');
+  if (!wrap) return;
+  const q = QUIZ_QUESTIONS[idx];
+  const total = QUIZ_QUESTIONS.length;
+  const pct = Math.round((idx / total) * 100);
+  wrap.innerHTML = `
+    <div class="quiz-progress">
+      <div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:${pct}%"></div></div>
+      <span class="quiz-step-label">第 ${idx + 1} / ${total} 題</span>
+    </div>
+    <div class="quiz-card">
+      <span class="quiz-q-icon">${q.icon}</span>
+      <div class="quiz-question">${q.q}</div>
+      <div class="quiz-options">
+        ${q.options.map((o, i) => `
+          <div class="quiz-option" onclick="quizAnswer(${idx},${i})">
+            <span class="opt-icon">${o.icon}</span>
+            <span class="opt-text">${o.text}</span>
+            <span class="opt-sub">${o.sub}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+window.quizAnswer = function(qIdx, optIdx) {
+  quizAnswers.push(QUIZ_QUESTIONS[qIdx].options[optIdx].scores);
+  const next = qIdx + 1;
+  if (next < QUIZ_QUESTIONS.length) {
+    renderQuizQuestion(next);
+  } else {
+    renderQuizResult();
+  }
+};
+
+function renderQuizResult() {
+  const totals = { sup:0, classic:0, family:0, turtle:0, eco:0 };
+  quizAnswers.forEach(s => Object.entries(s).forEach(([k,v]) => { totals[k] = (totals[k]||0) + v; }));
+  const best = Object.entries(totals).sort((a,b) => b[1]-a[1])[0][0];
+  const r = QUIZ_RESULTS[best];
+  const wrap = document.getElementById('quiz-wrap');
+  wrap.innerHTML = `
+    <div class="quiz-card quiz-result">
+      <div class="quiz-progress">
+        <div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:100%"></div></div>
+        <span class="quiz-step-label">✨ 結果揭曉！</span>
+      </div>
+      <span class="quiz-result-badge">你的旅遊類型</span>
+      <div class="quiz-result-type">${r.type}</div>
+      <p class="quiz-result-desc">${r.desc}</p>
+      <div class="quiz-result-tour">
+        <img src="${r.tour.img}" alt="${r.tour.name}" />
+        <div class="quiz-result-tour-info">
+          <div class="tour-recommend-label">✦ 推薦行程</div>
+          <div class="tour-recommend-name">${r.tour.name}</div>
+          <div class="tour-recommend-meta">
+            <i class="fas fa-calendar"></i> ${r.tour.duration} &nbsp;｜&nbsp;
+            <i class="fas fa-tag"></i> ${r.tour.price}
+          </div>
+        </div>
+      </div>
+      <div class="quiz-result-actions">
+        <a href="#contact" class="btn btn-primary" onclick="prefillTour('${r.tour.interest}')">
+          <i class="fas fa-comment-dots"></i> 立即諮詢這個行程
+        </a>
+        <button class="quiz-retry" onclick="initQuiz()">
+          <i class="fas fa-redo"></i> 重新測驗
+        </button>
+      </div>
+    </div>`;
+}
+
+function prefillTour(interest) {
+  const sel = document.getElementById('tour-interest');
+  if (sel && interest) sel.value = interest;
+}
+window.prefillTour = prefillTour;
 
 /* ─── 工具函式 ─── */
 function delay(ms) {

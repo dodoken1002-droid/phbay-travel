@@ -1094,6 +1094,46 @@ ul { list-style: none; }
 .back-to-top.visible { display: flex; }
 
 /* ═══════════════════════════════════════════════
+   行程心理測驗
+════════════════════════════════════════════════ */
+.quiz-section {
+  background: linear-gradient(135deg, #e8f4fc 0%, var(--sand) 100%);
+  padding: 80px 0;
+}
+.quiz-wrap { max-width: 760px; margin: 0 auto; }
+.quiz-progress { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+.quiz-progress-bar { flex: 1; height: 6px; background: rgba(26,107,158,.15); border-radius: 3px; overflow: hidden; }
+.quiz-progress-fill { height: 100%; background: linear-gradient(90deg,var(--blue-main),var(--blue-light)); border-radius: 3px; transition: width .4s ease; }
+.quiz-step-label { font-size:.82rem; font-weight:600; color:var(--blue-main); white-space:nowrap; }
+.quiz-card { background:var(--white); border-radius:var(--radius-lg); padding:36px 40px; box-shadow:var(--shadow); animation:quizFadeIn .35s ease; }
+@keyframes quizFadeIn { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+.quiz-q-icon { font-size:2.2rem; margin-bottom:10px; display:block; text-align:center; }
+.quiz-question { font-size:clamp(1.1rem,2.5vw,1.35rem); font-weight:800; color:var(--blue-dark); text-align:center; margin-bottom:28px; }
+.quiz-options { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.quiz-option { border:2px solid #e2e8f0; border-radius:var(--radius); padding:16px 14px; cursor:pointer; transition:var(--transition); text-align:center; background:var(--white); }
+.quiz-option:hover { border-color:var(--blue-main); background:var(--blue-pale); transform:translateY(-2px); box-shadow:var(--shadow-hover); }
+.quiz-option .opt-icon { font-size:1.8rem; display:block; margin-bottom:8px; }
+.quiz-option .opt-text { font-size:.9rem; font-weight:600; color:var(--text-dark); display:block; }
+.quiz-option .opt-sub  { font-size:.78rem; color:var(--text-light); display:block; margin-top:4px; }
+.quiz-result { text-align:center; animation:quizFadeIn .4s ease; }
+.quiz-result-badge { display:inline-block; background:linear-gradient(135deg,var(--blue-main),var(--blue-light)); color:#fff; font-size:.8rem; font-weight:700; padding:4px 16px; border-radius:20px; margin-bottom:10px; letter-spacing:.05em; }
+.quiz-result-type { font-size:clamp(1.3rem,3vw,1.7rem); font-weight:800; color:var(--blue-dark); margin-bottom:6px; }
+.quiz-result-desc { color:var(--text-mid); font-size:.95rem; margin-bottom:24px; line-height:1.7; }
+.quiz-result-tour { background:var(--blue-pale); border:2px solid var(--blue-light); border-radius:var(--radius); padding:18px 24px; margin-bottom:24px; display:flex; align-items:center; gap:16px; text-align:left; }
+.quiz-result-tour img { width:80px; height:80px; object-fit:cover; border-radius:10px; flex-shrink:0; }
+.quiz-result-tour-info .tour-recommend-label { font-size:.75rem; font-weight:700; color:var(--blue-main); margin-bottom:4px; }
+.quiz-result-tour-info .tour-recommend-name  { font-size:1.05rem; font-weight:800; color:var(--blue-dark); margin-bottom:4px; }
+.quiz-result-tour-info .tour-recommend-meta  { font-size:.82rem; color:var(--text-mid); }
+.quiz-result-actions { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+.quiz-retry { background:none; border:2px solid var(--blue-main); color:var(--blue-main); border-radius:30px; padding:10px 24px; font-size:.9rem; font-weight:700; cursor:pointer; transition:var(--transition); }
+.quiz-retry:hover { background:var(--blue-pale); }
+@media(max-width:600px) {
+  .quiz-card { padding:24px 18px; }
+  .quiz-options { grid-template-columns:1fr; }
+  .quiz-result-tour { flex-direction:column; text-align:center; }
+}
+
+/* ═══════════════════════════════════════════════
    RWD：手機版（768px 以下）
 ════════════════════════════════════════════════ */
 @media (max-width: 768px) {
