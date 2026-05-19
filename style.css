@@ -1256,6 +1256,13 @@ ul { list-style: none; }
 }
 
 /* 諮詢表單 — 梯次選擇 */
+.label-hint {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: #888;
+  margin-left: 4px;
+}
+
 .slot-status-hint {
   margin-top: 6px;
   font-size: 0.82rem;
