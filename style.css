@@ -881,6 +881,14 @@ ul { list-style: none; }
   box-shadow: 0 2px 8px rgba(232,92,58,0.4);
 }
 
+/* 官方合作特色行程角標 */
+.tour-badge.badge-collab {
+  background: linear-gradient(135deg, #e6a817, #c47f00);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  box-shadow: 0 2px 8px rgba(230,168,23,0.45);
+}
+
 /* 主打卡片外框強調 */
 .tour-card--hero {
   border: 2px solid transparent;
