@@ -150,25 +150,23 @@ function initContactForm() {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    // 收集表單資料
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
 
-    // 基本驗證
     if (!data.name || !data.phone || !data.travel_date || !data.travel_date_end || !data.people || !data.transport) {
       showFormError('請填寫所有必填欄位（標示 * 的欄位）');
       return;
     }
 
-    // 按鈕轉為 loading 狀態
+    // slot_id 轉為數字或移除
+    if (data.slot_id) data.slot_id = parseInt(data.slot_id);
+    else delete data.slot_id;
+
     const submitBtn = form.querySelector('.btn-submit');
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 傳送中...';
 
     try {
-      // 呼叫後端 API（Flask /api/contact）
-      // 在本機開發時會打 http://localhost:5000/api/contact
-      // 部署到 Railway 後自動使用同一網域，不需修改
       const res = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -181,9 +179,20 @@ function initContactForm() {
         throw new Error(result.error || '伺服器錯誤');
       }
 
+      // 更新成功訊息（正團 vs 候補）
+      const msgEl = document.getElementById('form-success-msg');
+      if (msgEl) {
+        msgEl.textContent = result.is_waitlist
+          ? '✅ 候補登記成功！名額釋出時我們將優先通知您。'
+          : '✅ 諮詢已送出！我們將於一個工作日內與您聯繫。';
+      }
+
       form.style.display = 'none';
       success.style.display = 'block';
       success.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      // 重新整理該梯次名額顯示
+      if (data.slot_id) refreshSlotStatus(data.slot_id);
 
     } catch (err) {
       submitBtn.disabled = false;
@@ -191,6 +200,70 @@ function initContactForm() {
       showFormError(err.message || '送出失敗，請直接 LINE 或電話聯繫我們。');
     }
   });
+}
+
+// ─── 梯次名額：依行程載入 ────────────────────────────────
+let _slotsCache = {};   // { tourId: [slot, ...] }
+
+async function loadSlotOptions(tourInterestVal) {
+  const group  = document.getElementById('slot-group');
+  const select = document.getElementById('slot-select');
+  const hint   = document.getElementById('slot-status');
+  if (!group || !select) return;
+
+  // 找出選擇的 option 的 data-tour-id
+  const opt    = document.querySelector(`#tour-interest option[value="${tourInterestVal}"]`);
+  const tourId = opt ? opt.dataset.tourId : null;
+
+  if (!tourId) { group.style.display = 'none'; return; }
+
+  group.style.display = 'block';
+  select.innerHTML = '<option value="">載入中...</option>';
+  if (hint) hint.textContent = '';
+
+  try {
+    const res  = await fetch(`/api/slots?tour_id=${tourId}`);
+    const json = await res.json();
+    const slots = (json.slots || []).filter(s => s.is_active);
+    _slotsCache[tourId] = slots;
+
+    if (!slots.length) {
+      select.innerHTML = '<option value="">（此行程尚無開放梯次）</option>';
+      return;
+    }
+
+    select.innerHTML = '<option value="">請選擇出發梯次（可不填）</option>';
+    slots.forEach(s => {
+      const label = slotStatusLabel(s);
+      const opt   = document.createElement('option');
+      opt.value   = s.id;
+      opt.textContent = `${s.date_label}　${label}`;
+      if (s.status === 'full_wl_full') opt.disabled = true;
+      select.appendChild(opt);
+    });
+  } catch (e) {
+    select.innerHTML = '<option value="">無法載入梯次，請在備註填寫日期</option>';
+  }
+}
+window.loadSlotOptions = loadSlotOptions;
+
+function slotStatusLabel(s) {
+  if (s.status === 'full_wl_full') return '⛔ 已額滿';
+  if (s.status === 'waitlist')     return `🔴 候補 ${s.wl_remaining} 位`;
+  if (s.status === 'low')          return `🟡 剩 ${s.remaining} 位`;
+  return `🟢 剩 ${s.remaining} 位`;
+}
+
+// 表單送出後重新抓單一梯次狀態並更新 select option 文字
+async function refreshSlotStatus(slotId) {
+  try {
+    const res   = await fetch('/api/slots');
+    const json  = await res.json();
+    const slot  = (json.slots || []).find(s => s.id === slotId);
+    if (!slot) return;
+    const opt = document.querySelector(`#slot-select option[value="${slotId}"]`);
+    if (opt) opt.textContent = `${slot.date_label}　${slotStatusLabel(slot)}`;
+  } catch (_) {}
 }
 
 function showFormError(msg) {
@@ -229,17 +302,30 @@ window.scrollToTop = scrollToTop;
 /* ═══════════════════════════════════════════════
    動態行程載入
 ════════════════════════════════════════════════ */
+// 全站梯次快取 { tourId: [slot,...] }
+let _allSlots = {};
+
 async function loadTours() {
   try {
-    const res = await fetch('/api/tours');
-    if (!res.ok) throw new Error('API error');
-    const json    = await res.json();
-    const grouped = json.tours || {}; // API: { ok: true, tours: { featured: [...], ... } }
+    // 同時抓行程與梯次名額
+    const [toursRes, slotsRes] = await Promise.all([
+      fetch('/api/tours'),
+      fetch('/api/slots')
+    ]);
+    if (!toursRes.ok) throw new Error('API error');
+    const json    = await toursRes.json();
+    const grouped = json.tours || {};
 
-    // 清除所有 loading 指示器
+    if (slotsRes.ok) {
+      const sJson = await slotsRes.json();
+      (sJson.slots || []).forEach(s => {
+        if (!_allSlots[s.tour_id]) _allSlots[s.tour_id] = [];
+        _allSlots[s.tour_id].push(s);
+      });
+    }
+
     document.querySelectorAll('.tours-loading').forEach(el => el.remove());
 
-    // 清空並填充每個 tab 的 grid
     ['featured', '2d1n', '3d2n', '4d3n'].forEach(tab => {
       const grid = document.getElementById(`grid-${tab}`);
       if (!grid) return;
@@ -280,6 +366,21 @@ function renderTourCard(tour) {
 
   const btnClass = isHero ? 'btn btn-card btn-card--hero' : 'btn btn-card';
 
+  // 梯次名額摘要
+  const slots = _allSlots[tour.id] || [];
+  let slotHtml = '';
+  if (slots.length) {
+    const soonest = slots[0];
+    const chip = soonest.status === 'full_wl_full'
+      ? `<span class="slot-chip chip-full">⛔ 已額滿</span>`
+      : soonest.status === 'waitlist'
+      ? `<span class="slot-chip chip-waitlist">🔴 候補 ${soonest.wl_remaining} 位</span>`
+      : soonest.status === 'low'
+      ? `<span class="slot-chip chip-low">🟡 剩 ${soonest.remaining} 位</span>`
+      : `<span class="slot-chip chip-ok">🟢 剩 ${soonest.remaining} 位</span>`;
+    slotHtml = `<div class="slot-summary">${chip} <span class="slot-date">${soonest.date_label}</span></div>`;
+  }
+
   card.innerHTML = `
     ${badgeHtml}
     <div class="tour-image">
@@ -292,6 +393,7 @@ function renderTourCard(tour) {
       ${isHero ? '<div class="tour-year-badge">2026</div>' : ''}
       <h3 class="tour-title">${tour.title}</h3>
       <p class="tour-desc">${tour.description || ''}</p>
+      ${slotHtml}
       ${pricesHtml}
       <div class="tour-meta">
         ${tour.suitable_for ? `<span class="meta-item"><i class="fas fa-users"></i> ${tour.suitable_for}</span>` : ''}

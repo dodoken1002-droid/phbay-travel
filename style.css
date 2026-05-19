@@ -1228,6 +1228,42 @@ ul { list-style: none; }
 .back-to-top.visible { display: flex; }
 
 /* ═══════════════════════════════════════════════
+   梯次名額顯示
+════════════════════════════════════════════════ */
+.slot-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 8px;
+  flex-wrap: wrap;
+}
+.slot-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.chip-ok       { background: #e6f9ee; color: #1a7a40; border: 1px solid #7bcca0; }
+.chip-low      { background: #fff8e1; color: #a06000; border: 1px solid #f5c842; }
+.chip-waitlist { background: #fff0f0; color: #c0392b; border: 1px solid #f5a0a0; }
+.chip-full     { background: #f5f5f5; color: #777;    border: 1px solid #ccc;    }
+.slot-date {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #666);
+}
+
+/* 諮詢表單 — 梯次選擇 */
+.slot-status-hint {
+  margin-top: 6px;
+  font-size: 0.82rem;
+  color: #888;
+  min-height: 1.2em;
+}
+
+/* ═══════════════════════════════════════════════
    行程心理測驗
 ════════════════════════════════════════════════ */
 .quiz-section {

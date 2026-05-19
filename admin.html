@@ -204,6 +204,9 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
     <button class="active" onclick="switchTab('tours',this)">
       <i class="fas fa-map-marked-alt"></i> 行程管理
     </button>
+    <button onclick="switchTab('slots',this)">
+      <i class="fas fa-calendar-check"></i> 梯次名額
+    </button>
     <button onclick="switchTab('contacts',this)">
       <i class="fas fa-envelope"></i> 諮詢紀錄
     </button>
@@ -243,6 +246,17 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
             載入中…</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- ── 梯次名額 ── -->
+    <div class="tab-content" id="tab-slots">
+      <div class="toolbar">
+        <h2>梯次名額管理</h2>
+        <button class="btn btn-primary" onclick="openSlotForm()">
+          <i class="fas fa-plus"></i> 新增梯次
+        </button>
+      </div>
+      <div id="slots-list">載入中…</div>
     </div>
 
     <!-- ── 諮詢紀錄 ── -->
@@ -456,6 +470,7 @@ function switchTab(name, btn) {
   document.getElementById(`tab-${name}`).classList.add('active');
   btn.classList.add('active');
   if (name === 'contacts') loadContacts();
+  if (name === 'slots')    loadSlots();
 }
 
 /* ══════════════════════════════════════
@@ -761,6 +776,191 @@ function loadContacts() {
             <span style="font-size:.78rem">${c.created_at}</span></div>
         </div>`).join('');
     });
+}
+
+/* ══════════════════════════════════════
+   梯次名額管理
+══════════════════════════════════════ */
+let _tourList = [];   // 行程清單（for 梯次表單下拉）
+
+function loadSlots() {
+  const el = document.getElementById('slots-list');
+  el.innerHTML = '載入中…';
+
+  // 同時抓行程清單（for 表單）和梯次清單
+  Promise.all([
+    fetch(`/api/admin/tours?key=${encodeURIComponent(ADMIN_KEY)}`).then(r => r.json()),
+    fetch(`/api/admin/slots?key=${encodeURIComponent(ADMIN_KEY)}`).then(r => r.json()),
+  ]).then(([toursData, slotsData]) => {
+    if (toursData.ok) _tourList = toursData.tours;
+    if (!slotsData.ok) { el.innerHTML = '載入失敗'; return; }
+
+    const slots = slotsData.slots;
+    if (!slots.length) {
+      el.innerHTML = '<p style="color:#a0aec0;text-align:center;padding:40px">尚無梯次，請點「新增梯次」建立</p>';
+      return;
+    }
+
+    // 依行程分組
+    const groups = {};
+    slots.forEach(s => {
+      const tour = _tourList.find(t => t.id === s.tour_id);
+      const name = tour ? tour.title : `行程 #${s.tour_id}`;
+      if (!groups[name]) groups[name] = [];
+      groups[name].push(s);
+    });
+
+    el.innerHTML = Object.entries(groups).map(([tourName, list]) => `
+      <div style="margin-bottom:24px">
+        <h3 style="font-size:.95rem;font-weight:700;color:#1a6b9e;margin-bottom:10px;
+          padding:6px 12px;background:#e8f4fd;border-radius:6px">${tourName}</h3>
+        <table class="tour-table" style="min-width:100%">
+          <thead><tr>
+            <th>梯次日期</th>
+            <th>限量名額</th>
+            <th>已報名</th>
+            <th>候補上限</th>
+            <th>已候補</th>
+            <th>剩餘</th>
+            <th>狀態</th>
+            <th style="width:130px">操作</th>
+          </tr></thead>
+          <tbody>${list.map(s => {
+            const statusBadge = s.remaining === 0 && s.wl_remaining === 0
+              ? '<span style="color:#e53e3e;font-weight:700">⛔ 額滿</span>'
+              : s.remaining === 0
+              ? `<span style="color:#dd6b20;font-weight:700">🔴 候補 ${s.wl_remaining}位</span>`
+              : s.remaining <= 3
+              ? `<span style="color:#d69e2e;font-weight:700">🟡 緊張</span>`
+              : `<span style="color:#38a169;font-weight:700">🟢 正常</span>`;
+            const activeBtn = s.is_active
+              ? `<button class="btn btn-sm btn-ghost" onclick="toggleSlot(${s.id},false)">下架</button>`
+              : `<button class="btn btn-sm btn-success" onclick="toggleSlot(${s.id},true)">上架</button>`;
+            return `<tr style="${!s.is_active?'opacity:.5':''}">
+              <td><strong>${s.date_label}</strong></td>
+              <td><input type="number" value="${s.capacity}" min="1" style="width:60px;text-align:center"
+                onchange="patchSlot(${s.id},'capacity',this.value)" /></td>
+              <td><input type="number" value="${s.booked}" min="0" style="width:60px;text-align:center"
+                onchange="patchSlot(${s.id},'booked',this.value)" /></td>
+              <td><input type="number" value="${s.waitlist_cap}" min="0" style="width:60px;text-align:center"
+                onchange="patchSlot(${s.id},'waitlist_cap',this.value)" /></td>
+              <td><input type="number" value="${s.waitlisted}" min="0" style="width:60px;text-align:center"
+                onchange="patchSlot(${s.id},'waitlisted',this.value)" /></td>
+              <td style="font-weight:700">${s.remaining}</td>
+              <td>${statusBadge}</td>
+              <td style="display:flex;gap:4px">
+                ${activeBtn}
+                <button class="btn btn-sm btn-danger" onclick="deleteSlot(${s.id})">刪除</button>
+              </td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>`).join('');
+  });
+}
+
+function patchSlot(id, field, value) {
+  // 找出該 slot 的完整資料再 PUT
+  fetch(`/api/admin/slots?key=${encodeURIComponent(ADMIN_KEY)}`)
+    .then(r => r.json())
+    .then(d => {
+      const slot = d.slots.find(s => s.id === id);
+      if (!slot) return;
+      slot[field] = parseInt(value) || 0;
+      return fetch(`/api/admin/slots/${id}`, {
+        method:'PUT',
+        headers:{'Content-Type':'application/json','X-Admin-Key':ADMIN_KEY},
+        body: JSON.stringify(slot)
+      });
+    })
+    .then(r => r && r.ok ? showToast('已更新') : showToast('更新失敗','error'))
+    .then(() => loadSlots())
+    .catch(() => showToast('更新失敗','error'));
+}
+
+function toggleSlot(id, active) {
+  fetch(`/api/admin/slots?key=${encodeURIComponent(ADMIN_KEY)}`)
+    .then(r => r.json())
+    .then(d => {
+      const slot = d.slots.find(s => s.id === id);
+      if (!slot) return;
+      slot.is_active = active;
+      return fetch(`/api/admin/slots/${id}`, {
+        method:'PUT',
+        headers:{'Content-Type':'application/json','X-Admin-Key':ADMIN_KEY},
+        body: JSON.stringify(slot)
+      });
+    })
+    .then(() => { showToast(active ? '已上架' : '已下架'); loadSlots(); })
+    .catch(() => showToast('操作失敗','error'));
+}
+
+function deleteSlot(id) {
+  if (!confirm('確定刪除此梯次？')) return;
+  fetch(`/api/admin/slots/${id}`, {
+    method:'DELETE', headers:{'X-Admin-Key':ADMIN_KEY}
+  }).then(() => { showToast('已刪除'); loadSlots(); });
+}
+
+function openSlotForm() {
+  const tourOpts = _tourList.map(t =>
+    `<option value="${t.id}">${t.title}</option>`).join('');
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:12px;padding:28px;width:420px;max-width:95vw">
+      <h3 style="font-size:1rem;font-weight:700;margin-bottom:16px">新增梯次</h3>
+      <label style="display:block;margin-bottom:8px;font-size:.85rem;font-weight:600">行程</label>
+      <select id="sf-tour" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:12px">
+        ${tourOpts}
+      </select>
+      <label style="display:block;margin-bottom:8px;font-size:.85rem;font-weight:600">梯次日期（顯示文字）</label>
+      <input id="sf-label" type="text" placeholder="例：9/12（五）－ 9/14（日）首演週末"
+        style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:12px" />
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+        <div>
+          <label style="font-size:.82rem;font-weight:600">限量名額</label>
+          <input id="sf-cap" type="number" value="20" min="1"
+            style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px" />
+        </div>
+        <div>
+          <label style="font-size:.82rem;font-weight:600">候補上限</label>
+          <input id="sf-wl" type="number" value="5" min="0"
+            style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-top:4px" />
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-ghost" onclick="this.closest('div[style]').remove()">取消</button>
+        <button class="btn btn-primary" onclick="submitSlotForm()">新增</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+function submitSlotForm() {
+  const tour_id     = parseInt(document.getElementById('sf-tour').value);
+  const date_label  = document.getElementById('sf-label').value.trim();
+  const capacity    = parseInt(document.getElementById('sf-cap').value) || 20;
+  const waitlist_cap= parseInt(document.getElementById('sf-wl').value)  || 5;
+
+  if (!date_label) { alert('請填寫梯次日期文字'); return; }
+
+  fetch('/api/admin/slots', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Admin-Key':ADMIN_KEY},
+    body: JSON.stringify({ tour_id, date_label, capacity, waitlist_cap, booked:0, waitlisted:0 })
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.ok) {
+      showToast('梯次已新增');
+      document.querySelector('div[style*="position:fixed"]').remove();
+      loadSlots();
+    } else {
+      showToast(d.error || '新增失敗', 'error');
+    }
+  });
 }
 
 /* ══════════════════════════════════════

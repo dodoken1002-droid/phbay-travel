@@ -65,10 +65,21 @@ def init_db():
             transport       VARCHAR(20),
             departure_city  VARCHAR(50),
             tour_interest   VARCHAR(100),
+            slot_id         INT,
+            is_waitlist     BOOLEAN DEFAULT FALSE,
             notes           TEXT,
             created_at      TIMESTAMP DEFAULT NOW()
         )
     """)
+    # 舊資料庫補欄位（不影響已有欄位）
+    for col, defn in [
+        ('slot_id',     'INT'),
+        ('is_waitlist', 'BOOLEAN DEFAULT FALSE'),
+    ]:
+        try:
+            cur.execute(f"ALTER TABLE contacts ADD COLUMN IF NOT EXISTS {col} {defn}")
+        except Exception:
+            conn.rollback()
 
     # tours 資料表
     cur.execute("""
@@ -90,6 +101,20 @@ def init_db():
             is_active    BOOLEAN  DEFAULT TRUE,
             created_at   TIMESTAMP DEFAULT NOW(),
             updated_at   TIMESTAMP DEFAULT NOW()
+        )
+    """)
+    # tour_slots 資料表
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS tour_slots (
+            id           SERIAL PRIMARY KEY,
+            tour_id      INT  NOT NULL,
+            date_label   VARCHAR(120) NOT NULL,
+            capacity     INT  NOT NULL DEFAULT 20,
+            booked       INT  NOT NULL DEFAULT 0,
+            waitlist_cap INT  NOT NULL DEFAULT 5,
+            waitlisted   INT  NOT NULL DEFAULT 0,
+            is_active    BOOLEAN DEFAULT TRUE,
+            created_at   TIMESTAMP DEFAULT NOW()
         )
     """)
     conn.commit()
@@ -516,6 +541,8 @@ def send_contact_email(data):
 交通方式：{data.get('transport', '（未填）')}
 出發地：{data.get('departure_city', '（未填）')}
 感興趣行程：{data.get('tour_interest', '（未填）')}
+選擇梯次：{data.get('slot_label', '（未選擇）')}
+候補狀態：{'候補' if data.get('is_waitlist') else '正團'}
 備註：{data.get('notes', '（未填）')}
 
 請盡快與客戶聯繫。
@@ -535,6 +562,109 @@ def send_contact_email(data):
         print(f'[EMAIL] 寄信失敗（不影響表單儲存）：{e}')
 
 
+# ─── 梯次名額 API（公開）─────────────────────────────────────
+@app.route('/api/slots', methods=['GET'])
+def get_slots():
+    """取得所有啟用梯次（可帶 ?tour_id=X 過濾）。"""
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        tour_id = request.args.get('tour_id')
+        if tour_id:
+            cur.execute(
+                "SELECT * FROM tour_slots WHERE is_active=TRUE AND tour_id=%s ORDER BY id",
+                (tour_id,))
+        else:
+            cur.execute("SELECT * FROM tour_slots WHERE is_active=TRUE ORDER BY tour_id, id")
+        rows = [dict(r) for r in cur.fetchall()]
+        cur.close(); conn.close()
+        for r in rows:
+            r['created_at'] = str(r.get('created_at', ''))
+            r['remaining']  = max(0, r['capacity'] - r['booked'])
+            r['wl_remaining'] = max(0, r['waitlist_cap'] - r['waitlisted'])
+            r['status'] = (
+                'full_wl_full' if r['remaining'] == 0 and r['wl_remaining'] == 0
+                else 'waitlist'  if r['remaining'] == 0
+                else 'low'       if r['remaining'] <= 3
+                else 'available'
+            )
+        return jsonify(ok=True, slots=rows)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+# ─── 梯次名額 CRUD（管理員）────────────────────────────────────
+@app.route('/api/admin/slots', methods=['GET'])
+def admin_get_slots():
+    if not is_admin(): return jsonify(ok=False, error='未授權'), 401
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT * FROM tour_slots ORDER BY tour_id, id")
+        rows = [dict(r) for r in cur.fetchall()]
+        cur.close(); conn.close()
+        for r in rows:
+            r['created_at'] = str(r.get('created_at', ''))
+            r['remaining']  = max(0, r['capacity'] - r['booked'])
+            r['wl_remaining'] = max(0, r['waitlist_cap'] - r['waitlisted'])
+        return jsonify(ok=True, slots=rows)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.route('/api/admin/slots', methods=['POST'])
+def admin_create_slot():
+    if not is_admin(): return jsonify(ok=False, error='未授權'), 401
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO tour_slots
+              (tour_id, date_label, capacity, booked, waitlist_cap, waitlisted, is_active)
+            VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id
+        """, (data['tour_id'], data['date_label'],
+              data.get('capacity', 20), data.get('booked', 0),
+              data.get('waitlist_cap', 5), data.get('waitlisted', 0),
+              data.get('is_active', True)))
+        new_id = cur.fetchone()['id']
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True, id=new_id)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.route('/api/admin/slots/<int:slot_id>', methods=['PUT'])
+def admin_update_slot(slot_id):
+    if not is_admin(): return jsonify(ok=False, error='未授權'), 401
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("""
+            UPDATE tour_slots SET
+              date_label=%s, capacity=%s, booked=%s,
+              waitlist_cap=%s, waitlisted=%s, is_active=%s
+            WHERE id=%s
+        """, (data.get('date_label', ''), data.get('capacity', 20),
+              data.get('booked', 0), data.get('waitlist_cap', 5),
+              data.get('waitlisted', 0), data.get('is_active', True),
+              slot_id))
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.route('/api/admin/slots/<int:slot_id>', methods=['DELETE'])
+def admin_delete_slot(slot_id):
+    if not is_admin(): return jsonify(ok=False, error='未授權'), 401
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("DELETE FROM tour_slots WHERE id=%s", (slot_id,))
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
 # ─── 諮詢表單 ──────────────────────────────────────────────
 @app.route('/api/contact', methods=['POST'])
 def submit_contact():
@@ -543,20 +673,60 @@ def submit_contact():
     missing = [f for f in required if not data.get(f)]
     if missing:
         return jsonify(ok=False, error=f'缺少必填欄位：{", ".join(missing)}'), 400
+
+    slot_id    = data.get('slot_id')
+    is_waitlist = False
+    slot_label  = ''
+
     try:
         conn = get_db()
-        cur = conn.cursor()
+        cur  = conn.cursor()
+
+        # ── 若有選梯次，鎖定並扣名額 ──────────────────────────
+        if slot_id:
+            cur.execute(
+                "SELECT * FROM tour_slots WHERE id=%s AND is_active=TRUE FOR UPDATE",
+                (slot_id,))
+            slot = cur.fetchone()
+            if not slot:
+                conn.rollback(); cur.close(); conn.close()
+                return jsonify(ok=False, error='此梯次不存在或已關閉'), 400
+
+            slot_label = slot['date_label']
+            remaining  = slot['capacity']     - slot['booked']
+            wl_remain  = slot['waitlist_cap'] - slot['waitlisted']
+
+            if remaining > 0:
+                cur.execute(
+                    "UPDATE tour_slots SET booked=booked+1 WHERE id=%s", (slot_id,))
+                is_waitlist = False
+            elif wl_remain > 0:
+                cur.execute(
+                    "UPDATE tour_slots SET waitlisted=waitlisted+1 WHERE id=%s", (slot_id,))
+                is_waitlist = True
+            else:
+                conn.rollback(); cur.close(); conn.close()
+                return jsonify(ok=False, error='此梯次名額與候補名額均已額滿'), 400
+
+        # ── 寫入諮詢資料 ────────────────────────────────────────
         cur.execute("""
             INSERT INTO contacts
-              (name,phone,travel_date,travel_date_end,people,budget,transport,departure_city,tour_interest,notes)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id, created_at
+              (name,phone,travel_date,travel_date_end,people,budget,transport,
+               departure_city,tour_interest,slot_id,is_waitlist,notes)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id, created_at
         """, (data['name'], data['phone'], data['travel_date'], data['travel_date_end'],
               data['people'], data.get('budget',''), data['transport'],
-              data.get('departure_city',''), data.get('tour_interest',''), data.get('notes','')))
+              data.get('departure_city',''), data.get('tour_interest',''),
+              slot_id, is_waitlist, data.get('notes','')))
         row = cur.fetchone()
         conn.commit(); cur.close(); conn.close()
-        send_contact_email(data)   # 寄通知信（失敗不影響回傳）
-        return jsonify(ok=True, id=row['id'], created_at=str(row['created_at']))
+
+        data['slot_label']  = slot_label
+        data['is_waitlist'] = is_waitlist
+        send_contact_email(data)
+        return jsonify(ok=True, id=row['id'], created_at=str(row['created_at']),
+                       is_waitlist=is_waitlist,
+                       message='已登記候補，我們將優先通知您' if is_waitlist else '報名成功')
     except Exception as e:
         return jsonify(ok=False, error='伺服器錯誤，請稍後再試'), 500
 

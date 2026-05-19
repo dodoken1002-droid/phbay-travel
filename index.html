@@ -401,15 +401,23 @@
             <!-- 有興趣的行程 -->
             <div class="form-group">
               <label for="tour-interest"><i class="fas fa-map"></i> 有興趣的行程</label>
-              <select id="tour-interest" name="tour_interest">
+              <select id="tour-interest" name="tour_interest" onchange="loadSlotOptions(this.value)">
                 <option value="">請選擇行程（可不填）</option>
-                <option value="flower3d">花路追風之旅｜3天2夜慢旅行</option>
-                <option value="turtle3d">澎湖三天兩夜追風海龜療癒行</option>
-                <option value="family3d">親子海島體驗行程</option>
-                <option value="eco4d">望安永續生態旅行</option>
-                <option value="turtle4d">2026 跟著海龜漫旅</option>
+                <option value="flower3d" data-tour-id="9">花路追風之旅｜3天2夜慢旅行</option>
+                <option value="turtle3d" data-tour-id="10">澎湖三天兩夜追風海龜療癒行</option>
+                <option value="family3d" data-tour-id="3">親子海島體驗行程</option>
+                <option value="eco4d"    data-tour-id="4">望安永續生態旅行</option>
+                <option value="turtle4d" data-tour-id="1">2026 跟著海龜漫旅</option>
                 <option value="other">其他（請在備註說明）</option>
               </select>
+            </div>
+            <!-- 梯次選擇（動態顯示） -->
+            <div class="form-group" id="slot-group" style="display:none;">
+              <label for="slot-select"><i class="fas fa-calendar-check"></i> 選擇出發梯次</label>
+              <select id="slot-select" name="slot_id">
+                <option value="">載入中...</option>
+              </select>
+              <div id="slot-status" class="slot-status-hint"></div>
             </div>
             <!-- 備註 -->
             <div class="form-group">
@@ -423,7 +431,7 @@
           <!-- 表單成功提示（預設隱藏） -->
           <div class="form-success" id="form-success" style="display:none;">
             <i class="fas fa-check-circle"></i>
-            <p>諮詢已送出！我們將於一個工作日內與您聯繫。</p>
+            <p id="form-success-msg">諮詢已送出！我們將於一個工作日內與您聯繫。</p>
             <p>也可直接加 LINE：<strong>@phbay2018</strong> 獲得更快速的回覆。</p>
           </div>
         </div>
