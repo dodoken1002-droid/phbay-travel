@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initScrollEffects();
   loadTours();
   initQuiz();
+  initCarousel();
 });
 
 /* ═══════════════════════════════════════════════
@@ -539,6 +540,70 @@ function prefillTour(interest) {
   if (sel && interest) sel.value = interest;
 }
 window.prefillTour = prefillTour;
+
+/* ═══════════════════════════════════════════════
+   首頁輪播
+════════════════════════════════════════════════ */
+let _carouselIdx   = 0;
+let _carouselTotal = 0;
+let _carouselTimer = null;
+
+function initCarousel() {
+  const track  = document.getElementById('carousel-track');
+  const dotsEl = document.getElementById('carousel-dots');
+  if (!track) return;
+
+  _carouselTotal = track.children.length;
+
+  // 建立圓點
+  dotsEl.innerHTML = '';
+  for (let i = 0; i < _carouselTotal; i++) {
+    const d = document.createElement('button');
+    d.className = 'carousel-dot' + (i === 0 ? ' active' : '');
+    d.setAttribute('aria-label', `第 ${i+1} 張`);
+    d.onclick = () => carouselGoTo(i);
+    dotsEl.appendChild(d);
+  }
+
+  carouselGoTo(0);
+  _carouselStartAuto();
+
+  // 暫停自動播放（hover）
+  const carousel = document.getElementById('main-carousel');
+  carousel.addEventListener('mouseenter', _carouselStopAuto);
+  carousel.addEventListener('mouseleave', _carouselStartAuto);
+
+  // 觸控滑動支援
+  let touchX = 0;
+  carousel.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; }, { passive: true });
+  carousel.addEventListener('touchend',   e => {
+    const dx = e.changedTouches[0].clientX - touchX;
+    if (Math.abs(dx) > 40) carouselMove(dx < 0 ? 1 : -1);
+  }, { passive: true });
+}
+
+function carouselGoTo(idx) {
+  _carouselIdx = (idx + _carouselTotal) % _carouselTotal;
+  document.getElementById('carousel-track').style.transform = `translateX(-${_carouselIdx * 100}%)`;
+  document.querySelectorAll('.carousel-dot').forEach((d, i) => {
+    d.classList.toggle('active', i === _carouselIdx);
+  });
+}
+
+function carouselMove(dir) {
+  carouselGoTo(_carouselIdx + dir);
+  _carouselStopAuto();
+  _carouselStartAuto();
+}
+window.carouselMove = carouselMove;
+
+function _carouselStartAuto() {
+  _carouselStopAuto();
+  _carouselTimer = setInterval(() => carouselGoTo(_carouselIdx + 1), 5000);
+}
+function _carouselStopAuto() {
+  if (_carouselTimer) { clearInterval(_carouselTimer); _carouselTimer = null; }
+}
 
 /* ─── 工具函式 ─── */
 function delay(ms) {

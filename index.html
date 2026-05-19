@@ -53,27 +53,69 @@
   </nav>
 
   <!-- ═══════════════════════════════════════════════
-       首頁主視覺 (Hero Section)
-       修改主標題、副標請找 <h1> 與 <p class="hero-subtitle">
+       首頁輪播（3 格）
+       圖片放在 /images/ 目錄，更換圖片只需替換對應檔案
   ════════════════════════════════════════════════ -->
-  <section class="hero" id="home">
-    <div class="hero-overlay"></div>
-    <div class="hero-content">
-      <h1 class="hero-title">潮旅國際旅行社</h1>
-      <p class="hero-subtitle">帶你玩出不一樣的澎湖旅行</p>
-      <p class="hero-tagline">在地深度 × 親子友善 × 永續海洋</p>
-      <div class="hero-buttons">
-        <a href="#tours" class="btn btn-primary">
-          <i class="fas fa-map-marked-alt"></i> 查看推薦行程
-        </a>
-        <a href="#contact" class="btn btn-outline">
-          <i class="fas fa-comment-dots"></i> 立即諮詢
-        </a>
+  <section class="carousel-hero" id="home">
+    <div class="carousel" id="main-carousel">
+
+      <div class="carousel-track" id="carousel-track">
+
+        <!-- ─ 第 1 格：音樂節直式海報 ─ -->
+        <div class="carousel-slide slide-poster">
+          <img src="/images/festival-poster.jpg" alt="2026 澎湖追風音樂燈光節" />
+          <div class="slide-overlay">
+            <a href="#contact" class="btn btn-primary slide-cta">
+              <i class="fas fa-comment-dots"></i> 詢問搭配行程
+            </a>
+          </div>
+        </div>
+
+        <!-- ─ 第 2 格：音樂節橫式 Banner ─ -->
+        <div class="carousel-slide slide-banner">
+          <img src="/images/festival-banner.jpg" alt="2026 澎湖追風音樂燈光節 Banner" />
+          <div class="slide-overlay">
+            <a href="#contact" class="btn btn-primary slide-cta">
+              <i class="fas fa-comment-dots"></i> 詢問搭配行程
+            </a>
+          </div>
+        </div>
+
+        <!-- ─ 第 3 格：潮旅主視覺 ─ -->
+        <div class="carousel-slide slide-hero">
+          <div class="hero-overlay"></div>
+          <div class="hero-content">
+            <h1 class="hero-title">潮旅國際旅行社</h1>
+            <p class="hero-subtitle">帶你玩出不一樣的澎湖旅行</p>
+            <p class="hero-tagline">在地深度 × 親子友善 × 永續海洋</p>
+            <div class="hero-buttons">
+              <a href="#tours" class="btn btn-primary">
+                <i class="fas fa-map-marked-alt"></i> 查看推薦行程
+              </a>
+              <a href="#contact" class="btn btn-outline">
+                <i class="fas fa-comment-dots"></i> 立即諮詢
+              </a>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- end carousel-track -->
+
+      <!-- 左右箭頭 -->
+      <button class="carousel-arrow carousel-prev" aria-label="上一張" onclick="carouselMove(-1)">
+        <i class="fas fa-chevron-left"></i>
+      </button>
+      <button class="carousel-arrow carousel-next" aria-label="下一張" onclick="carouselMove(1)">
+        <i class="fas fa-chevron-right"></i>
+      </button>
+
+      <!-- 底部圓點 -->
+      <div class="carousel-dots" id="carousel-dots"></div>
+
+      <!-- 向下滾動提示 -->
+      <div class="hero-scroll-hint">
+        <i class="fas fa-chevron-down"></i>
       </div>
-    </div>
-    <!-- 向下滾動指示箭頭 -->
-    <div class="hero-scroll-hint">
-      <i class="fas fa-chevron-down"></i>
     </div>
   </section>
 
@@ -395,9 +437,18 @@
        修改文字請直接修改 <span> 內容
   ════════════════════════════════════════════════ -->
   <div class="bottom-banner" id="bottom-banner">
-    <span>潮旅國際旅行社｜專業澎湖旅遊行程規劃</span>
+    <div class="banner-festival">
+      <span class="banner-festival-tag">🎵 2026</span>
+      <span class="banner-festival-name">澎湖追風音樂燈光節</span>
+      <span class="banner-sep">｜</span>
+      <span>澎湖觀音亭園區</span>
+      <span class="banner-sep">｜</span>
+      <span>燈光展演 9/12–10/11</span>
+      <span class="banner-sep d-mobile-none">｜</span>
+      <span class="d-mobile-none">藝人展演 9/12・9/13・9/19・9/26・10/3</span>
+    </div>
     <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" class="banner-line-btn">
-      <i class="fab fa-line"></i> 立即加入 LINE
+      <i class="fab fa-line"></i> 立即諮詢
     </a>
   </div>
 

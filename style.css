@@ -201,8 +201,134 @@ ul { list-style: none; }
 }
 
 /* ═══════════════════════════════════════════════
-   Hero 主視覺
+   Hero 主視覺 / 輪播
 ════════════════════════════════════════════════ */
+
+/* ── 輪播外框 ── */
+.carousel-hero { position: relative; overflow: hidden; }
+.carousel      { position: relative; width: 100%; overflow: hidden; }
+.carousel-track {
+  display: flex;
+  transition: transform .6s cubic-bezier(.4,0,.2,1);
+  will-change: transform;
+}
+
+/* ── 通用 slide ── */
+.carousel-slide {
+  flex: 0 0 100%;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 第 1 格：直式海報（粉紅底色，保持比例置中） */
+.slide-poster {
+  background: #e8197a;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.slide-poster img {
+  max-height: 100vh;
+  max-width: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* 第 2 格：橫式 Banner（全寬覆蓋） */
+.slide-banner {
+  background: #d61779;
+  min-height: 56vw;
+  max-height: 100vh;
+  display: flex;
+  align-items: center;
+}
+.slide-banner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* 第 3 格：潮旅主視覺（原 hero 樣式） */
+.slide-hero {
+  min-height: 100vh;
+  background: url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&q=85') center / cover no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+/* slide 上的半透明遮罩 CTA（海報/banner 用） */
+.slide-overlay {
+  position: absolute;
+  bottom: 40px;
+  left: 0; right: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 3;
+}
+.slide-cta { box-shadow: 0 4px 20px rgba(0,0,0,.3); }
+
+/* ── 左右箭頭 ── */
+.carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  background: rgba(255,255,255,.25);
+  backdrop-filter: blur(6px);
+  border: none;
+  color: #fff;
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background .2s;
+  display: flex; align-items: center; justify-content: center;
+}
+.carousel-arrow:hover { background: rgba(255,255,255,.45); }
+.carousel-prev { left: 20px; }
+.carousel-next { right: 20px; }
+
+/* ── 底部圓點 ── */
+.carousel-dots {
+  position: absolute;
+  bottom: 18px;
+  left: 0; right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  z-index: 10;
+}
+.carousel-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.5);
+  border: none;
+  cursor: pointer;
+  transition: .25s;
+  padding: 0;
+}
+.carousel-dot.active {
+  background: #fff;
+  transform: scale(1.25);
+}
+
+/* ── 底部 Banner 音樂節樣式 ── */
+.banner-festival {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 6px;
+}
+.banner-festival-tag  { background:rgba(255,255,255,.2); border-radius:12px; padding:1px 8px; font-weight:800; }
+.banner-festival-name { font-weight:800; letter-spacing:.02em; }
+.d-mobile-none { }
+
+/* ── 保留舊 .hero 選擇器相容性 ── */
 .hero {
   min-height: 100vh;
   background: url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&q=85') center / cover no-repeat;
@@ -1160,10 +1286,15 @@ ul { list-style: none; }
   .nav-links.open { display: flex; }
   .nav-links a { padding: 12px 16px; border-radius: 8px; font-size: 1rem; }
 
-  /* Hero */
+  /* Hero / Carousel */
   .hero-title { font-size: 2rem; }
   .hero-subtitle { font-size: 1rem; }
   .hero-buttons { flex-direction: column; align-items: center; }
+  .carousel-arrow { width: 36px; height: 36px; font-size: .9rem; }
+  .carousel-prev { left: 10px; }
+  .carousel-next { right: 10px; }
+  .slide-banner { min-height: 50vw; }
+  .d-mobile-none { display: none; }
   .hero-buttons .btn { width: 100%; max-width: 280px; justify-content: center; }
 
   /* 行程 Tab */
