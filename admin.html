@@ -907,6 +907,7 @@ function openSlotForm() {
     `<option value="${t.id}">${t.title}</option>`).join('');
 
   const overlay = document.createElement('div');
+  overlay.id = 'slot-form-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center';
   overlay.innerHTML = `
     <div style="background:#fff;border-radius:12px;padding:28px;width:420px;max-width:95vw">
@@ -931,7 +932,7 @@ function openSlotForm() {
         </div>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button class="btn btn-ghost" onclick="this.closest('div[style]').remove()">取消</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('slot-form-overlay').remove()">取消</button>
         <button class="btn btn-primary" onclick="submitSlotForm()">新增</button>
       </div>
     </div>`;
@@ -955,7 +956,8 @@ function submitSlotForm() {
   .then(d => {
     if (d.ok) {
       showToast('梯次已新增');
-      document.querySelector('div[style*="position:fixed"]').remove();
+      const ov = document.getElementById('slot-form-overlay');
+      if (ov) ov.remove();
       loadSlots();
     } else {
       showToast(d.error || '新增失敗', 'error');
