@@ -366,19 +366,20 @@ function renderTourCard(tour) {
 
   const btnClass = isHero ? 'btn btn-card btn-card--hero' : 'btn btn-card';
 
-  // 梯次名額摘要
+  // 梯次名額摘要（顯示全部梯次）
   const slots = _allSlots[tour.id] || [];
   let slotHtml = '';
   if (slots.length) {
-    const soonest = slots[0];
-    const chip = soonest.status === 'full_wl_full'
-      ? `<span class="slot-chip chip-full">⛔ 已額滿</span>`
-      : soonest.status === 'waitlist'
-      ? `<span class="slot-chip chip-waitlist">🔴 候補 ${soonest.wl_remaining} 位</span>`
-      : soonest.status === 'low'
-      ? `<span class="slot-chip chip-low">🟡 剩 ${soonest.remaining} 位</span>`
-      : `<span class="slot-chip chip-ok">🟢 剩 ${soonest.remaining} 位</span>`;
-    slotHtml = `<div class="slot-summary">${chip} <span class="slot-date">${soonest.date_label}</span></div>`;
+    const chipsHtml = slots.map(s => {
+      if (s.status === 'full_wl_full')
+        return `<span class="slot-chip chip-full">⛔ ${s.date_label}</span>`;
+      if (s.status === 'waitlist')
+        return `<span class="slot-chip chip-waitlist">🔴 ${s.date_label} 候補${s.wl_remaining}位</span>`;
+      if (s.status === 'low')
+        return `<span class="slot-chip chip-low">🟡 ${s.date_label} 剩${s.remaining}位</span>`;
+      return `<span class="slot-chip chip-ok">🟢 ${s.date_label} 剩${s.remaining}位</span>`;
+    }).join('');
+    slotHtml = `<div class="slot-summary">${chipsHtml}</div>`;
   }
 
   card.innerHTML = `
