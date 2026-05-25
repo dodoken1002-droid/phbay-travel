@@ -469,8 +469,8 @@ function renderTourModal(tour) {
     <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
     <div class="${headerClass}">${headerInner}</div>
     <div class="modal-body">
-      ${priceSection}
       ${datesHtml}
+      ${priceSection}
       ${hlHtml}
       ${daysHtml}
       ${includesHtml}
