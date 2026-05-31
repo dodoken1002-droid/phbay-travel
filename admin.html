@@ -846,8 +846,11 @@ function loadSlots() {
             const activeBtn = s.is_active
               ? `<button class="btn btn-sm btn-ghost" onclick="toggleSlot(${s.id},false)">下架</button>`
               : `<button class="btn btn-sm btn-success" onclick="toggleSlot(${s.id},true)">上架</button>`;
+            const safeLabel = String(s.date_label).replace(/"/g, '&quot;');
             return `<tr style="${!s.is_active?'opacity:.5':''}">
-              <td><strong>${s.date_label}</strong></td>
+              <td><input type="text" value="${safeLabel}" style="width:200px;font-weight:700"
+                title="可直接修改梯次日期/名稱，離開欄位即儲存"
+                onchange="patchSlot(${s.id},'date_label',this.value)" /></td>
               <td><input type="number" value="${s.capacity}" min="1" style="width:60px;text-align:center"
                 onchange="patchSlot(${s.id},'capacity',this.value)" /></td>
               <td><input type="number" value="${s.booked}" min="0" style="width:60px;text-align:center"
@@ -869,14 +872,25 @@ function loadSlots() {
   });
 }
 
+// 文字欄位（不做 parseInt）
+const SLOT_TEXT_FIELDS = ['date_label'];
+
 function patchSlot(id, field, value) {
+  // 文字欄位防呆：日期/名稱不可空白
+  if (SLOT_TEXT_FIELDS.includes(field) && !String(value).trim()) {
+    showToast('梯次日期不可空白', 'error');
+    loadSlots();
+    return;
+  }
   // 找出該 slot 的完整資料再 PUT
   fetch(`/api/admin/slots?key=${encodeURIComponent(ADMIN_KEY)}`)
     .then(r => r.json())
     .then(d => {
       const slot = d.slots.find(s => s.id === id);
       if (!slot) return;
-      slot[field] = parseInt(value) || 0;
+      slot[field] = SLOT_TEXT_FIELDS.includes(field)
+        ? String(value).trim()
+        : (parseInt(value) || 0);
       return fetch(`/api/admin/slots/${id}`, {
         method:'PUT',
         headers:{'Content-Type':'application/json','X-Admin-Key':ADMIN_KEY},
