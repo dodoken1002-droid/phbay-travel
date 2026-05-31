@@ -2,7 +2,7 @@
 
 > 適用：潮旅國際旅行社官網
 > 測量 ID：`G-47DV1VPF9J`
-> 網站：https://web-production-83d7b.up.railway.app/
+> 網站：https://www.phbay.info/
 
 ---
 
@@ -25,7 +25,7 @@
 
 ## 🎯 最快驗證法（3 步）
 
-1. **手機**開 https://web-production-83d7b.up.railway.app/ （避開電腦的廣告外掛與快取）
+1. **手機**開 https://www.phbay.info/ （避開電腦的廣告外掛與快取）
 2. 在頁面上捲動停留約 10 秒
 3. 電腦 GA4 看 **報表 → 即時** → 應出現「使用者：1」
 
