@@ -759,22 +759,32 @@ function loadContacts() {
           '<p style="color:#a0aec0;text-align:center;padding:40px">尚無諮詢紀錄</p>';
         return;
       }
-      const tourMap = {
+      // 舊資料的行程代碼對照（新資料已直接存中文名稱，免對照）
+      const legacyMap = {
         classic3d:'澎湖經典三日遊', family3d:'親子海島體驗', eco4d:'望安永續生態',
-        sup2d:'SUP × 浮潛', other:'其他',
+        sup2d:'SUP × 浮潛', flower3d:'花路追風之旅', turtle3d:'澎湖三天兩夜追風海龜療癒行',
+        turtle4d:'2026 跟著海龜漫旅', other:'其他',
       };
-      document.getElementById('contacts-list').innerHTML = d.contacts.map(c => `
+      document.getElementById('contacts-list').innerHTML = d.contacts.map(c => {
+        const wl = c.is_waitlist
+          ? '<span style="color:#dd6b20;font-weight:700">🔴 候補</span>'
+          : (c.slot_id ? '<span style="color:#38a169;font-weight:700">🟢 正團</span>' : '—');
+        return `
         <div class="contact-card">
           <div class="contact-field"><label>姓名</label><span>${c.name}</span></div>
           <div class="contact-field"><label>電話</label><span>${c.phone}</span></div>
-          <div class="contact-field"><label>旅遊日期</label><span>${c.travel_date||'—'}</span></div>
+          <div class="contact-field"><label>旅遊日期</label><span>${c.travel_date||'—'}${c.travel_date_end?' ~ '+c.travel_date_end:''}</span></div>
           <div class="contact-field"><label>人數</label><span>${c.people||'—'}</span></div>
+          <div class="contact-field"><label>交通／出發地</label><span>${c.transport||'—'}${c.departure_city?'｜'+c.departure_city:''}</span></div>
+          <div class="contact-field"><label>預算</label><span>${c.budget||'—'}</span></div>
           <div class="contact-field"><label>行程</label>
-            <span>${tourMap[c.tour_interest]||c.tour_interest||'—'}</span></div>
+            <span>${legacyMap[c.tour_interest]||c.tour_interest||'—'}</span></div>
+          <div class="contact-field"><label>梯次狀態</label><span>${wl}</span></div>
           <div class="contact-field"><label>備註</label><span>${c.notes||'—'}</span></div>
           <div class="contact-field"><label>送出時間</label>
             <span style="font-size:.78rem">${c.created_at}</span></div>
-        </div>`).join('');
+        </div>`;
+      }).join('');
     });
 }
 

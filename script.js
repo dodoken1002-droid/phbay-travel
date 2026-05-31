@@ -12,6 +12,9 @@ document.addEventListener('DOMContentLoaded', () => {
   loadTours();
   initQuiz();
   initCarousel();
+  // Footer 版權年份自動更新
+  const yr = document.getElementById('footer-year');
+  if (yr) yr.textContent = new Date().getFullYear();
 });
 
 /* ═══════════════════════════════════════════════
@@ -205,14 +208,31 @@ function initContactForm() {
 // ─── 梯次名額：依行程載入 ────────────────────────────────
 let _slotsCache = {};   // { tourId: [slot, ...] }
 
-async function loadSlotOptions(tourInterestVal) {
+// 依資料庫行程動態填入「有興趣的行程」下拉
+function populateTourInterest(tours) {
+  const sel = document.getElementById('tour-interest');
+  if (!sel) return;
+  const otherOpt = document.getElementById('tour-interest-other');
+  // 移除舊的動態 option（保留 placeholder 與「其他」）
+  [...sel.querySelectorAll('option[data-dyn="1"]')].forEach(o => o.remove());
+  tours.forEach(t => {
+    const o = document.createElement('option');
+    o.value = t.title;                 // 儲存行程名稱，後台直接顯示
+    o.dataset.tourId = t.id;           // 供梯次連動使用
+    o.dataset.dyn = '1';
+    o.textContent = t.title;
+    sel.insertBefore(o, otherOpt);     // 插在「其他」之前
+  });
+}
+
+async function loadSlotOptions(selectEl) {
   const group  = document.getElementById('slot-group');
   const select = document.getElementById('slot-select');
   const hint   = document.getElementById('slot-status');
   if (!group || !select) return;
 
-  // 找出選擇的 option 的 data-tour-id
-  const opt    = document.querySelector(`#tour-interest option[value="${tourInterestVal}"]`);
+  // 讀取目前選取 option 上的 data-tour-id（由動態填入時帶入）
+  const opt    = selectEl && selectEl.selectedOptions ? selectEl.selectedOptions[0] : null;
   const tourId = opt ? opt.dataset.tourId : null;
 
   if (!tourId) { group.style.display = 'none'; return; }
@@ -335,6 +355,15 @@ async function loadTours() {
         renderTourModal(tour);
       });
     });
+
+    // 用唯一行程清單填入諮詢表單下拉（不再寫死 ID）
+    const seen = new Set();
+    const uniqueTours = [];
+    Object.values(grouped).flat().forEach(t => {
+      if (!seen.has(t.id)) { seen.add(t.id); uniqueTours.push(t); }
+    });
+    uniqueTours.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    populateTourInterest(uniqueTours);
   } catch (err) {
     console.error('loadTours 失敗:', err);
     document.querySelectorAll('.tours-loading').forEach(el => {
