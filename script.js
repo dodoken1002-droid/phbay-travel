@@ -194,6 +194,16 @@ function initContactForm() {
       success.style.display = 'block';
       success.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
+      // GA4 轉換事件：記錄一筆諮詢成立
+      if (typeof gtag === 'function') {
+        gtag('event', 'generate_lead', {
+          tour_interest: data.tour_interest || '(未選)',
+          transport:     data.transport || '',
+          people:        data.people || '',
+          is_waitlist:   !!result.is_waitlist,
+        });
+      }
+
       // 重新整理該梯次名額顯示
       if (data.slot_id) refreshSlotStatus(data.slot_id);
 
