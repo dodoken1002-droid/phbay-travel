@@ -1,5 +1,8 @@
+# 一般搜尋引擎與 AI 爬蟲皆歡迎索引（GEO/AEO）
 User-agent: *
 Allow: /
 Disallow: /admin
+
+# AI 引擎說明檔：https://www.phbay.info/llms.txt
 
 Sitemap: https://www.phbay.info/sitemap.xml

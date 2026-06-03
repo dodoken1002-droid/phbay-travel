@@ -36,6 +36,18 @@
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 
+  <!-- ─── 麵包屑結構化資料（助 Google／AI 理解網站結構）─── -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "首頁", "item": "https://www.phbay.info/" },
+      { "@type": "ListItem", "position": 2, "name": "常見問題", "item": "https://www.phbay.info/faq.html" }
+    ]
+  }
+  </script>
+
   <style>
     /* ── FAQ 頁專屬樣式 ── */
     .faq-hero {

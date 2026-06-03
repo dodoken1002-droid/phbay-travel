@@ -43,34 +43,78 @@
   <!-- Font Awesome for icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 
-  <!-- ─── 結構化資料 JSON-LD（旅行社營業資訊，助 Google 收錄）─── -->
+  <!-- ─── 結構化資料 JSON-LD（旅行社營業資訊，助 Google／AI 引擎理解）─── -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "TravelAgency",
+    "@id": "https://www.phbay.info/#organization",
     "name": "潮旅國際旅行社",
-    "description": "澎湖在地深度旅遊專家，提供親子海島、望安綠蠵龜生態、SUP 浮潛與音樂節主題行程。",
+    "alternateName": "Phbay Travel",
+    "slogan": "帶你玩出不一樣的澎湖旅行",
+    "description": "潮旅國際旅行社是澎湖在地深度旅遊專家，提供親子海島體驗、望安綠蠵龜生態、七美跳島、SUP 浮潛、潮間帶、夜釣小管與 2026 澎湖追風音樂燈光節主題行程。在地嚮導親自規劃，兩人即可成行。交觀乙第1864號、澎品保0188號。",
     "url": "https://www.phbay.info/",
     "image": "https://www.phbay.info/images/festival-poster.png",
+    "logo": "https://www.phbay.info/images/festival-poster.png",
     "telephone": "+886-6-9271288",
     "email": "dodoken1002@phbay.net",
     "founder": "唐瑋汝",
+    "priceRange": "NT$4,500 - NT$15,000",
+    "currenciesAccepted": "TWD",
     "address": {
       "@type": "PostalAddress",
       "addressRegion": "澎湖縣",
       "addressLocality": "馬公市",
       "addressCountry": "TW"
     },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": 23.5655,
+      "longitude": 119.5860
+    },
+    "areaServed": {
+      "@type": "Place",
+      "name": "澎湖縣（馬公、白沙、西嶼、望安、七美、吉貝等離島）"
+    },
+    "knowsAbout": [
+      "澎湖旅遊", "澎湖跳島", "望安綠蠵龜生態", "七美雙心石滬", "吉貝水上活動",
+      "澎湖浮潛", "SUP 立槳", "夜釣小管", "潮間帶體驗", "澎湖跨海大橋",
+      "澎湖玄武岩", "2026 澎湖追風音樂燈光節", "親子海島旅遊", "澎湖自由行"
+    ],
     "openingHoursSpecification": {
       "@type": "OpeningHoursSpecification",
       "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
       "opens": "08:30",
       "closes": "17:30"
     },
+    "hasOfferCatalog": {
+      "@type": "OfferCatalog",
+      "name": "澎湖旅遊行程",
+      "itemListElement": [
+        { "@type": "OfferCatalog", "name": "2 天 1 夜行程" },
+        { "@type": "OfferCatalog", "name": "3 天 2 夜行程" },
+        { "@type": "OfferCatalog", "name": "4 天 3 夜行程" },
+        { "@type": "OfferCatalog", "name": "望安綠蠵龜生態行程" },
+        { "@type": "OfferCatalog", "name": "親子海島體驗行程" },
+        { "@type": "OfferCatalog", "name": "澎湖追風音樂燈光節主題行程" }
+      ]
+    },
     "sameAs": [
       "https://www.facebook.com/phbay2018",
       "https://www.instagram.com/phbay_2021/"
     ]
+  }
+  </script>
+
+  <!-- ─── WebSite 結構化資料 ─── -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "潮旅國際旅行社",
+    "url": "https://www.phbay.info/",
+    "inLanguage": "zh-TW",
+    "publisher": { "@id": "https://www.phbay.info/#organization" }
   }
   </script>
 </head>
