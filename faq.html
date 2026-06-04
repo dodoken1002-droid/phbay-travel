@@ -149,194 +149,204 @@
         <span></span><span></span><span></span>
       </button>
       <ul class="nav-links" id="nav-links">
-        <li><a href="index.html#home">首頁</a></li>
-        <li><a href="index.html#tours">行程介紹</a></li>
-        <li><a href="index.html#quiz">行程測驗</a></li>
-        <li><a href="faq.html">常見問題</a></li>
-        <li><a href="index.html#contact">聯絡我們</a></li>
+        <li><a href="index.html#home" data-i18n="nav.home">首頁</a></li>
+        <li><a href="index.html#tours" data-i18n="nav.tours">行程介紹</a></li>
+        <li><a href="index.html#quiz" data-i18n="nav.quiz">行程測驗</a></li>
+        <li><a href="faq.html" data-i18n="nav.faq">常見問題</a></li>
+        <li><a href="index.html#contact" data-i18n="nav.contact">聯絡我們</a></li>
+        <li class="lang-switch">
+          <button class="lang-btn" id="lang-btn" aria-label="Language">🌐 <span id="lang-current">中文</span> <i class="fas fa-chevron-down" style="font-size:.7em"></i></button>
+          <ul class="lang-menu" id="lang-menu">
+            <li><button data-lang="zh-tw">繁體中文</button></li>
+            <li><button data-lang="en">English</button></li>
+            <li><button data-lang="ja">日本語</button></li>
+            <li><button data-lang="ko">한국어</button></li>
+            <li><button data-lang="zh-cn">简体中文</button></li>
+          </ul>
+        </li>
       </ul>
     </div>
   </nav>
 
   <!-- FAQ Hero -->
   <header class="faq-hero">
-    <h1><i class="fas fa-circle-question"></i> 澎湖旅遊常見問題 100 問</h1>
-    <p>第一次來澎湖？怎麼去、幾月去、玩什麼、吃什麼、花多少？澎湖在地旅行社為你一次解答最常被問到的 100 個問題。</p>
+    <h1 data-i18n="faq.heroTitle"><i class="fas fa-circle-question"></i> 澎湖旅遊常見問題 100 問</h1>
+    <p data-i18n="faq.heroDesc">第一次來澎湖？怎麼去、幾月去、玩什麼、吃什麼、花多少？澎湖在地旅行社為你一次解答最常被問到的 100 個問題。</p>
   </header>
 
   <main class="faq-main">
 
     <!-- 分類目錄 -->
     <nav class="faq-toc">
-      <a href="#cat-traffic">🚢 交通抵達</a>
-      <a href="#cat-season">☀️ 季節天氣</a>
-      <a href="#cat-stay">🏨 住宿</a>
-      <a href="#cat-spot">📸 景點</a>
-      <a href="#cat-island">🏝️ 跳島離島</a>
-      <a href="#cat-water">🤿 水上活動</a>
-      <a href="#cat-food">🍤 美食</a>
-      <a href="#cat-family">👨‍👩‍👧 親子家庭</a>
-      <a href="#cat-plan">💰 預算規劃</a>
-      <a href="#cat-info">🎵 音樂節與實用資訊</a>
+      <a href="#cat-traffic" data-i18n="faq.tocTraffic">🚢 交通抵達</a>
+      <a href="#cat-season" data-i18n="faq.tocSeason">☀️ 季節天氣</a>
+      <a href="#cat-stay" data-i18n="faq.tocStay">🏨 住宿</a>
+      <a href="#cat-spot" data-i18n="faq.tocSpot">📸 景點</a>
+      <a href="#cat-island" data-i18n="faq.tocIsland">🏝️ 跳島離島</a>
+      <a href="#cat-water" data-i18n="faq.tocWater">🤿 水上活動</a>
+      <a href="#cat-food" data-i18n="faq.tocFood">🍤 美食</a>
+      <a href="#cat-family" data-i18n="faq.tocFamily">👨‍👩‍👧 親子家庭</a>
+      <a href="#cat-plan" data-i18n="faq.tocPlan">💰 預算規劃</a>
+      <a href="#cat-info" data-i18n="faq.tocInfo">🎵 音樂節與實用資訊</a>
     </nav>
 
     <!-- ═══ 1. 交通抵達 ═══ -->
     <section class="faq-cat" id="cat-traffic">
-      <h2><i class="fas fa-ship"></i> 交通與抵達</h2>
+      <h2 data-i18n="faq.catTraffic"><i class="fas fa-ship"></i> 交通與抵達</h2>
     </section>
-    <div class="faq-item"><button class="faq-q">怎麼去澎湖？</button><div class="faq-a">澎湖是離島，主要靠<strong>飛機</strong>或<strong>搭船</strong>前往。最快的方式是搭國內線飛機到馬公機場，約 40–50 分鐘；想省一點可以從嘉義布袋港或高雄搭客輪。我們可協助依你的出發地規劃最順的交通方式。</div></div>
-    <div class="faq-item"><button class="faq-q">從台灣哪些機場有飛澎湖？</button><div class="faq-a">目前飛澎湖（馬公機場）的航線主要有<strong>台北松山、台中、嘉義、台南、高雄</strong>等出發點，由華信、立榮等航空執飛。班次依季節調整，旺季建議提早訂位。</div></div>
-    <div class="faq-item"><button class="faq-q">搭飛機到澎湖要多久？</button><div class="faq-a">從西部各機場飛馬公約 <strong>35–50 分鐘</strong>，是最快、最輕鬆的方式，幾乎沒有暈機問題，很適合帶長輩或小孩。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖有船可以搭嗎？從哪裡搭？</button><div class="faq-a">有的。最常見是從<strong>嘉義布袋港</strong>搭客輪到馬公，也有<strong>高雄</strong>出發的航線。布袋港船程約 1.5–2 小時，班次和票價依季節與船公司而定。</div></div>
-    <div class="faq-item"><button class="faq-q">搭船到澎湖會暈船嗎？</button><div class="faq-a">現代客輪多為大型穩定船種，風浪小時很平穩；但遇到風浪較大的季節仍可能晃動。容易暈船的人建議<strong>提前服用暈船藥</strong>、選船中後段座位，或直接搭飛機更保險。</div></div>
-    <div class="faq-item"><button class="faq-q">去澎湖搭飛機還是搭船划算？</button><div class="faq-a">飛機快、舒適，但票價較高、暑假更貴；搭船便宜、可看海景，但耗時較長、受天候影響大。我們會依預算與人數，幫你比較「機票方案」與「船票方案」哪個更適合。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖機場到馬公市區多遠？怎麼去？</button><div class="faq-a">馬公機場距市區約 <strong>7 公里、車程 15 分鐘</strong>。可搭計程車、租車自駕，或由我們安排專車接送，下機就有人接最省心。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖適合自己開車嗎？需要租車嗎？</button><div class="faq-a">澎湖本島景點分散，<strong>自駕或租機車是主流玩法</strong>。不想自己開的話，我們的行程都含專車與在地導遊，定點接送、講解兼顧，更輕鬆。</div></div>
-    <div class="faq-item"><button class="faq-q">在澎湖租機車要注意什麼？</button><div class="faq-a">需備有效駕照，租車時檢查車況並拍照存證。澎湖<strong>風大、部分路段砂石多</strong>，務必戴安全帽、放慢速度，雨天路滑更要小心。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖有公車或大眾運輸嗎？</button><div class="faq-a">有公車但班次不密、路線有限，純靠公車玩會比較受限。多數旅客選擇租車、包車或<strong>跟含接送的行程</strong>，機動性高很多。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖計程車方便嗎？</button><div class="faq-a">市區與機場叫車方便，但偏遠景點較難隨招隨有，建議事先預約。多點移動或跳島時，包車或跟團通常更划算、更省時。</div></div>
-    <div class="faq-item"><button class="faq-q">暑假去澎湖的機票、船票要多早訂？</button><div class="faq-a">7–8 月與連假是<strong>超級旺季</strong>，機位、船位和住宿經常一位難求，建議<strong>提前 1–2 個月</strong>就訂，越早越有選擇與好價格。交給我們可一次幫你搞定機加酒。</div></div>
-    <div class="faq-item"><button class="faq-q">可以帶寵物去澎湖嗎？</button><div class="faq-a">可以，但各航空與船公司對寵物搭乘有不同規定（須提前申請、備籠具、健康證明等），住宿也需確認是否寵物友善。建議出發前先諮詢我們協助確認。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖跳島的船班怎麼搭？</button><div class="faq-a">前往七美、望安、吉貝等離島，要從南海或北海遊客中心搭<strong>交通船或遊艇</strong>，班次依季節與天候調整。跳島行程的船班我們會一併安排，免去自己排隊買票的麻煩。</div></div>
-    <div class="faq-item"><button class="faq-q">颱風天澎湖航班會停嗎？怎麼辦？</button><div class="faq-a">颱風或強風浪時，飛機與船班可能<strong>延誤或停駛</strong>。我們的行程備有彈性方案與天候應變（如改本島深度路線），並協助你處理改期事宜，降低風險。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q1">怎麼去澎湖？</button><div class="faq-a" data-i18n-html="faq.a1">澎湖是離島，主要靠<strong>飛機</strong>或<strong>搭船</strong>前往。最快的方式是搭國內線飛機到馬公機場，約 40–50 分鐘；想省一點可以從嘉義布袋港或高雄搭客輪。我們可協助依你的出發地規劃最順的交通方式。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q2">從台灣哪些機場有飛澎湖？</button><div class="faq-a" data-i18n-html="faq.a2">目前飛澎湖（馬公機場）的航線主要有<strong>台北松山、台中、嘉義、台南、高雄</strong>等出發點，由華信、立榮等航空執飛。班次依季節調整，旺季建議提早訂位。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q3">搭飛機到澎湖要多久？</button><div class="faq-a" data-i18n-html="faq.a3">從西部各機場飛馬公約 <strong>35–50 分鐘</strong>，是最快、最輕鬆的方式，幾乎沒有暈機問題，很適合帶長輩或小孩。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q4">澎湖有船可以搭嗎？從哪裡搭？</button><div class="faq-a" data-i18n-html="faq.a4">有的。最常見是從<strong>嘉義布袋港</strong>搭客輪到馬公，也有<strong>高雄</strong>出發的航線。布袋港船程約 1.5–2 小時，班次和票價依季節與船公司而定。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q5">搭船到澎湖會暈船嗎？</button><div class="faq-a" data-i18n-html="faq.a5">現代客輪多為大型穩定船種，風浪小時很平穩；但遇到風浪較大的季節仍可能晃動。容易暈船的人建議<strong>提前服用暈船藥</strong>、選船中後段座位，或直接搭飛機更保險。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q6">去澎湖搭飛機還是搭船划算？</button><div class="faq-a" data-i18n-html="faq.a6">飛機快、舒適，但票價較高、暑假更貴；搭船便宜、可看海景，但耗時較長、受天候影響大。我們會依預算與人數，幫你比較「機票方案」與「船票方案」哪個更適合。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q7">澎湖機場到馬公市區多遠？怎麼去？</button><div class="faq-a" data-i18n-html="faq.a7">馬公機場距市區約 <strong>7 公里、車程 15 分鐘</strong>。可搭計程車、租車自駕，或由我們安排專車接送，下機就有人接最省心。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q8">澎湖適合自己開車嗎？需要租車嗎？</button><div class="faq-a" data-i18n-html="faq.a8">澎湖本島景點分散，<strong>自駕或租機車是主流玩法</strong>。不想自己開的話，我們的行程都含專車與在地導遊，定點接送、講解兼顧，更輕鬆。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q9">在澎湖租機車要注意什麼？</button><div class="faq-a" data-i18n-html="faq.a9">需備有效駕照，租車時檢查車況並拍照存證。澎湖<strong>風大、部分路段砂石多</strong>，務必戴安全帽、放慢速度，雨天路滑更要小心。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q10">澎湖有公車或大眾運輸嗎？</button><div class="faq-a" data-i18n-html="faq.a10">有公車但班次不密、路線有限，純靠公車玩會比較受限。多數旅客選擇租車、包車或<strong>跟含接送的行程</strong>，機動性高很多。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q11">澎湖計程車方便嗎？</button><div class="faq-a" data-i18n-html="faq.a11">市區與機場叫車方便，但偏遠景點較難隨招隨有，建議事先預約。多點移動或跳島時，包車或跟團通常更划算、更省時。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q12">暑假去澎湖的機票、船票要多早訂？</button><div class="faq-a" data-i18n-html="faq.a12">7–8 月與連假是<strong>超級旺季</strong>，機位、船位和住宿經常一位難求，建議<strong>提前 1–2 個月</strong>就訂，越早越有選擇與好價格。交給我們可一次幫你搞定機加酒。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q13">可以帶寵物去澎湖嗎？</button><div class="faq-a" data-i18n-html="faq.a13">可以，但各航空與船公司對寵物搭乘有不同規定（須提前申請、備籠具、健康證明等），住宿也需確認是否寵物友善。建議出發前先諮詢我們協助確認。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q14">澎湖跳島的船班怎麼搭？</button><div class="faq-a" data-i18n-html="faq.a14">前往七美、望安、吉貝等離島，要從南海或北海遊客中心搭<strong>交通船或遊艇</strong>，班次依季節與天候調整。跳島行程的船班我們會一併安排，免去自己排隊買票的麻煩。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q15">颱風天澎湖航班會停嗎？怎麼辦？</button><div class="faq-a" data-i18n-html="faq.a15">颱風或強風浪時，飛機與船班可能<strong>延誤或停駛</strong>。我們的行程備有彈性方案與天候應變（如改本島深度路線），並協助你處理改期事宜，降低風險。</div></div>
 
     <!-- ═══ 2. 季節天氣 ═══ -->
     <section class="faq-cat" id="cat-season">
-      <h2><i class="fas fa-sun"></i> 最佳季節與天氣</h2>
+      <h2 data-i18n="faq.catSeason"><i class="fas fa-sun"></i> 最佳季節與天氣</h2>
     </section>
-    <div class="faq-item"><button class="faq-q">澎湖幾月去最好？</button><div class="faq-a">最推薦 <strong>4 月到 9 月</strong>：天氣穩定、海水溫暖、適合玩水與跳島。4–6 月有花火節、人潮相對少；7–8 月最熱鬧但也最貴。9–10 月白天仍溫暖，還能搭上音樂燈光節。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖的旅遊旺季是什麼時候？</button><div class="faq-a">旺季落在 <strong>4–9 月</strong>，尤其暑假 7–8 月與花火節期間最熱門。想避開人潮又有好天氣，可選 4–6 月或 9 月。</div></div>
-    <div class="faq-item"><button class="faq-q">冬天可以去澎湖嗎？</button><div class="faq-a">可以，但冬天（11–2 月）<strong>東北季風強、風大偏冷</strong>，不適合玩水，部分店家與船班也會休息。冬天適合想避開人潮、體驗在地生活與美食的旅客。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖花火節是什麼時候？</button><div class="faq-a">澎湖國際海上花火節通常在<strong>每年 4–6 月</strong>舉行，於觀音亭施放，是澎湖最具代表性的活動之一。確切場次每年公告，想搭配花火的行程歡迎詢問我們。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖夏天會很熱嗎？</button><div class="faq-a">夏天日照強、體感熱，但因為是海島、海風吹拂，<strong>比都市悶熱感好一些</strong>。務必做好防曬、多補水，玩水活動安排在上午或傍晚更舒適。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖的風很大嗎？</button><div class="faq-a">澎湖以「風大」聞名，<strong>冬季東北季風最強</strong>；夏季風較和緩、適合各項活動。這也是當地石滬、咾咕石牆等特殊人文景觀形成的原因。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖幾月可以玩水？</button><div class="faq-a">大約 <strong>5 月到 9 月</strong>海水溫暖、適合浮潛、SUP、潮間帶等水上活動。6–8 月是玩水黃金期，水溫舒適、能見度也好。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖的雨季是什麼時候？</button><div class="faq-a">澎湖整體雨量不多，5–6 月偶有梅雨、夏季可能有午後雷陣雨或颱風。出發前留意氣象，我們的行程也會視天候彈性調整。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖看夕陽最美的地方在哪？</button><div class="faq-a"><strong>觀音亭西瀛虹橋、西嶼漁翁島燈塔、外垵漁港</strong>都是知名夕陽點。傍晚的澎湖海天一色，是最浪漫的時刻，很適合情侶與拍照。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖適合避暑嗎？</button><div class="faq-a">澎湖夏天雖有陽光，但四面環海、海風不斷，傍晚相當涼爽。比起都市的悶熱，海島的開闊與海風讓人放鬆，是不錯的夏日去處。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q16">澎湖幾月去最好？</button><div class="faq-a" data-i18n-html="faq.a16">最推薦 <strong>4 月到 9 月</strong>：天氣穩定、海水溫暖、適合玩水與跳島。4–6 月有花火節、人潮相對少；7–8 月最熱鬧但也最貴。9–10 月白天仍溫暖，還能搭上音樂燈光節。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q17">澎湖的旅遊旺季是什麼時候？</button><div class="faq-a" data-i18n-html="faq.a17">旺季落在 <strong>4–9 月</strong>，尤其暑假 7–8 月與花火節期間最熱門。想避開人潮又有好天氣，可選 4–6 月或 9 月。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q18">冬天可以去澎湖嗎？</button><div class="faq-a" data-i18n-html="faq.a18">可以，但冬天（11–2 月）<strong>東北季風強、風大偏冷</strong>，不適合玩水，部分店家與船班也會休息。冬天適合想避開人潮、體驗在地生活與美食的旅客。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q19">澎湖花火節是什麼時候？</button><div class="faq-a" data-i18n-html="faq.a19">澎湖國際海上花火節通常在<strong>每年 4–6 月</strong>舉行，於觀音亭施放，是澎湖最具代表性的活動之一。確切場次每年公告，想搭配花火的行程歡迎詢問我們。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q20">澎湖夏天會很熱嗎？</button><div class="faq-a" data-i18n-html="faq.a20">夏天日照強、體感熱，但因為是海島、海風吹拂，<strong>比都市悶熱感好一些</strong>。務必做好防曬、多補水，玩水活動安排在上午或傍晚更舒適。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q21">澎湖的風很大嗎？</button><div class="faq-a" data-i18n-html="faq.a21">澎湖以「風大」聞名，<strong>冬季東北季風最強</strong>；夏季風較和緩、適合各項活動。這也是當地石滬、咾咕石牆等特殊人文景觀形成的原因。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q22">澎湖幾月可以玩水？</button><div class="faq-a" data-i18n-html="faq.a22">大約 <strong>5 月到 9 月</strong>海水溫暖、適合浮潛、SUP、潮間帶等水上活動。6–8 月是玩水黃金期，水溫舒適、能見度也好。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q23">澎湖的雨季是什麼時候？</button><div class="faq-a" data-i18n-html="faq.a23">澎湖整體雨量不多，5–6 月偶有梅雨、夏季可能有午後雷陣雨或颱風。出發前留意氣象，我們的行程也會視天候彈性調整。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q24">澎湖看夕陽最美的地方在哪？</button><div class="faq-a" data-i18n-html="faq.a24"><strong>觀音亭西瀛虹橋、西嶼漁翁島燈塔、外垵漁港</strong>都是知名夕陽點。傍晚的澎湖海天一色，是最浪漫的時刻，很適合情侶與拍照。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q25">澎湖適合避暑嗎？</button><div class="faq-a" data-i18n-html="faq.a25">澎湖夏天雖有陽光，但四面環海、海風不斷，傍晚相當涼爽。比起都市的悶熱，海島的開闊與海風讓人放鬆，是不錯的夏日去處。</div></div>
 
     <!-- ═══ 3. 住宿 ═══ -->
     <section class="faq-cat" id="cat-stay">
-      <h2><i class="fas fa-hotel"></i> 住宿</h2>
+      <h2 data-i18n="faq.catStay"><i class="fas fa-hotel"></i> 住宿</h2>
     </section>
-    <div class="faq-item"><button class="faq-q">澎湖住哪一區最方便？</button><div class="faq-a">第一次來建議住<strong>馬公市區</strong>，鄰近機場、餐廳、夜市與碼頭，跳島與採買都方便。想要海景或安靜，可考慮西嶼、湖西等區，但移動需自備交通。</div></div>
-    <div class="faq-item"><button class="faq-q">馬公市區住宿有哪些選擇？</button><div class="faq-a">從平價民宿、背包客棧到星級飯店都有。市區生活機能佳、晚上逛街吃宵夜方便，是多數旅客的首選。我們可依預算與人數幫你配房。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖民宿和飯店怎麼選？</button><div class="faq-a">想要在地溫度、CP 值高選<strong>民宿</strong>；重視設施、服務與隱私選<strong>飯店</strong>。親子或長輩同行，建議選電梯、停車與早餐齊全的住宿。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖住宿要多早訂？</button><div class="faq-a">暑假與連假房源緊張，建議<strong>提前 1–2 個月</strong>訂房。交給我們安排機加酒，可一次搞定，省去自己比價訂房的時間。</div></div>
-    <div class="faq-item"><button class="faq-q">離島（望安、七美）可以過夜嗎？</button><div class="faq-a">可以，離島有民宿可住宿。<strong>過夜才能體驗離島入夜後的寧靜、星空與晨間風景</strong>，是與一日來回完全不同的感受，很推薦至少安排一晚。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖住宿大概多少錢一晚？</button><div class="faq-a">淡旺季價差大。平價民宿雙人房淡季可能千元出頭，旺季與飯店則更高。實際依房型、地點、季節而定，我們的套裝行程已含住宿，報價透明。</div></div>
-    <div class="faq-item"><button class="faq-q">親子家庭適合住哪裡？</button><div class="faq-a">建議選<strong>市區、有電梯、附停車與早餐</strong>的飯店或家庭房民宿，鄰近超商與餐廳，半夜要買東西或孩子臨時需求都方便。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖有海景住宿嗎？</button><div class="faq-a">有，沿海與離島有不少海景民宿與飯店，能在房間就看到海與夕陽。海景房旺季很搶手，想住建議盡早預訂，我們可協助確認。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q26">澎湖住哪一區最方便？</button><div class="faq-a" data-i18n-html="faq.a26">第一次來建議住<strong>馬公市區</strong>，鄰近機場、餐廳、夜市與碼頭，跳島與採買都方便。想要海景或安靜，可考慮西嶼、湖西等區，但移動需自備交通。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q27">馬公市區住宿有哪些選擇？</button><div class="faq-a" data-i18n-html="faq.a27">從平價民宿、背包客棧到星級飯店都有。市區生活機能佳、晚上逛街吃宵夜方便，是多數旅客的首選。我們可依預算與人數幫你配房。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q28">澎湖民宿和飯店怎麼選？</button><div class="faq-a" data-i18n-html="faq.a28">想要在地溫度、CP 值高選<strong>民宿</strong>；重視設施、服務與隱私選<strong>飯店</strong>。親子或長輩同行，建議選電梯、停車與早餐齊全的住宿。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q29">澎湖住宿要多早訂？</button><div class="faq-a" data-i18n-html="faq.a29">暑假與連假房源緊張，建議<strong>提前 1–2 個月</strong>訂房。交給我們安排機加酒，可一次搞定，省去自己比價訂房的時間。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q30">離島（望安、七美）可以過夜嗎？</button><div class="faq-a" data-i18n-html="faq.a30">可以，離島有民宿可住宿。<strong>過夜才能體驗離島入夜後的寧靜、星空與晨間風景</strong>，是與一日來回完全不同的感受，很推薦至少安排一晚。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q31">澎湖住宿大概多少錢一晚？</button><div class="faq-a" data-i18n-html="faq.a31">淡旺季價差大。平價民宿雙人房淡季可能千元出頭，旺季與飯店則更高。實際依房型、地點、季節而定，我們的套裝行程已含住宿，報價透明。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q32">親子家庭適合住哪裡？</button><div class="faq-a" data-i18n-html="faq.a32">建議選<strong>市區、有電梯、附停車與早餐</strong>的飯店或家庭房民宿，鄰近超商與餐廳，半夜要買東西或孩子臨時需求都方便。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q33">澎湖有海景住宿嗎？</button><div class="faq-a" data-i18n-html="faq.a33">有，沿海與離島有不少海景民宿與飯店，能在房間就看到海與夕陽。海景房旺季很搶手，想住建議盡早預訂，我們可協助確認。</div></div>
 
     <!-- ═══ 4. 景點 ═══ -->
     <section class="faq-cat" id="cat-spot">
-      <h2><i class="fas fa-camera"></i> 景點</h2>
+      <h2 data-i18n="faq.catSpot"><i class="fas fa-camera"></i> 景點</h2>
     </section>
-    <div class="faq-item"><button class="faq-q">澎湖必去景點有哪些？</button><div class="faq-a">經典必訪：<strong>跨海大橋、通梁古榕、奎壁山摩西分海、雙心石滬（七美）、觀音亭、小門鯨魚洞、大菓葉柱狀玄武岩、篤行十村</strong>。我們的行程會把精華景點一次串連。</div></div>
-    <div class="faq-item"><button class="faq-q">跨海大橋在哪？怎麼去？</button><div class="faq-a">澎湖跨海大橋連接<strong>白沙島與西嶼</strong>，是澎湖地標。自駕或跟團都會經過，橋頭適合拍照打卡，附近還有知名的通梁古榕與仙人掌冰。</div></div>
-    <div class="faq-item"><button class="faq-q">奎壁山摩西分海是什麼？要看時間嗎？</button><div class="faq-a">奎壁山退潮時，會露出一條通往赤嶼的 S 型礫石步道，宛如「摩西分海」。<strong>務必依當日退潮時間前往</strong>，錯過就走不了，建議跟有掌握潮汐的行程最保險。</div></div>
-    <div class="faq-item"><button class="faq-q">雙心石滬在哪裡？</button><div class="faq-a">最有名的雙心石滬在<strong>七美島</strong>，是用石頭堆砌的捕魚陷阱，兩個愛心造型超浪漫，是澎湖最具代表性的打卡地標，需搭船跳島前往。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖天后宮值得去嗎？</button><div class="faq-a">值得。澎湖天后宮是<strong>台灣最古老的媽祖廟</strong>，建築古樸、香火鼎盛，位於馬公市區，可搭配中央老街一起散步走訪。</div></div>
-    <div class="faq-item"><button class="faq-q">通梁古榕是什麼？</button><div class="faq-a">通梁古榕是一棵超過三百年的大榕樹，<strong>氣根綿延成一大片綠蔭</strong>，位於跨海大橋旁，樹下常有仙人掌冰攤，是經典的休憩打卡點。</div></div>
-    <div class="faq-item"><button class="faq-q">小門鯨魚洞在哪？</button><div class="faq-a">位於西嶼的<strong>小門嶼</strong>，是海蝕作用形成的玄武岩拱門，遠看像鯨魚張口，海蝕地景壯觀，是西嶼線必看景點之一。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖的玄武岩在哪裡看？</button><div class="faq-a">澎湖是世界級玄武岩地景寶庫，<strong>大菓葉柱狀玄武岩、池西虎頭山、桶盤嶼</strong>都很壯觀，柱狀節理整齊排列，是地質與攝影迷的最愛。</div></div>
-    <div class="faq-item"><button class="faq-q">觀音亭在哪？有什麼好玩？</button><div class="faq-a">觀音亭園區位於馬公市區海邊，有<strong>西瀛虹橋、海水浴場與大草坪</strong>，是看夕陽、花火節與音樂燈光節的主場地，傍晚散步超舒服。</div></div>
-    <div class="faq-item"><button class="faq-q">篤行十村是什麼？</button><div class="faq-a">篤行十村是台灣歷史最悠久的眷村之一，也是歌手<strong>張雨生與潘安邦的故居</strong>所在，老屋改造成文創店與咖啡廳，很適合文青拍照散步。</div></div>
-    <div class="faq-item"><button class="faq-q">中央老街值得逛嗎？</button><div class="faq-a">值得。中央老街是馬公最古老的街區，<strong>四眼井、古厝、伴手禮與小吃</strong>聚集，可搭配天后宮一起走，感受澎湖的歷史風情。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖有哪些燈塔？</button><div class="faq-a"><strong>西嶼漁翁島燈塔（台灣最古老燈塔之一）、七美燈塔、目斗嶼燈塔</strong>都很有特色，白色塔身配上藍天大海，是熱門的拍照地標。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖適合拍 IG 美照的地方？</button><div class="faq-a">推薦<strong>雙心石滬、大菓葉玄武岩、西瀛虹橋、篤行十村、各離島沙灘</strong>。藍天、白沙、玄武岩配上海水漸層，怎麼拍都好看。</div></div>
-    <div class="faq-item"><button class="faq-q">大菓葉柱狀玄武岩怎麼去？</button><div class="faq-a">位於西嶼，自駕或跟團前往。<strong>漲潮時前方積水會形成倒影</strong>，整排玄武岩柱倒映水面非常夢幻，是攝影熱點。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖有沙灘嗎？哪個最美？</button><div class="faq-a">超多！<strong>山水沙灘、嵵裡沙灘、林投公園、吉貝沙尾、七美月鯉灣</strong>都很美，白沙藍海、海水透明，是玩水戲沙的好地方。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖適合看星空嗎？</button><div class="faq-a">非常適合。離島與郊區<strong>光害少，夜空星星密布</strong>，望安、七美過夜還能看銀河。我們的離島過夜行程常安排星空時光。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q34">澎湖必去景點有哪些？</button><div class="faq-a" data-i18n-html="faq.a34">經典必訪：<strong>跨海大橋、通梁古榕、奎壁山摩西分海、雙心石滬（七美）、觀音亭、小門鯨魚洞、大菓葉柱狀玄武岩、篤行十村</strong>。我們的行程會把精華景點一次串連。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q35">跨海大橋在哪？怎麼去？</button><div class="faq-a" data-i18n-html="faq.a35">澎湖跨海大橋連接<strong>白沙島與西嶼</strong>，是澎湖地標。自駕或跟團都會經過，橋頭適合拍照打卡，附近還有知名的通梁古榕與仙人掌冰。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q36">奎壁山摩西分海是什麼？要看時間嗎？</button><div class="faq-a" data-i18n-html="faq.a36">奎壁山退潮時，會露出一條通往赤嶼的 S 型礫石步道，宛如「摩西分海」。<strong>務必依當日退潮時間前往</strong>，錯過就走不了，建議跟有掌握潮汐的行程最保險。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q37">雙心石滬在哪裡？</button><div class="faq-a" data-i18n-html="faq.a37">最有名的雙心石滬在<strong>七美島</strong>，是用石頭堆砌的捕魚陷阱，兩個愛心造型超浪漫，是澎湖最具代表性的打卡地標，需搭船跳島前往。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q38">澎湖天后宮值得去嗎？</button><div class="faq-a" data-i18n-html="faq.a38">值得。澎湖天后宮是<strong>台灣最古老的媽祖廟</strong>，建築古樸、香火鼎盛，位於馬公市區，可搭配中央老街一起散步走訪。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q39">通梁古榕是什麼？</button><div class="faq-a" data-i18n-html="faq.a39">通梁古榕是一棵超過三百年的大榕樹，<strong>氣根綿延成一大片綠蔭</strong>，位於跨海大橋旁，樹下常有仙人掌冰攤，是經典的休憩打卡點。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q40">小門鯨魚洞在哪？</button><div class="faq-a" data-i18n-html="faq.a40">位於西嶼的<strong>小門嶼</strong>，是海蝕作用形成的玄武岩拱門，遠看像鯨魚張口，海蝕地景壯觀，是西嶼線必看景點之一。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q41">澎湖的玄武岩在哪裡看？</button><div class="faq-a" data-i18n-html="faq.a41">澎湖是世界級玄武岩地景寶庫，<strong>大菓葉柱狀玄武岩、池西虎頭山、桶盤嶼</strong>都很壯觀，柱狀節理整齊排列，是地質與攝影迷的最愛。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q42">觀音亭在哪？有什麼好玩？</button><div class="faq-a" data-i18n-html="faq.a42">觀音亭園區位於馬公市區海邊，有<strong>西瀛虹橋、海水浴場與大草坪</strong>，是看夕陽、花火節與音樂燈光節的主場地，傍晚散步超舒服。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q43">篤行十村是什麼？</button><div class="faq-a" data-i18n-html="faq.a43">篤行十村是台灣歷史最悠久的眷村之一，也是歌手<strong>張雨生與潘安邦的故居</strong>所在，老屋改造成文創店與咖啡廳，很適合文青拍照散步。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q44">中央老街值得逛嗎？</button><div class="faq-a" data-i18n-html="faq.a44">值得。中央老街是馬公最古老的街區，<strong>四眼井、古厝、伴手禮與小吃</strong>聚集，可搭配天后宮一起走，感受澎湖的歷史風情。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q45">澎湖有哪些燈塔？</button><div class="faq-a" data-i18n-html="faq.a45"><strong>西嶼漁翁島燈塔（台灣最古老燈塔之一）、七美燈塔、目斗嶼燈塔</strong>都很有特色，白色塔身配上藍天大海，是熱門的拍照地標。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q46">澎湖適合拍 IG 美照的地方？</button><div class="faq-a" data-i18n-html="faq.a46">推薦<strong>雙心石滬、大菓葉玄武岩、西瀛虹橋、篤行十村、各離島沙灘</strong>。藍天、白沙、玄武岩配上海水漸層，怎麼拍都好看。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q47">大菓葉柱狀玄武岩怎麼去？</button><div class="faq-a" data-i18n-html="faq.a47">位於西嶼，自駕或跟團前往。<strong>漲潮時前方積水會形成倒影</strong>，整排玄武岩柱倒映水面非常夢幻，是攝影熱點。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q48">澎湖有沙灘嗎？哪個最美？</button><div class="faq-a" data-i18n-html="faq.a48">超多！<strong>山水沙灘、嵵裡沙灘、林投公園、吉貝沙尾、七美月鯉灣</strong>都很美，白沙藍海、海水透明，是玩水戲沙的好地方。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q49">澎湖適合看星空嗎？</button><div class="faq-a" data-i18n-html="faq.a49">非常適合。離島與郊區<strong>光害少，夜空星星密布</strong>，望安、七美過夜還能看銀河。我們的離島過夜行程常安排星空時光。</div></div>
 
     <!-- ═══ 5. 跳島離島 ═══ -->
     <section class="faq-cat" id="cat-island">
-      <h2><i class="fas fa-umbrella-beach"></i> 跳島與離島</h2>
+      <h2 data-i18n="faq.catIsland"><i class="fas fa-umbrella-beach"></i> 跳島與離島</h2>
     </section>
-    <div class="faq-item"><button class="faq-q">澎湖有哪些離島可以去？</button><div class="faq-a">熱門離島包括<strong>七美、望安、吉貝、員貝、鳥嶼、桶盤、南方四島</strong>等，各有特色。要搭船前往，行程與船班我們會幫你安排妥當。</div></div>
-    <div class="faq-item"><button class="faq-q">七美怎麼去？要玩多久？</button><div class="faq-a">七美位於澎湖南海，從馬公搭船前往。可安排<strong>一日遊或過夜</strong>，必看雙心石滬、小台灣、月鯉灣與七美燈塔，環島景點豐富，建議至少半天到一天。</div></div>
-    <div class="faq-item"><button class="faq-q">望安有什麼特色？</button><div class="faq-a">望安以<strong>綠蠵龜保育、花宅古厝聚落、天台山</strong>聞名，步調悠閒、人文味濃。很適合想放慢腳步、深度體驗離島生活的旅客，是我們主打的療癒路線。</div></div>
-    <div class="faq-item"><button class="faq-q">吉貝島值得去嗎？</button><div class="faq-a">值得。吉貝以<strong>綿延的吉貝沙尾與水上活動</strong>聞名，沙灘潔白、海水清澈，是玩水上設施、香蕉船、浮潛的熱門離島。</div></div>
-    <div class="faq-item"><button class="faq-q">員貝嶼、鳥嶼是什麼？</button><div class="faq-a">兩座位於澎湖北海的小島，<strong>員貝有特殊玄武岩石柱，鳥嶼以潮間帶與夜釣聞名</strong>，是體驗純樸漁村與生態的好去處。</div></div>
-    <div class="faq-item"><button class="faq-q">南方四島是什麼？</button><div class="faq-a">指<strong>東吉、西吉、東嶼坪、西嶼坪</strong>，已列為國家公園，海水透明度極高、生態豐富，西吉「藍洞」更是夢幻。屬進階跳島，適合想深度探索的旅客。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖跳島一日遊推薦嗎？</button><div class="faq-a">推薦。若時間有限，<strong>南海（七美＋望安）或北海（吉貝等）一日遊</strong>能一次玩到精華。但若想細細感受離島，過夜會更深刻。</div></div>
-    <div class="faq-item"><button class="faq-q">離島需要過夜嗎？</button><div class="faq-a">不一定，但<strong>過夜能體驗離島的夜晚、星空與清晨</strong>，避開一日遊人潮。我們的望安兩天一夜就是為深度體驗設計，很受好評。</div></div>
-    <div class="faq-item"><button class="faq-q">綠蠵龜在哪裡可以看到？</button><div class="faq-a">澎湖的<strong>望安</strong>是綠蠵龜重要產卵棲地，設有保育中心可了解生態。浮潛時在某些海域也有機會與海龜相遇（請保持距離、不觸摸）。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖可以賞鯨或賞鳥嗎？</button><div class="faq-a">澎湖部分海域與離島（如貓嶼、鳥嶼）是<strong>海鳥保護區與生態熱點</strong>，季節對時可賞鳥、看生態。賞鯨需視季節與海況，建議事先諮詢安排。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q50">澎湖有哪些離島可以去？</button><div class="faq-a" data-i18n-html="faq.a50">熱門離島包括<strong>七美、望安、吉貝、員貝、鳥嶼、桶盤、南方四島</strong>等，各有特色。要搭船前往，行程與船班我們會幫你安排妥當。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q51">七美怎麼去？要玩多久？</button><div class="faq-a" data-i18n-html="faq.a51">七美位於澎湖南海，從馬公搭船前往。可安排<strong>一日遊或過夜</strong>，必看雙心石滬、小台灣、月鯉灣與七美燈塔，環島景點豐富，建議至少半天到一天。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q52">望安有什麼特色？</button><div class="faq-a" data-i18n-html="faq.a52">望安以<strong>綠蠵龜保育、花宅古厝聚落、天台山</strong>聞名，步調悠閒、人文味濃。很適合想放慢腳步、深度體驗離島生活的旅客，是我們主打的療癒路線。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q53">吉貝島值得去嗎？</button><div class="faq-a" data-i18n-html="faq.a53">值得。吉貝以<strong>綿延的吉貝沙尾與水上活動</strong>聞名，沙灘潔白、海水清澈，是玩水上設施、香蕉船、浮潛的熱門離島。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q54">員貝嶼、鳥嶼是什麼？</button><div class="faq-a" data-i18n-html="faq.a54">兩座位於澎湖北海的小島，<strong>員貝有特殊玄武岩石柱，鳥嶼以潮間帶與夜釣聞名</strong>，是體驗純樸漁村與生態的好去處。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q55">南方四島是什麼？</button><div class="faq-a" data-i18n-html="faq.a55">指<strong>東吉、西吉、東嶼坪、西嶼坪</strong>，已列為國家公園，海水透明度極高、生態豐富，西吉「藍洞」更是夢幻。屬進階跳島，適合想深度探索的旅客。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q56">澎湖跳島一日遊推薦嗎？</button><div class="faq-a" data-i18n-html="faq.a56">推薦。若時間有限，<strong>南海（七美＋望安）或北海（吉貝等）一日遊</strong>能一次玩到精華。但若想細細感受離島，過夜會更深刻。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q57">離島需要過夜嗎？</button><div class="faq-a" data-i18n-html="faq.a57">不一定，但<strong>過夜能體驗離島的夜晚、星空與清晨</strong>，避開一日遊人潮。我們的望安兩天一夜就是為深度體驗設計，很受好評。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q58">綠蠵龜在哪裡可以看到？</button><div class="faq-a" data-i18n-html="faq.a58">澎湖的<strong>望安</strong>是綠蠵龜重要產卵棲地，設有保育中心可了解生態。浮潛時在某些海域也有機會與海龜相遇（請保持距離、不觸摸）。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q59">澎湖可以賞鯨或賞鳥嗎？</button><div class="faq-a" data-i18n-html="faq.a59">澎湖部分海域與離島（如貓嶼、鳥嶼）是<strong>海鳥保護區與生態熱點</strong>，季節對時可賞鳥、看生態。賞鯨需視季節與海況，建議事先諮詢安排。</div></div>
 
     <!-- ═══ 6. 水上活動 ═══ -->
     <section class="faq-cat" id="cat-water">
-      <h2><i class="fas fa-person-swimming"></i> 水上活動</h2>
+      <h2 data-i18n="faq.catWater"><i class="fas fa-person-swimming"></i> 水上活動</h2>
     </section>
-    <div class="faq-item"><button class="faq-q">澎湖可以浮潛嗎？去哪浮潛？</button><div class="faq-a">可以！澎湖海水清澈、珊瑚與魚群豐富，<strong>山水、嵵裡、吉貝、望安</strong>等海域都適合浮潛。全程有教練帶領與裝備，新手也能安心下水。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖 SUP 立槳在哪玩？</button><div class="faq-a">澎湖風平浪靜的內灣很適合 SUP，能划向海上看玄武岩與夕陽。多在<strong>清晨或傍晚</strong>進行，含教練教學，是近年超人氣的活動。</div></div>
-    <div class="faq-item"><button class="faq-q">不會游泳可以玩水上活動嗎？</button><div class="faq-a">可以。浮潛、SUP 都會<strong>穿著救生衣、由教練全程陪同</strong>，不會游泳也能體驗。只要聽從指示、配合安全規範即可放心玩。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖有獨木舟嗎？</button><div class="faq-a">有，部分海域提供獨木舟體驗，可划行欣賞海岸地景。與 SUP 一樣會配備救生衣與教練，適合想嘗試不同海上活動的旅客。</div></div>
-    <div class="faq-item"><button class="faq-q">夜釣小管是什麼？好玩嗎？</button><div class="faq-a">夜釣小管是澎湖夏季限定的招牌體驗，<strong>搭船出海、用集魚燈吸引小管</strong>，現釣現煮超鮮甜。親子與朋友同遊都很有趣，是必玩之一。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖潮間帶體驗是什麼？</button><div class="faq-a">退潮時走進潮間帶，由解說員帶領<strong>認識海星、海參、貝類與石滬生態</strong>，寓教於樂，是親子與生態旅遊的熱門活動。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖適合潛水嗎？</button><div class="faq-a">適合。澎湖部分海域水質清澈、生態豐富，適合體驗潛水或進階潛點。需由合格教練帶領，依個人狀況與證照安排，可先與我們討論。</div></div>
-    <div class="faq-item"><button class="faq-q">水上活動會危險嗎？有保險嗎？</button><div class="faq-a">正規業者皆配備<strong>合格教練、安全裝備與旅遊／活動保險</strong>。只要選擇合法業者、聽從指示，安全性高。我們合作的廠商皆具相關資格與保障。</div></div>
-    <div class="faq-item"><button class="faq-q">帶小孩可以玩哪些水上活動？</button><div class="faq-a">潮間帶探索、淺水浮潛、戲沙、SUP（親子共乘）都很適合，<strong>有年齡與身高建議</strong>並配備兒童安全裝備。我們的親子行程會挑選適合的項目。</div></div>
-    <div class="faq-item"><button class="faq-q">玩水要自備什麼？</button><div class="faq-a">建議帶<strong>泳衣、防曬、毛巾、換洗衣物、防水袋、水母衣</strong>。裝備（蛙鏡、救生衣等）多由業者提供。怕曬可加戴帽子與防曬手袖。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q60">澎湖可以浮潛嗎？去哪浮潛？</button><div class="faq-a" data-i18n-html="faq.a60">可以！澎湖海水清澈、珊瑚與魚群豐富，<strong>山水、嵵裡、吉貝、望安</strong>等海域都適合浮潛。全程有教練帶領與裝備，新手也能安心下水。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q61">澎湖 SUP 立槳在哪玩？</button><div class="faq-a" data-i18n-html="faq.a61">澎湖風平浪靜的內灣很適合 SUP，能划向海上看玄武岩與夕陽。多在<strong>清晨或傍晚</strong>進行，含教練教學，是近年超人氣的活動。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q62">不會游泳可以玩水上活動嗎？</button><div class="faq-a" data-i18n-html="faq.a62">可以。浮潛、SUP 都會<strong>穿著救生衣、由教練全程陪同</strong>，不會游泳也能體驗。只要聽從指示、配合安全規範即可放心玩。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q63">澎湖有獨木舟嗎？</button><div class="faq-a" data-i18n-html="faq.a63">有，部分海域提供獨木舟體驗，可划行欣賞海岸地景。與 SUP 一樣會配備救生衣與教練，適合想嘗試不同海上活動的旅客。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q64">夜釣小管是什麼？好玩嗎？</button><div class="faq-a" data-i18n-html="faq.a64">夜釣小管是澎湖夏季限定的招牌體驗，<strong>搭船出海、用集魚燈吸引小管</strong>，現釣現煮超鮮甜。親子與朋友同遊都很有趣，是必玩之一。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q65">澎湖潮間帶體驗是什麼？</button><div class="faq-a" data-i18n-html="faq.a65">退潮時走進潮間帶，由解說員帶領<strong>認識海星、海參、貝類與石滬生態</strong>，寓教於樂，是親子與生態旅遊的熱門活動。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q66">澎湖適合潛水嗎？</button><div class="faq-a" data-i18n-html="faq.a66">適合。澎湖部分海域水質清澈、生態豐富，適合體驗潛水或進階潛點。需由合格教練帶領，依個人狀況與證照安排，可先與我們討論。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q67">水上活動會危險嗎？有保險嗎？</button><div class="faq-a" data-i18n-html="faq.a67">正規業者皆配備<strong>合格教練、安全裝備與旅遊／活動保險</strong>。只要選擇合法業者、聽從指示，安全性高。我們合作的廠商皆具相關資格與保障。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q68">帶小孩可以玩哪些水上活動？</button><div class="faq-a" data-i18n-html="faq.a68">潮間帶探索、淺水浮潛、戲沙、SUP（親子共乘）都很適合，<strong>有年齡與身高建議</strong>並配備兒童安全裝備。我們的親子行程會挑選適合的項目。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q69">玩水要自備什麼？</button><div class="faq-a" data-i18n-html="faq.a69">建議帶<strong>泳衣、防曬、毛巾、換洗衣物、防水袋、水母衣</strong>。裝備（蛙鏡、救生衣等）多由業者提供。怕曬可加戴帽子與防曬手袖。</div></div>
 
     <!-- ═══ 7. 美食 ═══ -->
     <section class="faq-cat" id="cat-food">
-      <h2><i class="fas fa-shrimp"></i> 美食</h2>
+      <h2 data-i18n="faq.catFood"><i class="fas fa-shrimp"></i> 美食</h2>
     </section>
-    <div class="faq-item"><button class="faq-q">澎湖必吃美食有哪些？</button><div class="faq-a">必吃：<strong>小管／小卷、現流海鮮、仙人掌冰、黑糖糕、花生酥、鹹餅、澎湖絲瓜、哈密瓜</strong>。海鮮新鮮、在地小吃多，是澎湖旅遊的一大重點。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖的小管、小卷怎麼吃？</button><div class="faq-a">可吃<strong>小管麵線、汆燙小卷、生魚片或夜釣現煮</strong>，肉質鮮甜彈牙。夏季是小管盛產期，搭配夜釣體驗更是難忘。</div></div>
-    <div class="faq-item"><button class="faq-q">仙人掌冰是什麼？哪裡買？</button><div class="faq-a">用澎湖特產<strong>仙人掌果實</strong>製成的冰品，紫紅色、酸甜消暑，是澎湖必吃。<strong>通梁古榕、跨海大橋旁</strong>都有名店，幾乎人手一支。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖黑糖糕是什麼？</button><div class="faq-a">黑糖糕是澎湖最具代表性的伴手禮，<strong>口感軟Q、黑糖香濃</strong>，源自琉球老師傅的配方。馬公多家名店現做現賣，買回家分送很受歡迎。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖海鮮推薦什麼？</button><div class="faq-a">現流<strong>石斑、龍蝦、海膽、生蠔、九孔、各式貝類</strong>都很讚。建議到在地海產店點當令漁獲，新鮮又實惠，是來澎湖必嚐的味道。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖有什麼伴手禮？</button><div class="faq-a">熱門伴手禮：<strong>黑糖糕、花生酥、鹹餅、干貝醬、魚乾、海菜、仙人掌相關製品</strong>。中央老街與市區名店都買得到，行程末段我們會留採買時間。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖花生酥、鹹餅好吃嗎？</button><div class="faq-a">好吃！<strong>花生酥入口即化、鹹餅香酥涮嘴</strong>，都是澎湖經典伴手禮，老店現烤的更香。很適合配茶、當辦公室分享零食。</div></div>
-    <div class="faq-item"><button class="faq-q">馬公夜市或市區美食推薦？</button><div class="faq-a">馬公市區與北辰市場周邊小吃林立，<strong>海鮮粥、小管麵線、燒肉飯、在地早餐</strong>都值得試。夜晚還可逛街吃宵夜，生活機能佳。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖在地早餐吃什麼？</button><div class="faq-a">推薦<strong>澎湖在地早餐店的牛雜湯、丁香魚粥、燒餅、阿婆冰前的傳統早點</strong>。在地人的早餐攤往往藏著驚喜美味，值得早起探索。</div></div>
-    <div class="faq-item"><button class="faq-q">素食者在澎湖好找吃的嗎？</button><div class="faq-a">市區有素食餐廳與自助餐，便利商店也有素食選擇，但離島選項較少。有素食需求請<strong>事先告知</strong>，我們會在行程餐食上幫你預先安排。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q70">澎湖必吃美食有哪些？</button><div class="faq-a" data-i18n-html="faq.a70">必吃：<strong>小管／小卷、現流海鮮、仙人掌冰、黑糖糕、花生酥、鹹餅、澎湖絲瓜、哈密瓜</strong>。海鮮新鮮、在地小吃多，是澎湖旅遊的一大重點。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q71">澎湖的小管、小卷怎麼吃？</button><div class="faq-a" data-i18n-html="faq.a71">可吃<strong>小管麵線、汆燙小卷、生魚片或夜釣現煮</strong>，肉質鮮甜彈牙。夏季是小管盛產期，搭配夜釣體驗更是難忘。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q72">仙人掌冰是什麼？哪裡買？</button><div class="faq-a" data-i18n-html="faq.a72">用澎湖特產<strong>仙人掌果實</strong>製成的冰品，紫紅色、酸甜消暑，是澎湖必吃。<strong>通梁古榕、跨海大橋旁</strong>都有名店，幾乎人手一支。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q73">澎湖黑糖糕是什麼？</button><div class="faq-a" data-i18n-html="faq.a73">黑糖糕是澎湖最具代表性的伴手禮，<strong>口感軟Q、黑糖香濃</strong>，源自琉球老師傅的配方。馬公多家名店現做現賣，買回家分送很受歡迎。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q74">澎湖海鮮推薦什麼？</button><div class="faq-a" data-i18n-html="faq.a74">現流<strong>石斑、龍蝦、海膽、生蠔、九孔、各式貝類</strong>都很讚。建議到在地海產店點當令漁獲，新鮮又實惠，是來澎湖必嚐的味道。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q75">澎湖有什麼伴手禮？</button><div class="faq-a" data-i18n-html="faq.a75">熱門伴手禮：<strong>黑糖糕、花生酥、鹹餅、干貝醬、魚乾、海菜、仙人掌相關製品</strong>。中央老街與市區名店都買得到，行程末段我們會留採買時間。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q76">澎湖花生酥、鹹餅好吃嗎？</button><div class="faq-a" data-i18n-html="faq.a76">好吃！<strong>花生酥入口即化、鹹餅香酥涮嘴</strong>，都是澎湖經典伴手禮，老店現烤的更香。很適合配茶、當辦公室分享零食。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q77">馬公夜市或市區美食推薦？</button><div class="faq-a" data-i18n-html="faq.a77">馬公市區與北辰市場周邊小吃林立，<strong>海鮮粥、小管麵線、燒肉飯、在地早餐</strong>都值得試。夜晚還可逛街吃宵夜，生活機能佳。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q78">澎湖在地早餐吃什麼？</button><div class="faq-a" data-i18n-html="faq.a78">推薦<strong>澎湖在地早餐店的牛雜湯、丁香魚粥、燒餅、阿婆冰前的傳統早點</strong>。在地人的早餐攤往往藏著驚喜美味，值得早起探索。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q79">素食者在澎湖好找吃的嗎？</button><div class="faq-a" data-i18n-html="faq.a79">市區有素食餐廳與自助餐，便利商店也有素食選擇，但離島選項較少。有素食需求請<strong>事先告知</strong>，我們會在行程餐食上幫你預先安排。</div></div>
 
     <!-- ═══ 8. 親子家庭 ═══ -->
     <section class="faq-cat" id="cat-family">
-      <h2><i class="fas fa-people-roof"></i> 親子與家庭</h2>
+      <h2 data-i18n="faq.catFamily"><i class="fas fa-people-roof"></i> 親子與家庭</h2>
     </section>
-    <div class="faq-item"><button class="faq-q">澎湖適合帶小孩去嗎？</button><div class="faq-a">非常適合。<strong>沙灘戲水、潮間帶生態、夜釣、DIY 體驗</strong>都很受孩子喜愛，飛機航程短、不易暈，是親子海島旅遊的好選擇。</div></div>
-    <div class="faq-item"><button class="faq-q">帶嬰兒去澎湖要注意什麼？</button><div class="faq-a">注意<strong>防曬、補水、避開正午烈日</strong>，住宿選有電梯與嬰兒設備者。航程短對嬰兒負擔小，但仍建議備好奶粉、尿布等用品，行程放慢不趕點。</div></div>
-    <div class="faq-item"><button class="faq-q">親子適合玩幾天？</button><div class="faq-a">建議 <strong>3 天 2 夜或 4 天 3 夜</strong>，步調從容、不趕景點，能兼顧玩水、生態與休息。我們的親子行程特別保留彈性與午休時間。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖有適合小孩的景點嗎？</button><div class="faq-a">很多！<strong>水族館、海洋牧場、沙灘、潮間帶、各種 DIY（黑糖糕、貝殼彩繪）</strong>都寓教於樂，讓孩子邊玩邊認識海洋。</div></div>
-    <div class="faq-item"><button class="faq-q">帶長輩去澎湖適合嗎？</button><div class="faq-a">適合。搭飛機輕鬆、景點多可定點欣賞，<strong>跨海大橋、古蹟廟宇、海鮮美食</strong>長輩都喜歡。我們可安排步調舒緩、含專車接送的行程。</div></div>
-    <div class="faq-item"><button class="faq-q">親子行程會不會太累？</button><div class="faq-a">不會，我們的親子行程<strong>刻意放慢節奏、保留休息與午睡時間</strong>，不塞滿景點，讓大人小孩都能輕鬆享受，避免拉車與曝曬過久。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖有醫療資源嗎？小孩生病怎麼辦？</button><div class="faq-a">馬公市區有<strong>署立澎湖醫院與診所、藥局</strong>，醫療資源以本島為主。離島醫療較有限，建議備妥常用藥品。遇狀況導遊也會協助就近就醫。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q80">澎湖適合帶小孩去嗎？</button><div class="faq-a" data-i18n-html="faq.a80">非常適合。<strong>沙灘戲水、潮間帶生態、夜釣、DIY 體驗</strong>都很受孩子喜愛，飛機航程短、不易暈，是親子海島旅遊的好選擇。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q81">帶嬰兒去澎湖要注意什麼？</button><div class="faq-a" data-i18n-html="faq.a81">注意<strong>防曬、補水、避開正午烈日</strong>，住宿選有電梯與嬰兒設備者。航程短對嬰兒負擔小，但仍建議備好奶粉、尿布等用品，行程放慢不趕點。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q82">親子適合玩幾天？</button><div class="faq-a" data-i18n-html="faq.a82">建議 <strong>3 天 2 夜或 4 天 3 夜</strong>，步調從容、不趕景點，能兼顧玩水、生態與休息。我們的親子行程特別保留彈性與午休時間。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q83">澎湖有適合小孩的景點嗎？</button><div class="faq-a" data-i18n-html="faq.a83">很多！<strong>水族館、海洋牧場、沙灘、潮間帶、各種 DIY（黑糖糕、貝殼彩繪）</strong>都寓教於樂，讓孩子邊玩邊認識海洋。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q84">帶長輩去澎湖適合嗎？</button><div class="faq-a" data-i18n-html="faq.a84">適合。搭飛機輕鬆、景點多可定點欣賞，<strong>跨海大橋、古蹟廟宇、海鮮美食</strong>長輩都喜歡。我們可安排步調舒緩、含專車接送的行程。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q85">親子行程會不會太累？</button><div class="faq-a" data-i18n-html="faq.a85">不會，我們的親子行程<strong>刻意放慢節奏、保留休息與午睡時間</strong>，不塞滿景點，讓大人小孩都能輕鬆享受，避免拉車與曝曬過久。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q86">澎湖有醫療資源嗎？小孩生病怎麼辦？</button><div class="faq-a" data-i18n-html="faq.a86">馬公市區有<strong>署立澎湖醫院與診所、藥局</strong>，醫療資源以本島為主。離島醫療較有限，建議備妥常用藥品。遇狀況導遊也會協助就近就醫。</div></div>
 
     <!-- ═══ 9. 預算規劃 ═══ -->
     <section class="faq-cat" id="cat-plan">
-      <h2><i class="fas fa-wallet"></i> 預算與行程規劃</h2>
+      <h2 data-i18n="faq.catPlan"><i class="fas fa-wallet"></i> 預算與行程規劃</h2>
     </section>
-    <div class="faq-item"><button class="faq-q">澎湖玩幾天比較剛好？</button><div class="faq-a"><strong>3 天 2 夜</strong>能玩到本島精華＋一個離島，是最熱門的天數；想加跳島或深度玩，<strong>4 天 3 夜</strong>更從容。一日來回較趕，建議至少兩天一夜。</div></div>
-    <div class="faq-item"><button class="faq-q">去澎湖大概要準備多少預算？</button><div class="faq-a">依交通（機票／船票）、住宿等級、活動而定差異大。我們的套裝行程<strong>含交通、住宿、行程的方案 6,000 元起／人</strong>，報價透明，可依預算客製。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖自由行還是跟團好？</button><div class="faq-a">想自由安排、不介意自己處理交通住宿，可自由行；想<strong>省心、有在地導遊、跳島接送一次搞定</strong>，跟團或半自助更輕鬆。我們提供彈性的小團與客製行程。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖兩人可以成行嗎？</button><div class="faq-a">可以！我們有<strong>兩人即可成行</strong>的行程方案，好友、情侶、夫妻說走就走，不必湊團，彈性高。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖三天兩夜怎麼安排？</button><div class="faq-a">經典安排：Day1 本島經典（跨海大橋、玄武岩、奎壁山）；Day2 跳島（七美或望安）；Day3 市區、伴手禮與返程。<strong>我們已規劃多條三天兩夜路線</strong>，可直接參考或客製。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖適合員工旅遊嗎？</button><div class="faq-a">非常適合！海島活動多、團體互動性強，<strong>夜釣、跳島、水上活動、音樂節</strong>都很適合員旅。我們可依人數與預算規劃專屬團體行程與報價。</div></div>
-    <div class="faq-item"><button class="faq-q">第一次去澎湖怎麼規劃？</button><div class="faq-a">建議先決定<strong>天數、季節、想玩的重點（玩水／景點／離島／親子）</strong>，再安排交通住宿。沒頭緒也沒關係，告訴我們需求，由在地團隊幫你量身規劃。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖一日遊夠玩嗎？</button><div class="faq-a">一日只能走馬看花本島部分景點，較可惜。<strong>建議至少兩天一夜</strong>才能玩到離島與水上活動，完整感受澎湖的海島魅力。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q87">澎湖玩幾天比較剛好？</button><div class="faq-a" data-i18n-html="faq.a87"><strong>3 天 2 夜</strong>能玩到本島精華＋一個離島，是最熱門的天數；想加跳島或深度玩，<strong>4 天 3 夜</strong>更從容。一日來回較趕，建議至少兩天一夜。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q88">去澎湖大概要準備多少預算？</button><div class="faq-a" data-i18n-html="faq.a88">依交通（機票／船票）、住宿等級、活動而定差異大。我們的套裝行程<strong>含交通、住宿、行程的方案 6,000 元起／人</strong>，報價透明，可依預算客製。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q89">澎湖自由行還是跟團好？</button><div class="faq-a" data-i18n-html="faq.a89">想自由安排、不介意自己處理交通住宿，可自由行；想<strong>省心、有在地導遊、跳島接送一次搞定</strong>，跟團或半自助更輕鬆。我們提供彈性的小團與客製行程。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q90">澎湖兩人可以成行嗎？</button><div class="faq-a" data-i18n-html="faq.a90">可以！我們有<strong>兩人即可成行</strong>的行程方案，好友、情侶、夫妻說走就走，不必湊團，彈性高。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q91">澎湖三天兩夜怎麼安排？</button><div class="faq-a" data-i18n-html="faq.a91">經典安排：Day1 本島經典（跨海大橋、玄武岩、奎壁山）；Day2 跳島（七美或望安）；Day3 市區、伴手禮與返程。<strong>我們已規劃多條三天兩夜路線</strong>，可直接參考或客製。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q92">澎湖適合員工旅遊嗎？</button><div class="faq-a" data-i18n-html="faq.a92">非常適合！海島活動多、團體互動性強，<strong>夜釣、跳島、水上活動、音樂節</strong>都很適合員旅。我們可依人數與預算規劃專屬團體行程與報價。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q93">第一次去澎湖怎麼規劃？</button><div class="faq-a" data-i18n-html="faq.a93">建議先決定<strong>天數、季節、想玩的重點（玩水／景點／離島／親子）</strong>，再安排交通住宿。沒頭緒也沒關係，告訴我們需求，由在地團隊幫你量身規劃。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q94">澎湖一日遊夠玩嗎？</button><div class="faq-a" data-i18n-html="faq.a94">一日只能走馬看花本島部分景點，較可惜。<strong>建議至少兩天一夜</strong>才能玩到離島與水上活動，完整感受澎湖的海島魅力。</div></div>
 
     <!-- ═══ 10. 音樂節與實用資訊 ═══ -->
     <section class="faq-cat" id="cat-info">
-      <h2><i class="fas fa-music"></i> 音樂節與實用資訊</h2>
+      <h2 data-i18n="faq.catInfo"><i class="fas fa-music"></i> 音樂節與實用資訊</h2>
     </section>
-    <div class="faq-item"><button class="faq-q">2026 澎湖追風音樂燈光節是什麼時候？</button><div class="faq-a">2026 澎湖追風音樂燈光節於<strong>澎湖觀音亭園區</strong>登場，燈光展演 <strong>9/12–10/11</strong>，藝人展演場次為 <strong>9/12、9/13、9/19、9/26、10/3</strong>。我們有搭配音樂節的主題行程，歡迎詢問。</div></div>
-    <div class="faq-item"><button class="faq-q">音樂節期間去澎湖要注意什麼？</button><div class="faq-a">活動期間（尤其演出週末）<strong>機票、船票與住宿會更搶手</strong>，務必提早預訂。建議搭配白天景點與離島，晚上看燈光展演，行程更充實。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖有便利商店、ATM 嗎？</button><div class="faq-a">馬公市區<strong>便利商店、ATM、銀行齊全</strong>，生活機能與本島無異。但離島據點較少，建議上離島前先領好現金、備妥所需物品。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖收訊、網路好嗎？</button><div class="faq-a">本島與主要離島<strong>4G／5G 收訊普遍良好</strong>，民宿飯店多有 Wi-Fi。少數偏遠海域或小島收訊較弱，屬正常現象。</div></div>
-    <div class="faq-item"><button class="faq-q">澎湖刷卡方便嗎？要帶現金嗎？</button><div class="faq-a">市區飯店、餐廳、大型店家多可刷卡，但<strong>傳統市場、小吃攤、離島仍以現金為主</strong>。建議備足現金，跳島前先在市區領好錢。</div></div>
-    <div class="faq-item"><button class="faq-q">去澎湖要帶什麼？有什麼必備？</button><div class="faq-a">必備：<strong>防曬乳、帽子、太陽眼鏡、泳衣、換洗衣物、暈船／藥品、行動電源、現金</strong>。夏天防曬補水最重要；冬天則要帶保暖外套防風。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q95">2026 澎湖追風音樂燈光節是什麼時候？</button><div class="faq-a" data-i18n-html="faq.a95">2026 澎湖追風音樂燈光節於<strong>澎湖觀音亭園區</strong>登場，燈光展演 <strong>9/12–10/11</strong>，藝人展演場次為 <strong>9/12、9/13、9/19、9/26、10/3</strong>。我們有搭配音樂節的主題行程，歡迎詢問。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q96">音樂節期間去澎湖要注意什麼？</button><div class="faq-a" data-i18n-html="faq.a96">活動期間（尤其演出週末）<strong>機票、船票與住宿會更搶手</strong>，務必提早預訂。建議搭配白天景點與離島，晚上看燈光展演，行程更充實。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q97">澎湖有便利商店、ATM 嗎？</button><div class="faq-a" data-i18n-html="faq.a97">馬公市區<strong>便利商店、ATM、銀行齊全</strong>，生活機能與本島無異。但離島據點較少，建議上離島前先領好現金、備妥所需物品。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q98">澎湖收訊、網路好嗎？</button><div class="faq-a" data-i18n-html="faq.a98">本島與主要離島<strong>4G／5G 收訊普遍良好</strong>，民宿飯店多有 Wi-Fi。少數偏遠海域或小島收訊較弱，屬正常現象。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q99">澎湖刷卡方便嗎？要帶現金嗎？</button><div class="faq-a" data-i18n-html="faq.a99">市區飯店、餐廳、大型店家多可刷卡，但<strong>傳統市場、小吃攤、離島仍以現金為主</strong>。建議備足現金，跳島前先在市區領好錢。</div></div>
+    <div class="faq-item"><button class="faq-q" data-i18n="faq.q100">去澎湖要帶什麼？有什麼必備？</button><div class="faq-a" data-i18n-html="faq.a100">必備：<strong>防曬乳、帽子、太陽眼鏡、泳衣、換洗衣物、暈船／藥品、行動電源、現金</strong>。夏天防曬補水最重要；冬天則要帶保暖外套防風。</div></div>
 
     <!-- 底部 CTA -->
     <div class="faq-cta">
-      <h3>還有問題沒解答到？</h3>
-      <p>不論行程規劃、預算或客製需求，澎湖在地團隊都樂意為你解答。</p>
-      <a href="index.html#contact" class="btn btn-primary"><i class="fas fa-comment-dots"></i> 線上諮詢</a>
-      <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" rel="noopener noreferrer" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main);"><i class="fab fa-line"></i> LINE 諮詢</a>
-      <a href="index.html#tours" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main);"><i class="fas fa-map-marked-alt"></i> 看推薦行程</a>
+      <h3 data-i18n="faq.ctaTitle">還有問題沒解答到？</h3>
+      <p data-i18n="faq.ctaDesc">不論行程規劃、預算或客製需求，澎湖在地團隊都樂意為你解答。</p>
+      <a href="index.html#contact" class="btn btn-primary" data-i18n="faq.ctaConsult"><i class="fas fa-comment-dots"></i> 線上諮詢</a>
+      <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" rel="noopener noreferrer" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main);" data-i18n="faq.ctaLine"><i class="fab fa-line"></i> LINE 諮詢</a>
+      <a href="index.html#tours" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main);" data-i18n="faq.ctaTours"><i class="fas fa-map-marked-alt"></i> 看推薦行程</a>
     </div>
 
   </main>
@@ -347,24 +357,24 @@
       <div class="footer-grid">
         <div class="footer-brand">
           <h3><i class="fas fa-water"></i> 潮旅國際旅行社</h3>
-          <p>帶你玩出不一樣的澎湖旅行</p>
+          <p data-i18n="hero.subtitle">帶你玩出不一樣的澎湖旅行</p>
           <p class="footer-license">交觀乙第1864號｜澎品保0188號</p>
         </div>
         <div class="footer-links">
-          <h4>快速連結</h4>
+          <h4 data-i18n="footer.quickLinks">快速連結</h4>
           <ul>
-            <li><a href="index.html#home">首頁</a></li>
-            <li><a href="index.html#tours">行程介紹</a></li>
-            <li><a href="faq.html">常見問題</a></li>
-            <li><a href="index.html#contact">聯絡我們</a></li>
+            <li><a href="index.html#home" data-i18n="nav.home">首頁</a></li>
+            <li><a href="index.html#tours" data-i18n="nav.tours">行程介紹</a></li>
+            <li><a href="faq.html" data-i18n="nav.faq">常見問題</a></li>
+            <li><a href="index.html#contact" data-i18n="nav.contact">聯絡我們</a></li>
           </ul>
         </div>
         <div class="footer-contact">
-          <h4>聯絡資訊</h4>
+          <h4 data-i18n="footer.contactInfo">聯絡資訊</h4>
           <p><i class="fas fa-phone"></i> 06-9271288</p>
           <p><i class="fas fa-envelope"></i> dodoken1002@phbay.net</p>
-          <p><i class="fas fa-user"></i> 負責人：唐瑋汝</p>
-          <p><i class="fas fa-clock"></i> 週一至週五 08:30–17:30</p>
+          <p><i class="fas fa-user"></i> <span data-i18n="footer.owner">負責人：唐瑋汝</span></p>
+          <p><i class="fas fa-clock"></i> <span data-i18n="footer.hours">週一至週五 08:30–17:30</span></p>
           <div class="footer-social">
             <a href="https://www.facebook.com/phbay2018" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
             <a href="https://www.instagram.com/phbay_2021/" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
@@ -383,6 +393,8 @@
     <i class="fas fa-chevron-up"></i>
   </button>
 
+  <script src="i18n.js"></script>
+  <script src="faq-i18n.js"></script>
   <script>
     // 版權年份
     document.getElementById('footer-year').textContent = new Date().getFullYear();
