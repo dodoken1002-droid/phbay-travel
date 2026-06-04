@@ -334,17 +334,42 @@ window.scrollToTop = scrollToTop;
 ════════════════════════════════════════════════ */
 // 全站梯次快取 { tourId: [slot,...] }
 let _allSlots = {};
+// 已載入行程（供語言切換時重新渲染）
+let _toursGrouped = null;
+
+// 取得行程欄位的當前語言版本（無翻譯則回退中文）
+function getLoc(tour, field) {
+  const l = window.__lang || 'zh-tw';
+  if (l === 'zh-tw') return tour[field];
+  const t = tour.i18n && tour.i18n[l];
+  return (t && t[field] != null && t[field] !== '') ? t[field] : tour[field];
+}
+// 取得行程 modal_data 的當前語言版本
+function getLocModal(tour) {
+  const l = window.__lang || 'zh-tw';
+  if (l === 'zh-tw') return tour.modal_data || {};
+  const t = tour.i18n && tour.i18n[l] && tour.i18n[l].modal_data;
+  return (t && Object.keys(t).length) ? t : (tour.modal_data || {});
+}
+// 取得行程 prices 的當前語言版本
+function getLocPrices(tour) {
+  const l = window.__lang || 'zh-tw';
+  if (l !== 'zh-tw') {
+    const t = tour.i18n && tour.i18n[l] && tour.i18n[l].prices;
+    if (Array.isArray(t) && t.length) return t;
+  }
+  return tour.prices || [];
+}
 
 async function loadTours() {
   try {
-    // 同時抓行程與梯次名額
     const [toursRes, slotsRes] = await Promise.all([
       fetch('/api/tours'),
       fetch('/api/slots')
     ]);
     if (!toursRes.ok) throw new Error('API error');
     const json    = await toursRes.json();
-    const grouped = json.tours || {};
+    _toursGrouped = json.tours || {};
 
     if (slotsRes.ok) {
       const sJson = await slotsRes.json();
@@ -354,22 +379,12 @@ async function loadTours() {
       });
     }
 
-    document.querySelectorAll('.tours-loading').forEach(el => el.remove());
-
-    ['featured', '2d1n', '3d2n', '4d3n'].forEach(tab => {
-      const grid = document.getElementById(`grid-${tab}`);
-      if (!grid) return;
-      const tours = grouped[tab] || [];
-      tours.forEach(tour => {
-        grid.appendChild(renderTourCard(tour));
-        renderTourModal(tour);
-      });
-    });
+    renderAllTours();
 
     // 用唯一行程清單填入諮詢表單下拉（不再寫死 ID）
     const seen = new Set();
     const uniqueTours = [];
-    Object.values(grouped).flat().forEach(t => {
+    Object.values(_toursGrouped).flat().forEach(t => {
       if (!seen.has(t.id)) { seen.add(t.id); uniqueTours.push(t); }
     });
     uniqueTours.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
@@ -382,26 +397,65 @@ async function loadTours() {
   }
 }
 
+// 依當前語言渲染所有行程卡片與彈窗（語言切換時重用）
+function renderAllTours() {
+  if (!_toursGrouped) return;
+  document.querySelectorAll('.tours-loading').forEach(el => el.remove());
+  const mc = document.getElementById('modal-container');
+  if (mc) mc.innerHTML = '';
+  ['featured', '2d1n', '3d2n', '4d3n'].forEach(tab => {
+    const grid = document.getElementById(`grid-${tab}`);
+    if (!grid) return;
+    grid.innerHTML = '';
+    (_toursGrouped[tab] || []).forEach(tour => {
+      grid.appendChild(renderTourCard(tour));
+      renderTourModal(tour);
+    });
+  });
+}
+
+// 語言切換時由 i18n.js 呼叫 → 重新渲染動態行程
+window.onLangChange = function () { renderAllTours(); };
+
+// 行程卡片／彈窗的固定 UI 字串（依語言）
+const TOUR_UI = {
+  'zh-tw':{detail:'查看詳情',priceHdr:'出發地 × 價格',suitable:'適合',duration:'天數',notice:'注意事項',includes:'費用包含',notes:'備註',highlights:'行程亮點',dates:'出發日期'},
+  'en':{detail:'View Details',priceHdr:'Departure × Price',suitable:'For',duration:'Duration',notice:'Note',includes:'Includes',notes:'Notes',highlights:'Highlights',dates:'Departure Dates'},
+  'ja':{detail:'詳細を見る',priceHdr:'出発地 × 料金',suitable:'対象',duration:'日数',notice:'ご注意',includes:'料金に含む',notes:'備考',highlights:'ハイライト',dates:'出発日'},
+  'ko':{detail:'상세 보기',priceHdr:'출발지 × 요금',suitable:'대상',duration:'일수',notice:'유의사항',includes:'포함 사항',notes:'비고',highlights:'하이라이트',dates:'출발일'},
+  'zh-cn':{detail:'查看详情',priceHdr:'出发地 × 价格',suitable:'适合',duration:'天数',notice:'注意事项',includes:'费用包含',notes:'备注',highlights:'行程亮点',dates:'出发日期'}
+};
+function tourUI(k){ return (TOUR_UI[window.__lang || 'zh-tw'] || TOUR_UI['zh-tw'])[k]; }
+
 function renderTourCard(tour) {
   const card = document.createElement('div');
   const isHero = tour.is_hero;
   card.className = 'tour-card' + (isHero ? ' tour-card--hero' : '');
 
+  const L = {
+    title: getLoc(tour, 'title'),
+    description: getLoc(tour, 'description'),
+    suitable_for: getLoc(tour, 'suitable_for'),
+    duration: getLoc(tour, 'duration'),
+    price_display: getLoc(tour, 'price_display'),
+    prices: getLocPrices(tour),
+  };
+
   const badgeHtml = tour.badge_text
     ? `<div class="tour-badge ${tour.badge_class || ''}">${tour.badge_text}</div>` : '';
 
   const imgHtml = tour.image_url
-    ? `<img src="${tour.image_url}" alt="${tour.title}" loading="lazy" />`
-    : `<img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80" alt="${tour.title}" loading="lazy" />`;
+    ? `<img src="${tour.image_url}" alt="${L.title}" loading="lazy" />`
+    : `<img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80" alt="${L.title}" loading="lazy" />`;
 
   // 多出發地價格列（DB 格式：{label, value}）
-  const pricesHtml = Array.isArray(tour.prices) && tour.prices.length
-    ? `<div class="tour-prices">${tour.prices.map(p =>
+  const pricesHtml = Array.isArray(L.prices) && L.prices.length
+    ? `<div class="tour-prices">${L.prices.map(p =>
         `<div class="price-row"><span class="price-from">${p.label ?? p.from ?? ''}</span><span class="price-val">${p.value ?? p.price ?? ''}</span></div>`
       ).join('')}</div>` : '';
 
-  const priceMetaHtml = (!tour.prices || !tour.prices.length) && tour.price_display
-    ? `<span class="meta-item price"><i class="fas fa-tag"></i> ${tour.price_display}</span>` : '';
+  const priceMetaHtml = (!L.prices || !L.prices.length) && L.price_display
+    ? `<span class="meta-item price"><i class="fas fa-tag"></i> ${L.price_display}</span>` : '';
 
   const btnClass = isHero ? 'btn btn-card btn-card--hero' : 'btn btn-card';
 
@@ -431,24 +485,28 @@ function renderTourCard(tour) {
     </div>
     <div class="tour-body">
       ${isHero ? '<div class="tour-year-badge">2026</div>' : ''}
-      <h3 class="tour-title">${tour.title}</h3>
-      <p class="tour-desc">${tour.description || ''}</p>
+      <h3 class="tour-title">${L.title}</h3>
+      <p class="tour-desc">${L.description || ''}</p>
       ${slotHtml}
       ${pricesHtml}
       <div class="tour-meta">
-        ${tour.suitable_for ? `<span class="meta-item"><i class="fas fa-users"></i> ${tour.suitable_for}</span>` : ''}
-        ${tour.duration ? `<span class="meta-item"><i class="fas fa-calendar"></i> ${tour.duration}</span>` : ''}
+        ${L.suitable_for ? `<span class="meta-item"><i class="fas fa-users"></i> ${L.suitable_for}</span>` : ''}
+        ${L.duration ? `<span class="meta-item"><i class="fas fa-calendar"></i> ${L.duration}</span>` : ''}
         ${priceMetaHtml}
       </div>
       <button class="${btnClass}" onclick="openModal('db-${tour.id}')">
-        查看詳情 <i class="fas fa-arrow-right"></i>
+        ${tourUI('detail')} <i class="fas fa-arrow-right"></i>
       </button>
     </div>`;
   return card;
 }
 
 function renderTourModal(tour) {
-  const md = tour.modal_data || {};
+  const md     = getLocModal(tour);
+  const title  = getLoc(tour, 'title');
+  const dur    = getLoc(tour, 'duration');
+  const pdisp  = getLoc(tour, 'price_display');
+  const prices = getLocPrices(tour);
   const container = document.getElementById('modal-container');
 
   const modalEl = document.createElement('div');
@@ -457,29 +515,29 @@ function renderTourModal(tour) {
 
   // Prices table or tag
   let priceSection = '';
-  if (Array.isArray(tour.prices) && tour.prices.length) {
-    priceSection = `<h4><i class="fas fa-tag"></i> 出發地 × 價格</h4>
+  if (Array.isArray(prices) && prices.length) {
+    priceSection = `<h4><i class="fas fa-tag"></i> ${tourUI('priceHdr')}</h4>
       <table class="price-table">
-        ${tour.prices.map(p => `<tr><td>${p.label ?? p.from ?? ''}</td><td class="price-highlight">${p.value ?? p.price ?? ''}</td></tr>`).join('')}
+        ${prices.map(p => `<tr><td>${p.label ?? p.from ?? ''}</td><td class="price-highlight">${p.value ?? p.price ?? ''}</td></tr>`).join('')}
       </table>`;
-  } else if (tour.price_display) {
-    priceSection = `<h4><i class="fas fa-tag"></i> 價格</h4><p>${tour.price_display}</p>`;
+  } else if (pdisp) {
+    priceSection = `<h4><i class="fas fa-tag"></i> ${tourUI('priceHdr')}</h4><p>${pdisp}</p>`;
   }
 
   // Dates
   const datesHtml = md.dates && md.dates.length
-    ? `<h4><i class="fas fa-calendar-alt"></i> 出發日期</h4>
+    ? `<h4><i class="fas fa-calendar-alt"></i> ${tourUI('dates')}</h4>
        <div class="date-chips">${md.dates.map(d => `<span class="date-chip">${d}</span>`).join('')}</div>` : '';
 
   // Highlights
   const hlHtml = md.highlights && md.highlights.length
-    ? `<h4><i class="fas fa-star"></i> 行程亮點</h4>
+    ? `<h4><i class="fas fa-star"></i> ${tourUI('highlights')}</h4>
        <ul>${md.highlights.map(h => `<li>${h}</li>`).join('')}</ul>` : '';
 
   // Day by day
   let daysHtml = '';
   if (md.days && md.days.length) {
-    daysHtml = `<h4><i class="fas fa-map-signs"></i> 行程規劃</h4><div class="day-blocks">
+    daysHtml = `<h4><i class="fas fa-map-signs"></i> ${tourUI('highlights')}</h4><div class="day-blocks">
       ${md.days.map(d => `
         <div class="day-block">
           <div class="day-label">${d.label}</div>
@@ -492,18 +550,18 @@ function renderTourModal(tour) {
   }
 
   // Includes / notes
-  const includesHtml = md.includes ? `<h4><i class="fas fa-check-circle"></i> 費用包含</h4><p>${md.includes}</p>` : '';
-  const notesHtml    = md.notes   ? `<h4><i class="fas fa-exclamation-circle"></i> 注意事項</h4><p>${md.notes}</p>` : '';
+  const includesHtml = md.includes ? `<h4><i class="fas fa-check-circle"></i> ${tourUI('includes')}</h4><p>${md.includes}</p>` : '';
+  const notesHtml    = md.notes   ? `<h4><i class="fas fa-exclamation-circle"></i> ${tourUI('notes')}</h4><p>${md.notes}</p>` : '';
 
   const headerClass = tour.is_hero ? 'modal-header modal-header--turtle' : 'modal-header';
   const headerInner = tour.is_hero
     ? `<div class="modal-header-content">
         <span class="modal-year">2026</span>
-        <h2>${tour.title}</h2>
-        <span class="modal-tag">${tour.duration || ''} × 望安深度 × 海島體驗 × 永續旅遊</span>
+        <h2>${title}</h2>
+        <span class="modal-tag">${dur || ''}</span>
        </div>`
-    : `<h2>${tour.title}</h2>
-       <span class="modal-tag">${tour.duration || ''}${tour.price_display ? '｜' + tour.price_display : ''}</span>`;
+    : `<h2>${title}</h2>
+       <span class="modal-tag">${dur || ''}${pdisp ? '｜' + pdisp : ''}</span>`;
 
   modalEl.innerHTML = `
     <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
@@ -516,7 +574,7 @@ function renderTourModal(tour) {
       ${includesHtml}
       ${notesHtml}
       <a href="#contact" class="btn btn-primary" onclick="closeModal()">
-        <i class="fas fa-comment-dots"></i> 我要諮詢這個行程
+        <i class="fas fa-comment-dots"></i> ${tourUI('detail')}
       </a>
     </div>`;
 

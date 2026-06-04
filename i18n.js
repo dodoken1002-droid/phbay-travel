@@ -195,11 +195,15 @@ function setLang(lang) {
   });
 
   document.documentElement.lang = LANG_HTML[lang] || 'zh-TW';
+  window.__lang = lang;
   try { localStorage.setItem('phbay_lang', lang); } catch (e) {}
   const cur = document.getElementById('lang-current');
   if (cur) cur.textContent = LANG_NAMES[lang] || '中文';
+  // 通知動態內容（行程卡片等）依語言重新渲染
+  if (typeof window.onLangChange === 'function') window.onLangChange(lang);
 }
 window.setLang = setLang;
+window.__lang = 'zh-tw';
 
 /* ── 切換選單與啟動 ── */
 document.addEventListener('DOMContentLoaded', () => {

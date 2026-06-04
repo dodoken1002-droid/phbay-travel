@@ -97,12 +97,18 @@ def init_db():
             is_hero      BOOLEAN  DEFAULT FALSE,
             prices       JSONB    DEFAULT '[]',
             modal_data   JSONB    DEFAULT '{}',
+            i18n         JSONB    DEFAULT '{}',
             sort_order   INT      DEFAULT 0,
             is_active    BOOLEAN  DEFAULT TRUE,
             created_at   TIMESTAMP DEFAULT NOW(),
             updated_at   TIMESTAMP DEFAULT NOW()
         )
     """)
+    # 舊資料庫補 i18n 欄位
+    try:
+        cur.execute("ALTER TABLE tours ADD COLUMN IF NOT EXISTS i18n JSONB DEFAULT '{}'")
+    except Exception:
+        conn.rollback()
     # tour_slots 資料表
     cur.execute("""
         CREATE TABLE IF NOT EXISTS tour_slots (
@@ -453,8 +459,8 @@ def admin_create_tour():
             INSERT INTO tours
               (tabs, badge_text, badge_class, image_url, title, description,
                suitable_for, duration, price_display, is_hero, prices, modal_data,
-               sort_order, is_active)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+               i18n, sort_order, is_active)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             RETURNING id
         """, (
             Json(data.get('tabs', ['featured'])),
@@ -464,6 +470,7 @@ def admin_create_tour():
             data.get('duration', ''), data.get('price_display', ''),
             data.get('is_hero', False),
             Json(data.get('prices', [])), Json(data.get('modal_data', {})),
+            Json(data.get('i18n', {})),
             data.get('sort_order', 99), data.get('is_active', True),
         ))
         new_id = cur.fetchone()['id']
@@ -485,8 +492,8 @@ def admin_update_tour(tour_id):
             UPDATE tours SET
               tabs=%s, badge_text=%s, badge_class=%s, image_url=%s, title=%s,
               description=%s, suitable_for=%s, duration=%s, price_display=%s,
-              is_hero=%s, prices=%s, modal_data=%s, sort_order=%s, is_active=%s,
-              updated_at=NOW()
+              is_hero=%s, prices=%s, modal_data=%s, i18n=COALESCE(%s, i18n),
+              sort_order=%s, is_active=%s, updated_at=NOW()
             WHERE id=%s
         """, (
             Json(data.get('tabs', ['featured'])),
@@ -496,6 +503,7 @@ def admin_update_tour(tour_id):
             data.get('duration', ''), data.get('price_display', ''),
             data.get('is_hero', False),
             Json(data.get('prices', [])), Json(data.get('modal_data', {})),
+            Json(data['i18n']) if 'i18n' in data else None,
             data.get('sort_order', 0), data.get('is_active', True),
             tour_id,
         ))
