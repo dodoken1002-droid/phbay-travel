@@ -402,6 +402,34 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
         </div>
       </div>
 
+      <!-- ── 多語翻譯編輯 ── -->
+      <div class="form-group full" style="border-top:2px dashed #cbd5e0;padding-top:16px;margin-top:8px">
+        <label style="font-weight:700;color:#1a6b9e">
+          <i class="fas fa-language"></i> 多語翻譯（選填，留空的語言／欄位會自動顯示中文）
+        </label>
+        <div style="display:flex;gap:6px;margin:10px 0;flex-wrap:wrap">
+          <button type="button" class="btn btn-sm btn-ghost i18n-lang-btn" data-lang="en" onclick="switchI18nLang('en')">English</button>
+          <button type="button" class="btn btn-sm btn-ghost i18n-lang-btn" data-lang="ja" onclick="switchI18nLang('ja')">日本語</button>
+          <button type="button" class="btn btn-sm btn-ghost i18n-lang-btn" data-lang="ko" onclick="switchI18nLang('ko')">한국어</button>
+          <button type="button" class="btn btn-sm btn-ghost i18n-lang-btn" data-lang="zh-cn" onclick="switchI18nLang('zh-cn')">简体</button>
+          <span id="i18n-cur-label" style="margin-left:8px;align-self:center;font-size:.85rem;color:#4a5568"></span>
+        </div>
+        <input id="fi-title" placeholder="行程名稱（翻譯）" style="width:100%;margin-bottom:6px;padding:7px;border:1px solid #e2e8f0;border-radius:6px" />
+        <textarea id="fi-desc" rows="2" placeholder="描述（翻譯）" style="width:100%;margin-bottom:6px;padding:7px;border:1px solid #e2e8f0;border-radius:6px"></textarea>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:6px">
+          <input id="fi-suitable" placeholder="適合對象（翻譯）" style="padding:7px;border:1px solid #e2e8f0;border-radius:6px" />
+          <input id="fi-duration" placeholder="天數（翻譯）" style="padding:7px;border:1px solid #e2e8f0;border-radius:6px" />
+          <input id="fi-price" placeholder="價格（翻譯）" style="padding:7px;border:1px solid #e2e8f0;border-radius:6px" />
+        </div>
+        <textarea id="fi-highlights" rows="3" placeholder="行程亮點（翻譯，每行一項）" style="width:100%;margin-bottom:6px;padding:7px;border:1px solid #e2e8f0;border-radius:6px"></textarea>
+        <textarea id="fi-dates" rows="2" placeholder="出發日期（翻譯，每行一項）" style="width:100%;margin-bottom:6px;padding:7px;border:1px solid #e2e8f0;border-radius:6px"></textarea>
+        <textarea id="fi-days" rows="4" placeholder="行程規劃（翻譯，格式：DAY 1|標題|項目1;項目2，每天一行）" style="width:100%;margin-bottom:6px;padding:7px;border:1px solid #e2e8f0;border-radius:6px"></textarea>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <input id="fi-includes" placeholder="費用包含（翻譯）" style="padding:7px;border:1px solid #e2e8f0;border-radius:6px" />
+          <input id="fi-notes" placeholder="備註（翻譯）" style="padding:7px;border:1px solid #e2e8f0;border-radius:6px" />
+        </div>
+      </div>
+
       <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:20px">
         <button class="btn btn-ghost" onclick="closeTourModal()">取消</button>
         <button class="btn btn-primary" onclick="saveTour()">
@@ -421,6 +449,101 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
 ══════════════════════════════════════ */
 let ADMIN_KEY = '';
 let allTours  = [];
+
+/* ══════════════════════════════════════
+   多語翻譯編輯
+══════════════════════════════════════ */
+let _i18nDraft   = {};       // { en:{...}, ja:{...}, ko:{...}, 'zh-cn':{...} }
+let _i18nCurLang = 'en';
+const I18N_LANGS = ['en','ja','ko','zh-cn'];
+const I18N_NAMES = { en:'English', ja:'日本語', ko:'한국어', 'zh-cn':'简体中文' };
+
+function _fiVal(id){ return document.getElementById(id).value; }
+function _fiSet(id,v){ document.getElementById(id).value = v || ''; }
+
+// 從畫面欄位讀出當前語言的翻譯物件
+function collectI18nFields(){
+  const md = {};
+  const hl = _fiVal('fi-highlights').split('\n').map(s=>s.trim()).filter(Boolean);
+  const dt = _fiVal('fi-dates').split('\n').map(s=>s.trim()).filter(Boolean);
+  const daysRaw = _fiVal('fi-days').split('\n').map(s=>s.trim()).filter(Boolean);
+  const days = daysRaw.map(line=>{
+    const [label,title,items] = line.split('|');
+    return { label:(label||'').trim(), title:(title||'').trim(),
+             items:(items||'').split(';').map(s=>s.trim()).filter(Boolean) };
+  });
+  const inc = _fiVal('fi-includes').trim();
+  const nt  = _fiVal('fi-notes').trim();
+  if (hl.length)  md.highlights = hl;
+  if (dt.length)  md.dates = dt;
+  if (days.length) md.days = days;
+  if (inc) md.includes = inc;
+  if (nt)  md.notes = nt;
+  const obj = {};
+  const title = _fiVal('fi-title').trim();
+  const desc  = _fiVal('fi-desc').trim();
+  const suit  = _fiVal('fi-suitable').trim();
+  const dur   = _fiVal('fi-duration').trim();
+  const price = _fiVal('fi-price').trim();
+  if (title) obj.title = title;
+  if (desc)  obj.description = desc;
+  if (suit)  obj.suitable_for = suit;
+  if (dur)   obj.duration = dur;
+  if (price) obj.price_display = price;
+  if (Object.keys(md).length) obj.modal_data = md;
+  return obj;
+}
+
+// 把翻譯物件填回畫面欄位
+function loadI18nFields(obj){
+  obj = obj || {};
+  _fiSet('fi-title', obj.title);
+  _fiSet('fi-desc', obj.description);
+  _fiSet('fi-suitable', obj.suitable_for);
+  _fiSet('fi-duration', obj.duration);
+  _fiSet('fi-price', obj.price_display);
+  const md = obj.modal_data || {};
+  _fiSet('fi-highlights', (md.highlights||[]).join('\n'));
+  _fiSet('fi-dates', (md.dates||[]).join('\n'));
+  _fiSet('fi-days', (md.days||[]).map(d=>`${d.label}|${d.title}|${(d.items||[]).join(';')}`).join('\n'));
+  _fiSet('fi-includes', md.includes);
+  _fiSet('fi-notes', md.notes);
+}
+
+// 切換編輯語言（先存當前，再載入目標語言）
+function switchI18nLang(lang){
+  _i18nDraft[_i18nCurLang] = collectI18nFields();
+  _i18nCurLang = lang;
+  loadI18nFields(_i18nDraft[lang]);
+  document.querySelectorAll('.i18n-lang-btn').forEach(b=>{
+    b.classList.toggle('btn-primary', b.dataset.lang===lang);
+    b.classList.toggle('btn-ghost', b.dataset.lang!==lang);
+  });
+  document.getElementById('i18n-cur-label').textContent = '正在編輯：' + I18N_NAMES[lang];
+}
+
+// 初始化編輯器（編輯或新增時呼叫）
+function initI18nEditor(i18n){
+  _i18nDraft = JSON.parse(JSON.stringify(i18n || {}));
+  _i18nCurLang = 'en';
+  loadI18nFields(_i18nDraft.en);
+  document.querySelectorAll('.i18n-lang-btn').forEach(b=>{
+    b.classList.toggle('btn-primary', b.dataset.lang==='en');
+    b.classList.toggle('btn-ghost', b.dataset.lang!=='en');
+  });
+  document.getElementById('i18n-cur-label').textContent = '正在編輯：English';
+}
+
+// 取得最終 i18n（過濾空語言）
+function buildI18nPayload(){
+  _i18nDraft[_i18nCurLang] = collectI18nFields();
+  const out = {};
+  I18N_LANGS.forEach(l=>{
+    const o = _i18nDraft[l];
+    if (o && Object.keys(o).length) out[l] = o;
+  });
+  return out;
+}
 
 /* ══════════════════════════════════════
    登入 / 登出
@@ -609,6 +732,9 @@ function editTour(id) {
       `${d.label}|${d.title}|${(d.items||[]).join(';')}`
     ).join('\n');
 
+  // 多語翻譯
+  initI18nEditor(t.i18n);
+
   previewImg();
   document.getElementById('tour-modal').classList.add('open');
 }
@@ -625,6 +751,8 @@ function resetForm() {
   document.querySelectorAll('#f-tabs-group input').forEach(cb => cb.checked = false);
   document.getElementById('prices-container').innerHTML = '';
   document.getElementById('img-preview').style.display = 'none';
+  // 清空多語翻譯編輯器
+  initI18nEditor({});
 }
 
 /* ── 關閉 Modal ── */
@@ -684,6 +812,7 @@ function saveTour() {
     },
     sort_order: parseInt(document.getElementById('f-sort').value) || 99,
     is_active:  document.getElementById('f-active').value === 'true',
+    i18n:       buildI18nPayload(),
     _key: ADMIN_KEY,
   };
 
