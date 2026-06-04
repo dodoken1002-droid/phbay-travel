@@ -200,6 +200,38 @@ ul { list-style: none; }
   transition: var(--transition);
 }
 
+/* ── 語言切換 ── */
+.lang-switch { position: relative; }
+.lang-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--blue-pale); color: var(--blue-main);
+  border: none; cursor: pointer;
+  padding: 7px 12px; border-radius: 8px;
+  font-weight: 700; font-size: 0.9rem; font-family: inherit;
+  transition: var(--transition);
+}
+.lang-btn:hover { background: var(--blue-main); color: var(--white); }
+.lang-menu {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  background: var(--white); border-radius: 10px;
+  box-shadow: var(--shadow-hover);
+  min-width: 140px; padding: 6px; z-index: 1001;
+  display: none;
+}
+.lang-menu.open { display: block; }
+.lang-menu li { list-style: none; }
+.lang-menu button {
+  width: 100%; text-align: left;
+  background: none; border: none; cursor: pointer;
+  padding: 9px 12px; border-radius: 7px;
+  font-size: 0.92rem; font-weight: 600; color: var(--text-mid);
+  font-family: inherit; transition: var(--transition);
+}
+.lang-menu button:hover { background: var(--blue-pale); color: var(--blue-main); }
+@media (max-width: 768px) {
+  .lang-menu { left: 0; right: auto; }
+}
+
 /* ═══════════════════════════════════════════════
    Hero 主視覺 / 輪播
 ════════════════════════════════════════════════ */
