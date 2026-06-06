@@ -1261,6 +1261,50 @@ ul { list-style: none; }
 .back-to-top.visible { display: flex; }
 
 /* ═══════════════════════════════════════════════
+   官方合作旅行社 信任標章
+════════════════════════════════════════════════ */
+.partner-trust {
+  padding: 28px 20px 4px;
+}
+.partner-card {
+  max-width: 920px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  background: linear-gradient(135deg, #fff8e8, #fef0d0);
+  border: 1.5px solid #e6c478;
+  border-radius: var(--radius-lg);
+  padding: 20px 26px;
+  box-shadow: 0 4px 18px rgba(200, 150, 30, 0.14);
+}
+.partner-badge {
+  flex: 0 0 auto;
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #e6a817, #c47f00);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.6rem;
+  box-shadow: 0 3px 10px rgba(196, 127, 0, 0.4);
+}
+.partner-text h2 {
+  font-size: clamp(1.05rem, 2.4vw, 1.35rem);
+  font-weight: 800;
+  color: #8a5a00;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+.partner-text p {
+  font-size: 0.92rem;
+  color: var(--text-mid);
+  line-height: 1.6;
+}
+@media (max-width: 600px) {
+  .partner-card { flex-direction: column; text-align: center; gap: 12px; padding: 18px 18px; }
+}
+
+/* ═══════════════════════════════════════════════
    梯次名額顯示
 ════════════════════════════════════════════════ */
 .slot-summary {
