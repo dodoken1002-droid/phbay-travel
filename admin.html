@@ -207,6 +207,9 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
     <button onclick="switchTab('slots',this)">
       <i class="fas fa-calendar-check"></i> 梯次名額
     </button>
+    <button onclick="switchTab('posts',this)">
+      <i class="fas fa-pen-nib"></i> 部落格
+    </button>
     <button onclick="switchTab('contacts',this)">
       <i class="fas fa-envelope"></i> 諮詢紀錄
     </button>
@@ -259,6 +262,17 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
       <div id="slots-list">載入中…</div>
     </div>
 
+    <!-- ── 部落格 ── -->
+    <div class="tab-content" id="tab-posts">
+      <div class="toolbar">
+        <h2>部落格文章</h2>
+        <button class="btn btn-primary" onclick="openPostForm()">
+          <i class="fas fa-plus"></i> 寫新文章
+        </button>
+      </div>
+      <div id="posts-list">載入中…</div>
+    </div>
+
     <!-- ── 諮詢紀錄 ── -->
     <div class="tab-content" id="tab-contacts">
       <div class="toolbar">
@@ -268,6 +282,57 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
         </button>
       </div>
       <div id="contacts-list">載入中…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 部落格文章編輯彈窗 ── -->
+<div class="modal-bg" id="post-modal">
+  <div class="modal-box" style="max-width:760px">
+    <div class="modal-head">
+      <h3 id="post-modal-title">寫新文章</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closePostModal()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body-inner">
+      <input type="hidden" id="p-id" />
+      <div class="form-group full">
+        <label>標題 *</label>
+        <input id="p-title" placeholder="例：澎湖三天兩夜這樣玩最順" oninput="autoSlug()" />
+      </div>
+      <div class="form-group full">
+        <label>網址代稱 slug（英數與 - ，會成為 /blog/<b>slug</b>）</label>
+        <input id="p-slug" placeholder="penghu-3day-itinerary" />
+      </div>
+      <div class="form-group full">
+        <label>摘要（列表與搜尋預覽顯示，約 60–120 字）</label>
+        <textarea id="p-summary" rows="2" placeholder="一句話介紹這篇文章…"></textarea>
+      </div>
+      <div class="form-group full">
+        <label>封面圖網址（選填）</label>
+        <input id="p-cover" placeholder="https://...jpg 或 /images/xxx.jpg" />
+      </div>
+      <div class="form-group full">
+        <label>內文（可用基本 HTML：<code>&lt;h2&gt; &lt;p&gt; &lt;strong&gt; &lt;ul&gt;&lt;li&gt; &lt;img&gt; &lt;a&gt;</code>；
+          直接打字、空一行分段也可，存檔會自動轉段落）</label>
+        <textarea id="p-content" rows="12" placeholder="在這裡寫文章內容…&#10;&#10;空一行就會自動分成新段落。"></textarea>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label>標籤（逗號分隔）</label>
+          <input id="p-tags" placeholder="景點,攻略,親子" />
+        </div>
+        <div class="form-group">
+          <label>發布狀態</label>
+          <select id="p-pub">
+            <option value="false">草稿（不公開）</option>
+            <option value="true">發布（公開於部落格）</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:18px">
+        <button class="btn btn-ghost" onclick="closePostModal()">取消</button>
+        <button class="btn btn-primary" onclick="savePost()"><i class="fas fa-save"></i> 儲存文章</button>
+      </div>
     </div>
   </div>
 </div>
@@ -594,6 +659,7 @@ function switchTab(name, btn) {
   btn.classList.add('active');
   if (name === 'contacts') loadContacts();
   if (name === 'slots')    loadSlots();
+  if (name === 'posts')    loadPosts();
 }
 
 /* ══════════════════════════════════════
@@ -1117,6 +1183,129 @@ function submitSlotForm() {
     }
   });
 }
+
+/* ══════════════════════════════════════
+   部落格文章管理
+══════════════════════════════════════ */
+let _allPosts = [];
+
+function loadPosts() {
+  const el = document.getElementById('posts-list');
+  el.innerHTML = '載入中…';
+  fetch(`/api/admin/posts?key=${encodeURIComponent(ADMIN_KEY)}`)
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) { el.innerHTML = '載入失敗'; return; }
+      _allPosts = d.posts;
+      if (!d.posts.length) {
+        el.innerHTML = '<p style="color:#a0aec0;text-align:center;padding:40px">尚無文章，點「寫新文章」開始第一篇！</p>';
+        return;
+      }
+      el.innerHTML = `<table class="tour-table" style="min-width:100%"><thead><tr>
+        <th>標題</th><th>網址</th><th>狀態</th><th>發布日</th><th style="width:150px">操作</th>
+        </tr></thead><tbody>${d.posts.map(p => {
+          const badge = p.is_published
+            ? '<span style="color:#38a169;font-weight:700">🟢 已發布</span>'
+            : '<span style="color:#a0aec0;font-weight:700">⚪ 草稿</span>';
+          const view = p.is_published
+            ? `<a href="/blog/${encodeURIComponent(p.slug)}" target="_blank" class="btn btn-sm btn-ghost">看</a>` : '';
+          return `<tr>
+            <td><strong>${p.title}</strong></td>
+            <td style="font-size:.8rem;color:#718096">/blog/${p.slug}</td>
+            <td>${badge}</td>
+            <td style="font-size:.8rem">${(p.published_at||'').slice(0,10) || '—'}</td>
+            <td style="display:flex;gap:4px">
+              ${view}
+              <button class="btn btn-sm btn-primary" onclick="editPost(${p.id})">編輯</button>
+              <button class="btn btn-sm btn-danger" onclick="deletePost(${p.id},'${(p.title||'').replace(/'/g,"")}')">刪除</button>
+            </td></tr>`;
+        }).join('')}</tbody></table>`;
+    });
+}
+
+function autoSlug() {
+  const slugEl = document.getElementById('p-slug');
+  if (slugEl.dataset.touched) return;
+  const t = document.getElementById('p-title').value.trim();
+  // 標題有英數時自動生成；中文標題請手動填 slug
+  const s = t.toLowerCase().replace(/[^a-z0-9一-龥]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60);
+  slugEl.value = s;
+}
+
+function openPostForm() {
+  document.getElementById('post-modal-title').textContent = '寫新文章';
+  ['p-id','p-title','p-slug','p-summary','p-cover','p-content','p-tags'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('p-pub').value = 'false';
+  document.getElementById('p-slug').dataset.touched = '';
+  document.getElementById('post-modal').classList.add('open');
+}
+
+function editPost(id) {
+  const p = _allPosts.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('post-modal-title').textContent = '編輯文章';
+  document.getElementById('p-id').value = id;
+  document.getElementById('p-title').value = p.title || '';
+  document.getElementById('p-slug').value = p.slug || '';
+  document.getElementById('p-slug').dataset.touched = '1';
+  document.getElementById('p-summary').value = p.summary || '';
+  document.getElementById('p-cover').value = p.cover_image || '';
+  document.getElementById('p-content').value = p.content || '';
+  document.getElementById('p-tags').value = p.tags || '';
+  document.getElementById('p-pub').value = String(!!p.is_published);
+  document.getElementById('post-modal').classList.add('open');
+}
+
+function closePostModal() { document.getElementById('post-modal').classList.remove('open'); }
+
+// 純文字自動轉段落（若內容沒有 HTML 標籤）
+function autoParagraph(txt) {
+  if (/<[a-z][\s\S]*>/i.test(txt)) return txt; // 已含 HTML
+  return txt.split(/\n{2,}/).map(b => b.trim()).filter(Boolean)
+            .map(b => `<p>${b.replace(/\n/g,'<br>')}</p>`).join('\n');
+}
+
+function savePost() {
+  const id    = document.getElementById('p-id').value;
+  const title = document.getElementById('p-title').value.trim();
+  let   slug  = document.getElementById('p-slug').value.trim();
+  if (!title) { showToast('請輸入標題', 'error'); return; }
+  if (!slug)  { showToast('請輸入網址代稱 slug', 'error'); return; }
+  slug = slug.toLowerCase().replace(/[^a-z0-9一-龥-]+/g,'-').replace(/^-+|-+$/g,'');
+
+  const payload = {
+    title, slug,
+    summary:    document.getElementById('p-summary').value.trim(),
+    content:    autoParagraph(document.getElementById('p-content').value),
+    cover_image:document.getElementById('p-cover').value.trim(),
+    tags:       document.getElementById('p-tags').value.trim(),
+    is_published: document.getElementById('p-pub').value === 'true',
+    _key: ADMIN_KEY,
+  };
+  const url    = id ? `/api/admin/posts/${id}` : '/api/admin/posts';
+  const method = id ? 'PUT' : 'POST';
+  fetch(`${url}?key=${encodeURIComponent(ADMIN_KEY)}`, {
+    method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+  }).then(r => r.json()).then(d => {
+    if (d.ok) { showToast(id ? '文章已更新 ✅' : '文章已建立 ✅', 'success'); closePostModal(); loadPosts(); }
+    else showToast('儲存失敗：' + (d.error||''), 'error');
+  });
+}
+
+function deletePost(id, name) {
+  if (!confirm(`確定刪除「${name}」？此操作無法復原。`)) return;
+  fetch(`/api/admin/posts/${id}?key=${encodeURIComponent(ADMIN_KEY)}`, { method:'DELETE' })
+    .then(r => r.json()).then(d => {
+      if (d.ok) { showToast('文章已刪除', 'success'); loadPosts(); }
+      else showToast('刪除失敗', 'error');
+    });
+}
+
+// slug 手動編輯時標記，避免被自動覆蓋
+document.addEventListener('DOMContentLoaded', () => {
+  const s = document.getElementById('p-slug');
+  if (s) s.addEventListener('input', () => { s.dataset.touched = '1'; });
+});
 
 /* ══════════════════════════════════════
    Toast 通知

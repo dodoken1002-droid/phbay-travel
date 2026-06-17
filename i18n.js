@@ -10,7 +10,7 @@ const LANG_HTML  = { 'zh-tw':'zh-TW', 'en':'en', 'ja':'ja', 'ko':'ko', 'zh-cn':'
 const DICT = {
   /* ─────────── English ─────────── */
   en: {
-    'nav.home':'Home', 'nav.tours':'Tours', 'nav.quiz':'Trip Quiz', 'nav.about':'About', 'nav.faq':'FAQ', 'nav.contact':'Contact',
+    'nav.home':'Home', 'nav.tours':'Tours', 'nav.quiz':'Trip Quiz', 'nav.about':'About', 'nav.faq':'FAQ', 'nav.blog':'Blog', 'nav.contact':'Contact',
     'slide.cta':'Ask About Tours',
     'partner.title':'Official Partner · 2026 Penghu Chasing-the-Wind Music & Light Festival','partner.subtitle':'Phbay Travel is on the official partner list alongside ezTravel, Lion Travel, Cola Tour, SET Tour, Starsunny, kkday and EverFun.',
     'hero.title':'Phbay Travel', 'hero.subtitle':'Discover a different side of Penghu',
@@ -50,7 +50,7 @@ const DICT = {
 
   /* ─────────── 日本語 ─────────── */
   ja: {
-    'nav.home':'ホーム', 'nav.tours':'ツアー', 'nav.quiz':'旅行診断', 'nav.about':'会社紹介', 'nav.faq':'よくある質問', 'nav.contact':'お問い合わせ',
+    'nav.home':'ホーム', 'nav.tours':'ツアー', 'nav.quiz':'旅行診断', 'nav.about':'会社紹介', 'nav.faq':'よくある質問', 'nav.blog':'ブログ', 'nav.contact':'お問い合わせ',
     'slide.cta':'ツアーを相談する',
     'partner.title':'2026 澎湖追風音楽燈光祭 公式提携旅行社','partner.subtitle':'Phbay Travel は易遊網・雄獅・可楽・東南・星晴・佳期・kkday・長汎とともに公式提携リストに掲載されています。',
     'hero.title':'Phbay Travel', 'hero.subtitle':'いつもと違う澎湖（ポンフー）の旅へ',
@@ -90,7 +90,7 @@ const DICT = {
 
   /* ─────────── 한국어 ─────────── */
   ko: {
-    'nav.home':'홈', 'nav.tours':'투어', 'nav.quiz':'여행 진단', 'nav.about':'회사 소개', 'nav.faq':'자주 묻는 질문', 'nav.contact':'문의하기',
+    'nav.home':'홈', 'nav.tours':'투어', 'nav.quiz':'여행 진단', 'nav.about':'회사 소개', 'nav.faq':'자주 묻는 질문', 'nav.blog':'블로그', 'nav.contact':'문의하기',
     'slide.cta':'투어 문의하기',
     'partner.title':'2026 펑후 추풍 음악조명축제 공식 제휴 여행사','partner.subtitle':'Phbay Travel은 ezTravel·라이언트래블·콜라투어·SET투어 등과 함께 공식 제휴 명단에 등재되어 있습니다.',
     'hero.title':'Phbay Travel', 'hero.subtitle':'색다른 펑후 여행을 만나보세요',
@@ -130,7 +130,7 @@ const DICT = {
 
   /* ─────────── 简体中文 ─────────── */
   'zh-cn': {
-    'nav.home':'首页', 'nav.tours':'行程介绍', 'nav.quiz':'行程测验', 'nav.about':'关于我们', 'nav.faq':'常见问题', 'nav.contact':'联系我们',
+    'nav.home':'首页', 'nav.tours':'行程介绍', 'nav.quiz':'行程测验', 'nav.about':'关于我们', 'nav.faq':'常见问题', 'nav.blog':'博客', 'nav.contact':'联系我们',
     'slide.cta':'咨询搭配行程',
     'partner.title':'2026 澎湖追风音乐灯光节 官方合作旅行社','partner.subtitle':'潮旅国际与易游网、雄狮、可乐、东南、星晴、佳期、kkday、长汎并列官方授权名单',
     'hero.title':'潮旅国际旅行社', 'hero.subtitle':'带你玩出不一样的澎湖旅行',
