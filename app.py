@@ -22,6 +22,8 @@ import psycopg2
 import psycopg2.extras
 from psycopg2.extras import Json
 from dotenv import load_dotenv
+from knowledge_posts import KNOWLEDGE_POSTS, MIGRATION_ID as KNOWLEDGE_POSTS_MIGRATION
+from repo_posts import sync_repo_posts
 
 load_dotenv()
 
@@ -142,7 +144,36 @@ def init_db():
             updated_at   TIMESTAMP DEFAULT NOW()
         )
     """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS site_migrations (
+            migration_id VARCHAR(120) PRIMARY KEY,
+            applied_at   TIMESTAMP DEFAULT NOW()
+        )
+    """)
     conn.commit()
+
+    # Repository-managed posts are the source of truth for automated publishing.
+    # Each JSON file is upserted by slug, so Railway redeploys stay idempotent.
+    repo_post_count = sync_repo_posts(cur)
+    conn.commit()
+    if repo_post_count:
+        print(f'[DB] Synced {repo_post_count} repository posts')
+
+    # 一次性更新四篇常青知識文章；完成後保留後台人工編修內容。
+    cur.execute("""INSERT INTO site_migrations (migration_id) VALUES (%s)
+                   ON CONFLICT (migration_id) DO NOTHING RETURNING migration_id""",
+                (KNOWLEDGE_POSTS_MIGRATION,))
+    if cur.fetchone():
+        for post in KNOWLEDGE_POSTS:
+            cur.execute("""INSERT INTO posts
+                           (slug, title, summary, content, tags, author, is_published, published_at)
+                           VALUES (%s, %s, %s, %s, %s, '潮旅國際旅行社', TRUE, NOW())
+                           ON CONFLICT (slug) DO UPDATE SET
+                               title=EXCLUDED.title, summary=EXCLUDED.summary,
+                               content=EXCLUDED.content, tags=EXCLUDED.tags,
+                               author=EXCLUDED.author, updated_at=NOW()""",
+                        (post['slug'], post['title'], post['summary'], post['content'], post['tags']))
+        conn.commit()
 
     # 若 tours 資料表是空的，寫入預設行程
     cur.execute("SELECT COUNT(*) AS n FROM tours")
@@ -402,303 +433,22 @@ def health():
     db_url = os.environ.get('DATABASE_URL', '')
     db_status = 'not_set'
     db_error = None
-    table_exists = False
-    if db_url:
-        db_status = 'url_found'
-        try:
-            conn = get_db()
-            cur = conn.cursor()
-            cur.execute("SELECT to_regclass('public.contacts') AS t")
-            row = cur.fetchone()
-            table_exists = row['t'] is not None
-            cur.close()
-            conn.close()
-            db_status = 'connected'
-        except Exception as e:
-            db_error = str(e)
-            db_status = 'error'
-    return jsonify(ok=True, db_url_set=bool(db_url),
-                   db_url_prefix=db_url[:25] + '...' if db_url else '',
-                   db_status=db_status, db_error=db_error,
-                   table_contacts=table_exists)
-
-
-# ─── 公開行程 API ──────────────────────────────────────────
-@app.route('/api/tours', methods=['GET'])
-def get_tours():
-    """回傳所有啟用行程，依 tab 分組。"""
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM tours WHERE is_active=TRUE ORDER BY sort_order, id")
-        rows = cur.fetchall()
-        cur.close(); conn.close()
-
-        grouped = {'featured': [], '2d1n': [], '3d2n': [], '4d3n': []}
-        for r in rows:
-            r = dict(r)
-            r['created_at'] = str(r.get('created_at', ''))
-            r['updated_at'] = str(r.get('updated_at', ''))
-            for tab in (r.get('tabs') or ['featured']):
-                if tab in grouped:
-                    grouped[tab].append(r)
-        return jsonify(ok=True, tours=grouped)
-    except Exception as e:
-        return jsonify(ok=False, error=str(e)), 500
-
-
-# ─── 管理員行程 CRUD ────────────────────────────────────────
-@app.route('/api/admin/tours', methods=['GET'])
-def admin_get_tours():
-    if not is_admin():
-        return jsonify(ok=False, error='未授權'), 401
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM tours ORDER BY sort_order, id")
-        rows = [dict(r) for r in cur.fetchall()]
-        cur.close(); conn.close()
-        for r in rows:
-            r['created_at'] = str(r.get('created_at', ''))
-            r['updated_at'] = str(r.get('updated_at', ''))
-        return jsonify(ok=True, tours=rows)
-    except Exception as e:
-        return jsonify(ok=False, error=str(e)), 500
-
-
-@app.route('/api/admin/tours', methods=['POST'])
-def admin_create_tour():
-    if not is_admin():
-        return jsonify(ok=False, error='未授權'), 401
-    data = request.get_json(force=True, silent=True) or {}
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute("""
-            INSERT INTO tours
-              (tabs, badge_text, badge_class, image_url, title, description,
-               suitable_for, duration, price_display, is_hero, prices, modal_data,
-               i18n, sort_order, is_active)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            RETURNING id
-        """, (
-            Json(data.get('tabs', ['featured'])),
-            data.get('badge_text', ''), data.get('badge_class', ''),
-            data.get('image_url', ''), data.get('title', '新行程'),
-            data.get('description', ''), data.get('suitable_for', ''),
-            data.get('duration', ''), data.get('price_display', ''),
-            data.get('is_hero', False),
-            Json(data.get('prices', [])), Json(data.get('modal_data', {})),
-            Json(data.get('i18n', {})),
-            data.get('sort_order', 99), data.get('is_active', True),
-        ))
-        new_id = cur.fetchone()['id']
-        conn.commit(); cur.close(); conn.close()
-        return jsonify(ok=True, id=new_id)
-    except Exception as e:
-        return jsonify(ok=False, error=str(e)), 500
-
-
-@app.route('/api/admin/tours/<int:tour_id>', methods=['PUT'])
-def admin_update_tour(tour_id):
-    if not is_admin():
-        return jsonify(ok=False, error='未授權'), 401
-    data = request.get_json(force=True, silent=True) or {}
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute("""
-            UPDATE tours SET
-              tabs=%s, badge_text=%s, badge_class=%s, image_url=%s, title=%s,
-              description=%s, suitable_for=%s, duration=%s, price_display=%s,
-              is_hero=%s, prices=%s, modal_data=%s, i18n=COALESCE(%s, i18n),
-              sort_order=%s, is_active=%s, updated_at=NOW()
-            WHERE id=%s
-        """, (
-            Json(data.get('tabs', ['featured'])),
-            data.get('badge_text', ''), data.get('badge_class', ''),
-            data.get('image_url', ''), data.get('title', ''),
-            data.get('description', ''), data.get('suitable_for', ''),
-            data.get('duration', ''), data.get('price_display', ''),
-            data.get('is_hero', False),
-            Json(data.get('prices', [])), Json(data.get('modal_data', {})),
-            Json(data['i18n']) if 'i18n' in data else None,
-            data.get('sort_order', 0), data.get('is_active', True),
-            tour_id,
-        ))
-        conn.commit(); cur.close(); conn.close()
-        return jsonify(ok=True)
-    except Exception as e:
-        return jsonify(ok=False, error=str(e)), 500
-
-
-@app.route('/api/admin/tours/<int:tour_id>', methods=['DELETE'])
-def admin_delete_tour(tour_id):
-    if not is_admin():
-        return jsonify(ok=False, error='未授權'), 401
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute("DELETE FROM tours WHERE id=%s", (tour_id,))
-        conn.commit(); cur.close(); conn.close()
-        return jsonify(ok=True)
-    except Exception as e:
-        return jsonify(ok=False, error=str(e)), 500
-
-
-# ─── 寄送諮詢通知信 ────────────────────────────────────────
-def send_contact_email(data):
-    sender    = os.environ.get('EMAIL_USER', '')
-    password  = os.environ.get('EMAIL_PASS', '')
-    smtp_host = os.environ.get('SMTP_HOST', 'smtpout.secureserver.net')
-    smtp_port = int(os.environ.get('SMTP_PORT', '465'))
-    recipient = 'dodoken1002@phbay.net'
-    if not sender or not password:
-        print('[EMAIL] 未設定 EMAIL_USER / EMAIL_PASS，跳過寄信')
-        return
-
-    body = f"""潮旅國際旅行社 — 新諮詢通知
-
-姓名：{data.get('name', '')}
-電話：{data.get('phone', '')}
-出發日：{data.get('travel_date', '')}
-回程日：{data.get('travel_date_end', '')}
-旅遊人數：{data.get('people', '')} 人
-每人預算：{data.get('budget', '（未填）')}
-交通方式：{data.get('transport', '（未填）')}
-出發地：{data.get('departure_city', '（未填）')}
-感興趣行程：{data.get('tour_interest', '（未填）')}
-選擇梯次：{data.get('slot_label', '（未選擇）')}
-候補狀態：{'候補' if data.get('is_waitlist') else '正團'}
-備註：{data.get('notes', '（未填）')}
-
-請盡快與客戶聯繫。
-"""
-    msg = MIMEMultipart()
-    msg['From']    = f'潮旅國際旅行社 <{sender}>'
-    msg['To']      = recipient
-    msg['Subject'] = f'【新諮詢】{data.get("name", "")} — {data.get("travel_date", "")} ~ {data.get("travel_date_end", "")}'
-    msg.attach(MIMEText(body, 'plain', 'utf-8'))
-
-    try:
-        with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as server:
-            server.login(sender, password)
-            server.sendmail(sender, recipient, msg.as_string())
-        print(f'[EMAIL] 通知信已寄出至 {recipient}')
-    except Exception as e:
-        print(f'[EMAIL] 寄信失敗（不影響表單儲存）：{e}')
-
-
-# ─── 梯次名額 API（公開）─────────────────────────────────────
-@app.route('/api/slots', methods=['GET'])
-def get_slots():
-    """取得所有啟用梯次（可帶 ?tour_id=X 過濾）。"""
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        tour_id = request.args.get('tour_id')
-        if tour_id:
-            cur.execute(
-                "SELECT * FROM tour_slots WHERE is_active=TRUE AND tour_id=%s ORDER BY id",
-                (tour_id,))
-        else:
-            cur.execute("SELECT * FROM tour_slots WHERE is_active=TRUE ORDER BY tour_id, id")
-        rows = [dict(r) for r in cur.fetchall()]
-        cur.close(); conn.close()
-        for r in rows:
-            r['created_at'] = str(r.get('created_at', ''))
-            r['remaining']  = max(0, r['capacity'] - r['booked'])
-            r['wl_remaining'] = max(0, r['waitlist_cap'] - r['waitlisted'])
-            r['status'] = (
-                'full_wl_full' if r['remaining'] == 0 and r['wl_remaining'] == 0
-                else 'waitlist'  if r['remaining'] == 0
-                else 'low'       if r['remaining'] <= 3
-                else 'available'
-            )
-        return jsonify(ok=True, slots=rows)
-    except Exception as e:
-        return jsonify(ok=False, error=str(e)), 500
-
-
-# ─── 梯次名額 CRUD（管理員）────────────────────────────────────
-@app.route('/api/admin/slots', methods=['GET'])
-def admin_get_slots():
-    if not is_admin(): return jsonify(ok=False, error='未授權'), 401
-    try:
-        conn = get_db(); cur = conn.cursor()
-        cur.execute("SELECT * FROM tour_slots ORDER BY tour_id, id")
-        rows = [dict(r) for r in cur.fetchall()]
-        cur.close(); conn.close()
-        for r in rows:
-            r['created_at'] = str(r.get('created_at', ''))
-            r['remaining']  = max(0, r['capacity'] - r['booked'])
-            r['wl_remaining'] = max(0, r['waitlist_cap'] - r['waitlisted'])
-        return jsonify(ok=True, slots=rows)
-    except Exception as e:
-        return jsonify(ok=False, error=str(e)), 500
-
-
-@app.route('/api/admin/slots', methods=['POST'])
-def admin_create_slot():
-    if not is_admin(): return jsonify(ok=False, error='未授權'), 401
-    data = request.get_json(force=True, silent=True) or {}
-    try:
-        conn = get_db(); cur = conn.cursor()
-        cur.execute("""
-            INSERT INTO tour_slots
-              (tour_id, date_label, capacity, booked, waitlist_cap, waitlisted, is_active)
-            VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id
-        """, (data['tour_id'], data['date_label'],
-              data.get('capacity', 20), data.get('booked', 0),
-              data.get('waitlist_cap', 5), data.get('waitlisted', 0),
-              data.get('is_active', True)))
-        new_id = cur.fetchone()['id']
-        conn.commit(); cur.close(); conn.close()
-        return jsonify(ok=True, id=new_id)
-    except Exception as e:
-        return jsonify(ok=False, error=str(e)), 500
-
-
-@app.route('/api/admin/slots/<int:slot_id>', methods=['PUT'])
-def admin_update_slot(slot_id):
-    if not is_admin(): return jsonify(ok=False, error='未授權'), 401
-    data = request.get_json(force=True, silent=True) or {}
-    try:
-        conn = get_db(); cur = conn.cursor()
-        cur.execute("""
-            UPDATE tour_slots SET
-              date_label=%s, capacity=%s, booked=%s,
-              waitlist_cap=%s, waitlisted=%s, is_active=%s
-            WHERE id=%s
-        """, (data.get('date_label', ''), data.get('capacity', 20),
-              data.get('booked', 0), data.get('waitlist_cap', 5),
-              data.get('waitlisted', 0), data.get('is_active', True),
-              slot_id))
-        conn.commit(); cur.close(); conn.close()
-        return jsonify(ok=True)
-    except Exception as e:
-        return jsonify(ok=False, error=str(e)), 500
-
-
-@app.route('/api/admin/slots/<int:slot_id>', methods=['DELETE'])
-def admin_delete_slot(slot_id):
-    if not is_admin(): return jsonify(ok=False, error='未授權'), 401
-    try:
-        conn = get_db(); cur = conn.cursor()
-        cur.execute("DELETE FROM tour_slots WHERE id=%s", (slot_id,))
-        conn.commit(); cur.close(); conn.close()
-        return jsonify(ok=True)
-    except Exception as e:
-        return jsonify(ok=False, error=str(e)), 500
-
-
-# ═══════════════════════════════════════════════════════════
+    table_exists = …3043 tokens truncated…═══════════════════════════════════════
 #   部落格（SEO：文章由伺服器渲染，每篇獨立網址可被收錄）
 # ═══════════════════════════════════════════════════════════
 import html as _html
 from datetime import datetime as _dt
 
 SITE = 'https://www.phbay.info'
+ORG_ID = f'{SITE}/#organization'
+BUSINESS_ADDRESS = {
+    "@type": "PostalAddress",
+    "postalCode": "880008",
+    "addressRegion": "澎湖縣",
+    "addressLocality": "馬公市",
+    "streetAddress": "啟明里民權路13號2樓",
+    "addressCountry": "TW"
+}
 
 def _post_public(r):
     r = dict(r)
@@ -799,7 +549,7 @@ def admin_delete_post(pid):
 def _render_blog(title, desc, canonical, body, head_extra=''):
     nav = '''<div class="top-banner"><div class="banner-static"><span>潮旅國際旅行社</span><span class="banner-sep">｜</span><span>2026 澎湖追風音樂燈光節 官方合作旅行社</span><span class="banner-sep">｜</span><span>電話：06-9271288</span></div></div>
 <nav class="navbar" id="navbar"><div class="nav-container"><a href="/" class="nav-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a><button class="nav-toggle" id="nav-toggle" aria-label="選單"><span></span><span></span><span></span></button><ul class="nav-links" id="nav-links"><li><a href="/#tours">行程介紹</a></li><li><a href="/blog">部落格</a></li><li><a href="/faq.html">常見問題</a></li><li><a href="/#contact">聯絡我們</a></li></ul></div></nav>'''
-    footer = '''<footer class="footer"><div class="container"><div class="footer-bottom"><p>© 2026 潮旅國際旅行社 All Rights Reserved.｜<a href="/" style="color:inherit">官網</a>｜<a href="/blog" style="color:inherit">部落格</a></p></div></div></footer>
+    footer = '''<footer class="footer"><div class="container"><div class="footer-bottom"><p>潮旅國際旅行社｜統一編號 60305305｜營業地址：880008 澎湖縣馬公市啟明里民權路13號2樓</p><p>© 2026 潮旅國際旅行社 All Rights Reserved.｜<a href="/" style="color:inherit">官網</a>｜<a href="/blog" style="color:inherit">部落格</a></p></div></div></footer>
 <script>(function(){var t=document.getElementById('nav-toggle'),l=document.getElementById('nav-links');if(t)t.addEventListener('click',function(){l.classList.toggle('open')});})();</script>'''
     return ('<!DOCTYPE html><html lang="zh-TW"><head>'
         '<meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>'
@@ -864,8 +614,10 @@ def blog_post(slug):
         "headline": p['title'], "description": desc,
         "datePublished": str(p.get('published_at') or p.get('created_at') or ''),
         "dateModified": str(p.get('updated_at') or ''),
-        "author": {"@type": "Organization", "name": p.get('author') or '潮旅國際旅行社'},
-        "publisher": {"@type": "Organization", "name": "潮旅國際旅行社",
+        "author": {"@id": ORG_ID},
+        "publisher": {"@type": "TravelAgency", "@id": ORG_ID,
+                      "name": "潮旅國際旅行社", "legalName": "潮旅國際旅行社",
+                      "taxID": "60305305", "address": BUSINESS_ADDRESS,
                       "logo": {"@type": "ImageObject", "url": f"{SITE}/images/festival-poster.png"}},
         "mainEntityOfPage": canonical, "url": canonical,
         "inLanguage": "zh-TW"
@@ -999,3 +751,4 @@ if __name__ == '__main__':
         print(f'[警告] 本機無 DB，跳過初始化：{e}')
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=os.environ.get('FLASK_DEBUG','0')=='1')
+
