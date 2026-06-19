@@ -1,0 +1,45 @@
+name: Submit sitemap to GSC
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "content/posts/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: submit-gsc-sitemap
+  cancel-in-progress: true
+
+jobs:
+  submit:
+    name: Submit production sitemap
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Google API dependencies
+        run: pip install "google-api-python-client>=2,<3" "google-auth>=2,<3"
+
+      - name: Wait for Railway deployment
+        run: sleep 90
+
+      - name: Submit sitemap to Google Search Console
+        env:
+          GSC_SERVICE_ACCOUNT_JSON: ${{ secrets.GSC_SERVICE_ACCOUNT_JSON }}
+          GSC_SITE_URL: ${{ secrets.GSC_SITE_URL }}
+          GSC_SITEMAP_URL: ${{ secrets.GSC_SITEMAP_URL }}
+        run: python scripts/submit_gsc_sitemap.py
+
