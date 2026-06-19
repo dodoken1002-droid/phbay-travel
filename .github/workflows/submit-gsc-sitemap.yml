@@ -7,6 +7,8 @@ on:
       - main
     paths:
       - "content/posts/**"
+      - ".github/workflows/submit-gsc-sitemap.yml"
+      - "scripts/submit_gsc_sitemap.py"
 
 permissions:
   contents: read
