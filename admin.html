@@ -308,8 +308,18 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
         <textarea id="p-summary" rows="2" placeholder="一句話介紹這篇文章…"></textarea>
       </div>
       <div class="form-group full">
-        <label>封面圖網址（選填）</label>
-        <input id="p-cover" placeholder="https://...jpg 或 /images/xxx.jpg" />
+        <label>封面圖（選填）</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+          <input type="file" id="p-cover-file" accept="image/*" style="display:none" onchange="handleCoverUpload(this)" />
+          <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('p-cover-file').click()">
+            <i class="fas fa-image"></i> 選擇圖片上傳
+          </button>
+          <button type="button" class="btn btn-sm btn-ghost" onclick="clearCover()">清除</button>
+          <span id="cover-status" style="font-size:.82rem;color:#718096"></span>
+        </div>
+        <img id="cover-preview" style="display:none;max-width:240px;max-height:150px;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:8px" />
+        <input id="p-cover" placeholder="也可直接貼圖片網址 https://...jpg" oninput="syncCoverPreview()" style="font-size:.85rem" />
+        <p style="font-size:.78rem;color:#a0aec0;margin-top:4px">上傳的圖片會自動縮圖、壓縮並存進資料庫，免擔心尺寸與部署消失問題。</p>
       </div>
       <div class="form-group full">
         <label>內文（可用基本 HTML：<code>&lt;h2&gt; &lt;p&gt; &lt;strong&gt; &lt;ul&gt;&lt;li&gt; &lt;img&gt; &lt;a&gt;</code>；
@@ -1237,6 +1247,7 @@ function openPostForm() {
   ['p-id','p-title','p-slug','p-summary','p-cover','p-content','p-tags'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('p-pub').value = 'false';
   document.getElementById('p-slug').dataset.touched = '';
+  if (typeof clearCover === 'function') clearCover();
   document.getElementById('post-modal').classList.add('open');
 }
 
@@ -1253,10 +1264,60 @@ function editPost(id) {
   document.getElementById('p-content').value = p.content || '';
   document.getElementById('p-tags').value = p.tags || '';
   document.getElementById('p-pub').value = String(!!p.is_published);
+  document.getElementById('cover-status').textContent = '';
+  syncCoverPreview();
   document.getElementById('post-modal').classList.add('open');
 }
 
 function closePostModal() { document.getElementById('post-modal').classList.remove('open'); }
+
+// ── 封面圖：上傳 → 瀏覽器自動縮圖壓縮 → 存成 data URI ──
+function handleCoverUpload(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { showToast('請選擇圖片檔', 'error'); return; }
+  const status = document.getElementById('cover-status');
+  status.textContent = '處理中…';
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 1200;                         // 最長邊縮到 1200px
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width >= height) { height = Math.round(height * MAX / width); width = MAX; }
+        else { width = Math.round(width * MAX / height); height = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      let q = 0.82, dataUri = canvas.toDataURL('image/jpeg', q);
+      // 若仍偏大，逐步降品質（控制在約 ≤ 350KB）
+      while (dataUri.length > 480000 && q > 0.45) { q -= 0.1; dataUri = canvas.toDataURL('image/jpeg', q); }
+      document.getElementById('p-cover').value = dataUri;
+      syncCoverPreview();
+      const kb = Math.round(dataUri.length * 0.75 / 1024);
+      status.textContent = `✅ 已縮圖 ${width}×${height}，約 ${kb} KB`;
+    };
+    img.onerror = () => { status.textContent = '圖片讀取失敗'; };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+function clearCover() {
+  document.getElementById('p-cover').value = '';
+  document.getElementById('cover-status').textContent = '';
+  syncCoverPreview();
+}
+
+function syncCoverPreview() {
+  const v = document.getElementById('p-cover').value.trim();
+  const prev = document.getElementById('cover-preview');
+  if (v) { prev.src = v; prev.style.display = 'block'; }
+  else { prev.removeAttribute('src'); prev.style.display = 'none'; }
+}
 
 // 純文字自動轉段落（若內容沒有 HTML 標籤）
 function autoParagraph(txt) {
