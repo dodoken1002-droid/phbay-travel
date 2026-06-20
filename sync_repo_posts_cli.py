@@ -1,6 +1,17 @@
-"""Publish repository-managed posts before the Railway web process starts."""
+"""Publish repository-managed posts before the Railway web process starts.
+
+This runs as the first half of the Railway start command
+(``python sync_repo_posts_cli.py && gunicorn ...``). It is deliberately
+best-effort: publishing a new blog post must never be allowed to block the web
+server from booting. A transient database hiccup at startup should leave the
+site serving the posts already in PostgreSQL, not take the whole site down. So
+``main`` may raise, but the ``__main__`` entry point swallows every failure,
+logs it loudly, and exits 0 so gunicorn always starts.
+"""
 
 import os
+import sys
+import traceback
 
 import psycopg2
 import psycopg2.extras
@@ -54,4 +65,14 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:  # noqa: BLE001 - boot must never fail because of the sync step
+        print(
+            "[BLOG] sync_repo_posts failed; continuing to start the web server. "
+            "New repository posts may not appear until the next successful deploy.",
+            file=sys.stderr,
+        )
+        traceback.print_exc()
+        # Exit 0 so the Railway start command's `&& gunicorn ...` still runs.
+        sys.exit(0)
