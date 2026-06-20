@@ -45,7 +45,7 @@ def main() -> None:
         count = sync_repo_posts(cursor)
         connection.commit()
         cursor.close()
-        print(f"[BLOG] Synced {count} repository post(s)")
+        print(f"[BLOG] Inserted {count} new repository post(s); existing posts preserved")
     except Exception:
         connection.rollback()
         raise

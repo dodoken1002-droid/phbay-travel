@@ -61,24 +61,21 @@ def load_repo_posts(posts_dir: Path | str = POSTS_DIR) -> list[dict]:
 
 
 def sync_repo_posts(cursor, posts_dir: Path | str = POSTS_DIR) -> int:
-    """Upsert repository posts into PostgreSQL and return the synced count."""
+    """Insert new repository posts without modifying articles already in PostgreSQL.
+
+    Repository files are publication inputs, not a permanent source of truth. After
+    the first insert an editor may correct the article or replace its cover image in
+    the admin UI, so later deployments must leave the existing row untouched.
+    """
     posts = load_repo_posts(posts_dir)
+    inserted = 0
     for post in posts:
         cursor.execute(
             """INSERT INTO posts
                (slug, title, summary, content, cover_image, tags, author,
                 is_published, published_at)
                VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE, NOW())
-               ON CONFLICT (slug) DO UPDATE SET
-                   title=EXCLUDED.title,
-                   summary=EXCLUDED.summary,
-                   content=EXCLUDED.content,
-                   cover_image=EXCLUDED.cover_image,
-                   tags=EXCLUDED.tags,
-                   author=EXCLUDED.author,
-                   is_published=TRUE,
-                   published_at=COALESCE(posts.published_at, NOW()),
-                   updated_at=NOW()""",
+               ON CONFLICT (slug) DO NOTHING""",
             (
                 post["slug"],
                 post["title"],
@@ -89,4 +86,5 @@ def sync_repo_posts(cursor, posts_dir: Path | str = POSTS_DIR) -> int:
                 post["author"],
             ),
         )
-    return len(posts)
+        inserted += max(cursor.rowcount, 0)
+    return inserted
