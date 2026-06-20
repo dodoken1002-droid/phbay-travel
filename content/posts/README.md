@@ -1,8 +1,12 @@
 # Automated blog posts
 
 Each published article is stored as one UTF-8 JSON file named
-`YYYY-MM-DD-slug.json`. Railway imports these files into PostgreSQL during
+`YYYY-MM-DD-slug.json`. Railway imports new files into PostgreSQL during
 deployment. The article `slug` is the idempotency key, so it must be unique.
+
+Existing database articles are never overwritten during deployment. After the
+first import, edits made in the admin UI—including cover-image corrections—are
+preserved. To publish a different article, always create a new unique slug.
 
 Required fields:
 
