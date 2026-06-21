@@ -382,10 +382,16 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
       <!-- 分類設定 -->
       <div class="form-section">顯示分類（可多選）</div>
       <div class="checkbox-group" id="f-tabs-group">
+        <div style="width:100%;font-weight:700;color:#1a6b9e;margin:2px 0;">📦 套裝行程</div>
         <label class="checkbox-label"><input type="checkbox" value="featured" /> ⭐ 官方合作特色行程</label>
         <label class="checkbox-label"><input type="checkbox" value="2d1n" /> ☀ 兩天一夜</label>
         <label class="checkbox-label"><input type="checkbox" value="3d2n" /> 🏖 三天兩夜</label>
         <label class="checkbox-label"><input type="checkbox" value="4d3n" /> 🚢 四天三夜</label>
+        <div style="width:100%;font-weight:700;color:#1a6b9e;margin:8px 0 2px;">🌊 單一行程（依海域）</div>
+        <label class="checkbox-label"><input type="checkbox" value="north-sea" /> 北海海域</label>
+        <label class="checkbox-label"><input type="checkbox" value="east-sea" /> 東海海域</label>
+        <label class="checkbox-label"><input type="checkbox" value="south-sea" /> 南海海域</label>
+        <label class="checkbox-label"><input type="checkbox" value="main-island" /> 本島海域</label>
       </div>
 
       <!-- 標籤與天數 -->
@@ -695,7 +701,8 @@ function renderStats(tours) {
 }
 
 // tab 名稱對應
-const TAB_NAMES = { featured:'特色行程', '2d1n':'兩天一夜', '3d2n':'三天兩夜', '4d3n':'四天三夜' };
+const TAB_NAMES = { featured:'特色行程', '2d1n':'兩天一夜', '3d2n':'三天兩夜', '4d3n':'四天三夜',
+                    'north-sea':'北海海域', 'east-sea':'東海海域', 'south-sea':'南海海域', 'main-island':'本島海域' };
 
 function renderTourTable(tours) {
   const tbody = document.getElementById('tour-tbody');

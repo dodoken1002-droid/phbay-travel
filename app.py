@@ -434,7 +434,12 @@ def get_tours():
         rows = cur.fetchall()
         cur.close(); conn.close()
 
-        grouped = {'featured': [], '2d1n': [], '3d2n': [], '4d3n': []}
+        grouped = {
+            # 套裝行程
+            'featured': [], '2d1n': [], '3d2n': [], '4d3n': [],
+            # 單一行程（依海域）
+            'north-sea': [], 'east-sea': [], 'south-sea': [], 'main-island': [],
+        }
         for r in rows:
             r = dict(r)
             r['created_at'] = str(r.get('created_at', ''))

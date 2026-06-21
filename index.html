@@ -289,9 +289,12 @@
   </section>
 
   <!-- ═══════════════════════════════════════════════
-       行程分類 Tab 選單
-       如需新增分類，在 .tab-buttons 加 <button>，
-       並在 .tab-panels 加對應 <div data-tab="...">
+       行程分類（兩層）
+       上層分類：.cat-btn[data-cat] ↔ .tour-cat[data-cat-panel]
+       下層子分頁：.tab-btn[data-tab] ↔ .tab-panel[data-panel]（限於所屬分類內）
+       如需新增子分頁，在對應分類的 .tab-buttons 加 <button>，
+       並加對應 <div class="tab-panel" data-panel="...">＋ <div class="tours-grid" id="grid-...">
+       同時記得更新 script.js 的 TAB_KEYS、app.py get_tours() 分組與 i18n.js 標籤。
   ════════════════════════════════════════════════ -->
   <section class="tours" id="tours">
     <div class="container">
@@ -300,44 +303,86 @@
         <p data-i18n="tours.subtitle">量身打造每一趟澎湖旅程</p>
       </div>
 
-      <!-- 行程分類 Tab -->
-      <div class="tab-buttons" role="tablist">
-        <button class="tab-btn active" data-tab="featured" role="tab" data-i18n="tab.featured">
-          <i class="fas fa-star"></i> 官方合作特色行程
+      <!-- 上層分類：套裝行程 / 單一行程 -->
+      <div class="tour-cat-buttons" role="tablist">
+        <button class="cat-btn active" data-cat="package" role="tab" data-i18n="cat.package">
+          <i class="fas fa-box-open"></i> 套裝行程
         </button>
-        <button class="tab-btn" data-tab="2d1n" role="tab" data-i18n="tab.2d1n">
-          <i class="fas fa-sun"></i> 兩天一夜
-        </button>
-        <button class="tab-btn" data-tab="3d2n" role="tab" data-i18n="tab.3d2n">
-          <i class="fas fa-umbrella-beach"></i> 三天兩夜
-        </button>
-        <button class="tab-btn" data-tab="4d3n" role="tab" data-i18n="tab.4d3n">
-          <i class="fas fa-ship"></i> 四天三夜
+        <button class="cat-btn" data-cat="single" role="tab" data-i18n="cat.single">
+          <i class="fas fa-water"></i> 單一行程
         </button>
       </div>
 
-      <!-- ─── 行程卡片由 script.js loadTours() 動態產生 ─── -->
-      <!-- 如需修改行程內容，請前往 /admin 管理後台 -->
-      <div class="tab-panel active" data-panel="featured">
-        <div class="tours-loading" id="loading-featured"><i class="fas fa-spinner fa-spin"></i> 載入中…</div>
-        <div class="tours-grid" id="grid-featured"></div>
+      <!-- ═══ 套裝行程 ═══ -->
+      <div class="tour-cat active" data-cat-panel="package">
+        <div class="tab-buttons" role="tablist">
+          <button class="tab-btn active" data-tab="featured" role="tab" data-i18n="tab.featured">
+            <i class="fas fa-star"></i> 官方合作特色行程
+          </button>
+          <button class="tab-btn" data-tab="2d1n" role="tab" data-i18n="tab.2d1n">
+            <i class="fas fa-sun"></i> 兩天一夜
+          </button>
+          <button class="tab-btn" data-tab="3d2n" role="tab" data-i18n="tab.3d2n">
+            <i class="fas fa-umbrella-beach"></i> 三天兩夜
+          </button>
+          <button class="tab-btn" data-tab="4d3n" role="tab" data-i18n="tab.4d3n">
+            <i class="fas fa-ship"></i> 四天三夜
+          </button>
+        </div>
+
+        <!-- ─── 行程卡片由 script.js loadTours() 動態產生；修改內容請至 /admin ─── -->
+        <div class="tab-panel active" data-panel="featured">
+          <div class="tours-loading" id="loading-featured"><i class="fas fa-spinner fa-spin"></i> 載入中…</div>
+          <div class="tours-grid" id="grid-featured"></div>
+        </div>
+        <div class="tab-panel" data-panel="2d1n">
+          <div class="tours-loading" id="loading-2d1n"><i class="fas fa-spinner fa-spin"></i> 載入中…</div>
+          <div class="tours-grid" id="grid-2d1n"></div>
+        </div>
+        <div class="tab-panel" data-panel="3d2n">
+          <div class="tours-loading" id="loading-3d2n"><i class="fas fa-spinner fa-spin"></i> 載入中…</div>
+          <div class="tours-grid" id="grid-3d2n"></div>
+        </div>
+        <div class="tab-panel" data-panel="4d3n">
+          <div class="tours-loading" id="loading-4d3n"><i class="fas fa-spinner fa-spin"></i> 載入中…</div>
+          <div class="tours-grid" id="grid-4d3n"></div>
+        </div>
       </div>
 
-      <div class="tab-panel" data-panel="2d1n">
-        <div class="tours-loading" id="loading-2d1n"><i class="fas fa-spinner fa-spin"></i> 載入中…</div>
-        <div class="tours-grid" id="grid-2d1n"></div>
-      </div>
+      <!-- ═══ 單一行程（依海域）═══ -->
+      <div class="tour-cat" data-cat-panel="single">
+        <div class="tab-buttons" role="tablist">
+          <button class="tab-btn active" data-tab="north-sea" role="tab" data-i18n="tab.north-sea">
+            <i class="fas fa-water"></i> 北海海域
+          </button>
+          <button class="tab-btn" data-tab="east-sea" role="tab" data-i18n="tab.east-sea">
+            <i class="fas fa-water"></i> 東海海域
+          </button>
+          <button class="tab-btn" data-tab="south-sea" role="tab" data-i18n="tab.south-sea">
+            <i class="fas fa-water"></i> 南海海域
+          </button>
+          <button class="tab-btn" data-tab="main-island" role="tab" data-i18n="tab.main-island">
+            <i class="fas fa-map-marker-alt"></i> 本島海域
+          </button>
+        </div>
 
-      <div class="tab-panel" data-panel="3d2n">
-        <div class="tours-loading" id="loading-3d2n"><i class="fas fa-spinner fa-spin"></i> 載入中…</div>
-        <div class="tours-grid" id="grid-3d2n"></div>
+        <div class="tab-panel active" data-panel="north-sea">
+          <div class="tours-grid" id="grid-north-sea"></div>
+          <div class="tours-empty" data-empty="north-sea" data-i18n="tours.empty">行程陸續上架中，敬請期待。</div>
+        </div>
+        <div class="tab-panel" data-panel="east-sea">
+          <div class="tours-grid" id="grid-east-sea"></div>
+          <div class="tours-empty" data-empty="east-sea" data-i18n="tours.empty">行程陸續上架中，敬請期待。</div>
+        </div>
+        <div class="tab-panel" data-panel="south-sea">
+          <div class="tours-grid" id="grid-south-sea"></div>
+          <div class="tours-empty" data-empty="south-sea" data-i18n="tours.empty">行程陸續上架中，敬請期待。</div>
+        </div>
+        <div class="tab-panel" data-panel="main-island">
+          <div class="tours-grid" id="grid-main-island"></div>
+          <div class="tours-empty" data-empty="main-island" data-i18n="tours.empty">行程陸續上架中，敬請期待。</div>
+        </div>
       </div>
-
-      <div class="tab-panel" data-panel="4d3n">
-        <div class="tours-loading" id="loading-4d3n"><i class="fas fa-spinner fa-spin"></i> 載入中…</div>
-        <div class="tours-grid" id="grid-4d3n"></div>
-      </div>
-
 
     </div><!-- end container -->
   </section>

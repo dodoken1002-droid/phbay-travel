@@ -553,6 +553,52 @@ ul { list-style: none; }
 }
 
 /* Tab 選單 */
+/* ─── 上層分類：套裝行程 / 單一行程 ─── */
+.tour-cat-buttons {
+  display: flex;
+  gap: 0;
+  margin: 0 auto 28px;
+  justify-content: center;
+  flex-wrap: wrap;
+  background: var(--blue-bg, #eef6fb);
+  border-radius: 40px;
+  padding: 6px;
+  width: fit-content;
+  max-width: 100%;
+}
+.cat-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 32px;
+  border-radius: 36px;
+  border: none;
+  background: transparent;
+  color: var(--blue-main);
+  font-weight: 800;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.cat-btn:hover { color: var(--blue-dark, #134e74); }
+.cat-btn.active {
+  background: var(--blue-main);
+  color: var(--white);
+  box-shadow: 0 4px 16px rgba(26, 107, 158, 0.28);
+}
+
+/* 分類面板：未啟用隱藏 */
+.tour-cat { display: none; }
+.tour-cat.active { display: block; }
+
+/* 空分頁佔位說明 */
+.tours-empty {
+  text-align: center;
+  color: var(--gray, #8a97a3);
+  font-size: 1rem;
+  padding: 48px 16px;
+}
+
 .tab-buttons {
   display: flex;
   gap: 12px;

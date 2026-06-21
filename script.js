@@ -55,25 +55,35 @@ function initNavbar() {
 }
 
 /* ═══════════════════════════════════════════════
-   行程 Tab 切換
-   如需新增 Tab，只要在 HTML 對應加上
-   tab-btn[data-tab="xxx"] 與 tab-panel[data-panel="xxx"]
+   行程 Tab 切換（兩層）
+   上層分類：.cat-btn[data-cat] ↔ .tour-cat[data-cat-panel]
+   下層子分頁：.tab-btn[data-tab] ↔ .tab-panel[data-panel]，
+   子分頁切換只作用在所屬分類（.tour-cat）內，分類之間互不干擾。
 ════════════════════════════════════════════════ */
 function initTabs() {
-  const tabBtns   = document.querySelectorAll('.tab-btn');
-  const tabPanels = document.querySelectorAll('.tab-panel');
+  // 上層分類切換
+  const catBtns   = document.querySelectorAll('.cat-btn');
+  const catPanels = document.querySelectorAll('.tour-cat');
+  catBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.cat;
+      catBtns.forEach(b => b.classList.remove('active'));
+      catPanels.forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      const panel = document.querySelector(`.tour-cat[data-cat-panel="${target}"]`);
+      if (panel) panel.classList.add('active');
+    });
+  });
 
-  tabBtns.forEach(btn => {
+  // 下層子分頁切換（限同一分類內）
+  document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const target = btn.dataset.tab;
-
-      // 移除全部 active
-      tabBtns.forEach(b => b.classList.remove('active'));
-      tabPanels.forEach(p => p.classList.remove('active'));
-
-      // 加上目標 active
+      const cat = btn.closest('.tour-cat') || document;
+      cat.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      cat.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
-      const panel = document.querySelector(`.tab-panel[data-panel="${target}"]`);
+      const panel = cat.querySelector(`.tab-panel[data-panel="${target}"]`);
       if (panel) panel.classList.add('active');
     });
   });
@@ -397,20 +407,28 @@ async function loadTours() {
   }
 }
 
+// 所有行程子分頁鍵（套裝 4 + 單一 4）。新增分頁時一併更新此清單與 HTML、app.py、i18n.js
+const TAB_KEYS = ['featured', '2d1n', '3d2n', '4d3n',
+                 'north-sea', 'east-sea', 'south-sea', 'main-island'];
+
 // 依當前語言渲染所有行程卡片與彈窗（語言切換時重用）
 function renderAllTours() {
   if (!_toursGrouped) return;
   document.querySelectorAll('.tours-loading').forEach(el => el.remove());
   const mc = document.getElementById('modal-container');
   if (mc) mc.innerHTML = '';
-  ['featured', '2d1n', '3d2n', '4d3n'].forEach(tab => {
+  TAB_KEYS.forEach(tab => {
     const grid = document.getElementById(`grid-${tab}`);
     if (!grid) return;
     grid.innerHTML = '';
-    (_toursGrouped[tab] || []).forEach(tour => {
+    const list = _toursGrouped[tab] || [];
+    list.forEach(tour => {
       grid.appendChild(renderTourCard(tour));
       renderTourModal(tour);
     });
+    // 該分頁沒有行程時顯示佔位說明（若 HTML 有提供）
+    const empty = document.querySelector(`.tours-empty[data-empty="${tab}"]`);
+    if (empty) empty.style.display = list.length ? 'none' : '';
   });
 }
 
