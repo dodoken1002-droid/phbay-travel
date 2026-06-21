@@ -52,6 +52,14 @@ function initNavbar() {
       navLinks.classList.remove('open');
     }
   });
+
+  // 行程介紹子選單：點套裝/單一 → 捲到行程區並切到對應分類
+  navLinks.querySelectorAll('.nav-submenu a[data-cat]').forEach(a => {
+    a.addEventListener('click', () => {
+      const catBtn = document.querySelector(`.cat-btn[data-cat="${a.dataset.cat}"]`);
+      if (catBtn) catBtn.click();   // 切換分類（沿用既有兩層切換邏輯）
+    });
+  });
 }
 
 /* ═══════════════════════════════════════════════

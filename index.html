@@ -161,7 +161,13 @@
       </button>
       <ul class="nav-links" id="nav-links">
         <li><a href="#home" data-i18n="nav.home">首頁</a></li>
-        <li><a href="#tours" data-i18n="nav.tours">行程介紹</a></li>
+        <li class="nav-item has-submenu">
+          <a href="#tours" data-i18n="nav.tours">行程介紹 <i class="fas fa-chevron-down nav-caret"></i></a>
+          <ul class="nav-submenu">
+            <li><a href="#tours" data-cat="package" data-i18n="cat.package">套裝行程</a></li>
+            <li><a href="#tours" data-cat="single" data-i18n="cat.single">單一行程</a></li>
+          </ul>
+        </li>
         <li><a href="#quiz" data-i18n="nav.quiz">行程測驗</a></li>
         <li><a href="#about" data-i18n="nav.about">關於我們</a></li>
         <li><a href="/blog" data-i18n="nav.blog">部落格</a></li>
