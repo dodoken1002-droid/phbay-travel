@@ -31,3 +31,5 @@ Thumbs.db
 
 # 測試輸出
 *.log
+flask_out.txt
+flask_err.txt
