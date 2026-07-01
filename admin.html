@@ -1032,6 +1032,19 @@ function neihaiMonthDefault() {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
 }
 
+// 身分證字號預設遮蔽（保留前3後2），點擊切換顯示/隱藏
+function maskId(v) {
+  v = String(v || '');
+  if (v.length <= 5) return v ? v[0] + '*'.repeat(v.length - 1) : '';
+  return v.slice(0, 3) + '*'.repeat(v.length - 5) + v.slice(-2);
+}
+function toggleMaskId(el) {
+  const shown = el.dataset.shown === '1';
+  el.textContent = shown ? el.dataset.masked : el.dataset.full;
+  el.dataset.shown = shown ? '' : '1';
+}
+window.toggleMaskId = toggleMaskId;
+
 function statusText(status) {
   return {
     pending_departure: '待成團',
@@ -1088,7 +1101,7 @@ function loadNeihaiOrders() {
           <div class="contact-field"><label>備註</label><span>${o.notes || '—'}</span></div>
           <table class="tour-table" style="margin-top:12px">
             <thead><tr><th>乘客</th><th>身分證字號</th><th>出生年月日</th><th>電話</th></tr></thead>
-            <tbody>${(o.passengers || []).map(p => `<tr><td>${p.name}</td><td>${p.national_id}</td><td>${p.birth_date}</td><td>${p.phone}</td></tr>`).join('')}</tbody>
+            <tbody>${(o.passengers || []).map(p => `<tr><td>${p.name}</td><td><span class="mask-id" style="cursor:pointer;font-family:monospace" title="點擊顯示/隱藏完整號碼" onclick="toggleMaskId(this)" data-full="${p.national_id || ''}" data-masked="${maskId(p.national_id)}">${maskId(p.national_id)}</span></td><td>${p.birth_date}</td><td>${p.phone}</td></tr>`).join('')}</tbody>
           </table>
         </div>`).join('');
     })
