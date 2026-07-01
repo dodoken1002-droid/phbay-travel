@@ -210,6 +210,9 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
     <button onclick="switchTab('posts',this)">
       <i class="fas fa-pen-nib"></i> 部落格
     </button>
+    <button onclick="switchTab('neihai',this)">
+      <i class="fas fa-ship"></i> 內海預購
+    </button>
     <button onclick="switchTab('contacts',this)">
       <i class="fas fa-envelope"></i> 諮詢紀錄
     </button>
@@ -271,6 +274,25 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
         </button>
       </div>
       <div id="posts-list">載入中…</div>
+    </div>
+
+
+    <!-- ── 小城故事・內海巡禮預購 ── -->
+    <div class="tab-content" id="tab-neihai">
+      <div class="toolbar">
+        <h2>小城故事・內海巡禮預購訂單</h2>
+        <div class="toolbar-right">
+          <input type="month" id="neihai-month" class="search-input" style="width:160px" />
+          <button class="btn btn-primary" onclick="loadNeihaiOrders()">
+            <i class="fas fa-sync"></i> 載入月份
+          </button>
+          <a class="btn btn-ghost" href="/neihai-preorder.html" target="_blank">
+            <i class="fas fa-up-right-from-square"></i> 開啟預購頁
+          </a>
+        </div>
+      </div>
+      <div id="neihai-stats" class="stats-row"></div>
+      <div id="neihai-orders-list">請選擇月份後載入…</div>
     </div>
 
     <!-- ── 諮詢紀錄 ── -->
@@ -676,6 +698,7 @@ function switchTab(name, btn) {
   if (name === 'contacts') loadContacts();
   if (name === 'slots')    loadSlots();
   if (name === 'posts')    loadPosts();
+  if (name === 'neihai')   loadNeihaiOrders();
 }
 
 /* ══════════════════════════════════════
@@ -999,6 +1022,95 @@ function loadContacts() {
       }).join('');
     });
 }
+
+
+/* ══════════════════════════════════════
+   小城故事・內海巡禮預購訂單
+══════════════════════════════════════ */
+function neihaiMonthDefault() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+function statusText(status) {
+  return {
+    pending_departure: '待成團',
+    confirmed_departure: '已達發船門檻',
+    confirmed: '人工確認',
+    cancelled: '已取消',
+  }[status] || status || '—';
+}
+
+function orderStatusColor(status) {
+  return status === 'cancelled' ? '#c53030'
+    : status === 'confirmed' || status === 'confirmed_departure' ? '#2f855a'
+    : '#b7791f';
+}
+
+function loadNeihaiOrders() {
+  const monthEl = document.getElementById('neihai-month');
+  if (monthEl && !monthEl.value) monthEl.value = neihaiMonthDefault();
+  const month = monthEl ? monthEl.value : neihaiMonthDefault();
+  const list = document.getElementById('neihai-orders-list');
+  list.innerHTML = '載入中…';
+  fetch(`/api/admin/neihai/preorders?month=${encodeURIComponent(month)}&key=${encodeURIComponent(ADMIN_KEY)}`)
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) { list.innerHTML = d.error || '載入失敗'; return; }
+      const activeOrders = d.orders.filter(o => o.status !== 'cancelled');
+      const pax = activeOrders.reduce((sum, o) => sum + (parseInt(o.passenger_count, 10) || 0), 0);
+      const guaranteed = d.sailings.filter(s => s.status === 'guaranteed').length;
+      const forming = d.sailings.filter(s => s.status === 'forming' && s.booked > 0).length;
+      document.getElementById('neihai-stats').innerHTML = `
+        <div class="stat-card"><div class="num">${d.orders.length}</div><div class="lbl">本月訂單</div></div>
+        <div class="stat-card"><div class="num">${pax}</div><div class="lbl">有效預購人數</div></div>
+        <div class="stat-card"><div class="num">${guaranteed}</div><div class="lbl">已達發船船班</div></div>
+        <div class="stat-card"><div class="num">${forming}</div><div class="lbl">待成團船班</div></div>`;
+      if (!d.orders.length) {
+        list.innerHTML = '<p style="color:#a0aec0;text-align:center;padding:40px">本月尚無預購訂單</p>';
+        return;
+      }
+      list.innerHTML = d.orders.map(o => `
+        <div class="contact-card" style="display:block">
+          <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+            <div>
+              <strong style="font-size:1.05rem;color:var(--blue-dk)">${o.booking_ref || '未編號'}</strong>
+              <div style="color:var(--mid);font-size:.9rem">${o.sailing_date} ${o.sailing_time}｜${o.passenger_count} 人｜業者：${o.agency_name || '—'}</div>
+            </div>
+            <div>
+              <span style="font-weight:800;color:${orderStatusColor(o.status)}">${statusText(o.status)}</span>
+              <select onchange="updateNeihaiOrderStatus(${o.id}, this.value)" style="margin-left:8px;padding:6px;border:1px solid #e2e8f0;border-radius:6px">
+                ${['pending_departure','confirmed_departure','confirmed','cancelled'].map(s => `<option value="${s}" ${o.status===s?'selected':''}>${statusText(s)}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="contact-field"><label>主要聯絡</label><span>${o.contact_name}｜${o.contact_phone}</span></div>
+          <div class="contact-field"><label>備註</label><span>${o.notes || '—'}</span></div>
+          <table class="tour-table" style="margin-top:12px">
+            <thead><tr><th>乘客</th><th>身分證字號</th><th>出生年月日</th><th>電話</th></tr></thead>
+            <tbody>${(o.passengers || []).map(p => `<tr><td>${p.name}</td><td>${p.national_id}</td><td>${p.birth_date}</td><td>${p.phone}</td></tr>`).join('')}</tbody>
+          </table>
+        </div>`).join('');
+    })
+    .catch(() => { list.innerHTML = '載入失敗'; });
+}
+
+function updateNeihaiOrderStatus(id, status) {
+  fetch(`/api/admin/neihai/preorders/${id}?key=${encodeURIComponent(ADMIN_KEY)}`, {
+    method:'PATCH',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ status, _key: ADMIN_KEY })
+  }).then(r => r.json()).then(d => {
+    if (d.ok) { showToast('狀態已更新', 'success'); loadNeihaiOrders(); }
+    else showToast(d.error || '更新失敗', 'error');
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const el = document.getElementById('neihai-month');
+  if (el && !el.value) el.value = neihaiMonthDefault();
+});
+
 
 /* ══════════════════════════════════════
    梯次名額管理

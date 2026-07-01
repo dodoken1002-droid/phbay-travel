@@ -453,6 +453,10 @@ const TOUR_UI = {
 };
 function tourUI(k){ return (TOUR_UI[window.__lang || 'zh-tw'] || TOUR_UI['zh-tw'])[k]; }
 
+function isNeihaiTourTitle(title) {
+  return /小城故事|內海巡禮|内海巡礼|Inner-Sea Cruise/i.test(title || '');
+}
+
 function renderTourCard(tour) {
   const card = document.createElement('div');
   const isHero = tour.is_hero;
@@ -484,6 +488,11 @@ function renderTourCard(tour) {
     ? `<span class="meta-item price"><i class="fas fa-tag"></i> ${L.price_display}</span>` : '';
 
   const btnClass = isHero ? 'btn btn-card btn-card--hero' : 'btn btn-card';
+  const neihaiCardCta = isNeihaiTourTitle(L.title)
+    ? `<a href="/neihai-preorder.html" class="${btnClass}" style="margin-top:10px;text-decoration:none;text-align:center">
+        <i class="fas fa-ship"></i> 預購訂位
+      </a>`
+    : '';
 
   // 梯次名額摘要（顯示全部梯次）
   const slots = _allSlots[tour.id] || [];
@@ -523,6 +532,7 @@ function renderTourCard(tour) {
       <button class="${btnClass}" onclick="openModal('db-${tour.id}')">
         ${tourUI('detail')} <i class="fas fa-arrow-right"></i>
       </button>
+      ${neihaiCardCta}
     </div>`;
   return card;
 }
@@ -588,6 +598,13 @@ function renderTourModal(tour) {
        </div>`
     : `<h2>${title}</h2>
        <span class="modal-tag">${dur || ''}${pdisp ? '｜' + pdisp : ''}</span>`;
+  const neihaiModalCta = isNeihaiTourTitle(title)
+    ? `<a href="/neihai-preorder.html" class="btn btn-primary">
+        <i class="fas fa-ship"></i> 前往預購訂位
+      </a>`
+    : `<a href="#contact" class="btn btn-primary" onclick="closeModal()">
+        <i class="fas fa-comment-dots"></i> ${tourUI('detail')}
+      </a>`;
 
   modalEl.innerHTML = `
     <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
@@ -599,9 +616,7 @@ function renderTourModal(tour) {
       ${daysHtml}
       ${includesHtml}
       ${notesHtml}
-      <a href="#contact" class="btn btn-primary" onclick="closeModal()">
-        <i class="fas fa-comment-dots"></i> ${tourUI('detail')}
-      </a>
+      ${neihaiModalCta}
     </div>`;
 
   container.appendChild(modalEl);

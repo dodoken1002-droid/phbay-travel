@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>小城故事・內海巡禮預購訂位｜潮旅國際旅行社</title>
+  <meta name="description" content="小城故事・內海巡禮預購訂位表。每日 09:00、11:00 出航，6 人成行，最多 13 人。可由消費者或合作業者填寫訂位資料。" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <style>
+    body{background:#f4fbff;color:#17324d}
+    .preorder-hero{padding:120px 20px 48px;background:linear-gradient(135deg,#0b5e9e,#14b8c9);color:#fff}
+    .preorder-wrap{max-width:1120px;margin:0 auto}
+    .preorder-hero h1{font-size:clamp(2rem,5vw,3.6rem);line-height:1.1;margin-bottom:16px}
+    .preorder-hero p{font-size:1.08rem;max-width:760px;opacity:.94}
+    .preorder-badges{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+    .preorder-badge{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:8px 14px;font-weight:800}
+    .preorder-main{max-width:1120px;margin:-28px auto 64px;padding:0 20px;display:grid;grid-template-columns:1.05fr .95fr;gap:24px}
+    .panel{background:#fff;border-radius:20px;box-shadow:0 18px 50px rgba(17,55,86,.12);padding:24px}
+    .panel h2{font-size:1.35rem;margin-bottom:8px;color:#0d4f83}
+    .panel small,.muted{color:#63788d}
+    .month-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:18px 0}
+    .month-row input,.field input,.field textarea{width:100%;border:1px solid #d8e6ef;border-radius:12px;padding:12px 14px;font-size:1rem}
+    .sailing-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;max-height:640px;overflow:auto;padding-right:4px}
+    .sailing-card{border:1px solid #d9e9f2;border-radius:16px;padding:14px;background:#fbfeff;text-align:left;cursor:pointer;transition:.18s}
+    .sailing-card:hover,.sailing-card.selected{border-color:#0b8cc4;box-shadow:0 8px 22px rgba(16,126,177,.16);transform:translateY(-2px)}
+    .sailing-card.full,.sailing-card.closed{opacity:.55;cursor:not-allowed}
+    .sailing-date{font-weight:900;color:#143957}
+    .sailing-time{font-size:1.35rem;font-weight:900;color:#0b74a5;margin:6px 0}
+    .status{display:inline-block;border-radius:999px;padding:4px 9px;font-size:.78rem;font-weight:800}
+    .status.forming{background:#fff7e6;color:#b7791f}
+    .status.guaranteed{background:#e8fff4;color:#07834f}
+    .status.full,.status.closed{background:#ffecec;color:#c53030}
+    .field{margin:14px 0}
+    .field label{display:block;font-weight:900;margin-bottom:6px;color:#17324d}
+    .selected-box{background:#edf9ff;border:1px solid #bee3f8;border-radius:16px;padding:14px;margin:14px 0;font-weight:800}
+    .passenger-card{border:1px solid #e2edf5;border-radius:16px;padding:16px;margin-top:12px;background:#fcfeff}
+    .passenger-card h3{font-size:1rem;margin-bottom:10px;color:#0d4f83}
+    .passenger-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .privacy{font-size:.88rem;line-height:1.7;background:#fff8e8;border-left:4px solid #f6ad55;border-radius:12px;padding:12px 14px;margin:14px 0;color:#5f4217}
+    .result{display:none;border-radius:16px;padding:18px;margin-top:18px}
+    .result.ok{display:block;background:#e8fff4;border:1px solid #9ae6b4;color:#095f3d}
+    .result.err{display:block;background:#fff5f5;border:1px solid #feb2b2;color:#9b2c2c}
+    .btn-wide{width:100%;justify-content:center;margin-top:10px}
+    .back-link{display:inline-flex;align-items:center;gap:8px;color:#fff;text-decoration:none;margin-bottom:22px;font-weight:800}
+    @media(max-width:900px){.preorder-main{grid-template-columns:1fr}.passenger-grid{grid-template-columns:1fr}.preorder-hero{padding-top:86px}}
+  </style>
+</head>
+<body>
+  <section class="preorder-hero">
+    <div class="preorder-wrap">
+      <a class="back-link" href="/"><i class="fas fa-arrow-left"></i> 回潮旅首頁</a>
+      <h1>小城故事・內海巡禮預購訂位</h1>
+      <p>每日提供 09:00、11:00 兩個出航時間。每班最多 13 人，累計 6 人報名即達發船門檻。消費者與合作業者都可使用本表單預購訂位。</p>
+      <div class="preorder-badges">
+        <span class="preorder-badge">6 人成行</span>
+        <span class="preorder-badge">最多 13 人</span>
+        <span class="preorder-badge">航程約 90 分鐘</span>
+        <span class="preorder-badge">亞果碼頭出發</span>
+      </div>
+    </div>
+  </section>
+
+  <main class="preorder-main">
+    <section class="panel">
+      <h2><i class="fas fa-calendar-days"></i> 選擇月份與船班</h2>
+      <p class="muted">請先選月份，再點選日期與時間。名額會依目前預購人數即時顯示。</p>
+      <div class="month-row">
+        <input type="month" id="month-input" />
+        <button class="btn btn-primary" id="load-month"><i class="fas fa-sync"></i> 載入船班</button>
+      </div>
+      <div id="sailing-grid" class="sailing-grid"></div>
+    </section>
+
+    <section class="panel">
+      <h2><i class="fas fa-clipboard-list"></i> 預購訂單資料</h2>
+      <div id="selected-sailing" class="selected-box">請先從左側選擇出航日期與時間</div>
+      <form id="preorder-form">
+        <div class="field">
+          <label for="agency-name">業者名稱或代號（選填）</label>
+          <input id="agency-name" name="agency_name" placeholder="例：PHBAY-A01 / 某某旅行社" />
+        </div>
+        <div class="field">
+          <label for="passenger-count">預購人數</label>
+          <input id="passenger-count" type="number" min="1" max="13" value="1" />
+        </div>
+        <div class="privacy">
+          本表單會蒐集身分證字號與出生年月日，供旅客保險、出航名冊與行程聯繫使用。請確認資料正確後再送出。
+        </div>
+        <div id="passenger-list"></div>
+        <div class="field">
+          <label for="notes">備註（選填）</label>
+          <textarea id="notes" rows="3" placeholder="例：11:00 船班需加購午餐、同行者特殊需求等"></textarea>
+        </div>
+        <button class="btn btn-submit btn-wide" type="submit"><i class="fas fa-paper-plane"></i> 送出預購訂單</button>
+      </form>
+      <div id="result" class="result"></div>
+    </section>
+  </main>
+
+  <script>
+    const grid = document.getElementById('sailing-grid');
+    const monthInput = document.getElementById('month-input');
+    const selectedBox = document.getElementById('selected-sailing');
+    const passengerCount = document.getElementById('passenger-count');
+    const passengerList = document.getElementById('passenger-list');
+    const resultBox = document.getElementById('result');
+    let selectedSailing = null;
+
+    function ymToday(){
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    }
+    function esc(s){ return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+    function weekday(dateStr){
+      return ['日','一','二','三','四','五','六'][new Date(`${dateStr}T00:00:00`).getDay()];
+    }
+    function statusClass(s){ return ['forming','guaranteed','full','closed'].includes(s) ? s : 'forming'; }
+    function renderPassengers(){
+      const n = Math.max(1, Math.min(13, parseInt(passengerCount.value || '1', 10)));
+      passengerCount.value = n;
+      passengerList.innerHTML = Array.from({length:n}, (_, i) => `
+        <div class="passenger-card">
+          <h3>第 ${i+1} 位乘客</h3>
+          <div class="passenger-grid">
+            <div class="field"><label>姓名 *</label><input name="p_name_${i}" required /></div>
+            <div class="field"><label>身分證字號 *</label><input name="p_id_${i}" required autocomplete="off" /></div>
+            <div class="field"><label>出生年月日 *</label><input type="date" name="p_birth_${i}" required /></div>
+            <div class="field"><label>電話 *</label><input type="tel" name="p_phone_${i}" required /></div>
+          </div>
+        </div>`).join('');
+    }
+    async function loadSailings(){
+      grid.innerHTML = '載入中…';
+      selectedSailing = null;
+      selectedBox.textContent = '請先從左側選擇出航日期與時間';
+      const res = await fetch(`/api/neihai/sailings?month=${encodeURIComponent(monthInput.value)}`);
+      const json = await res.json();
+      if (!json.ok) { grid.innerHTML = esc(json.error || '載入失敗'); return; }
+      grid.innerHTML = json.sailings.map(s => `
+        <button type="button" class="sailing-card ${esc(s.status)}" data-date="${esc(s.date)}" data-time="${esc(s.time)}" ${['full','closed'].includes(s.status) ? 'disabled' : ''}>
+          <div class="sailing-date">${esc(s.date)}（${weekday(s.date)}）</div>
+          <div class="sailing-time">${esc(s.time)}</div>
+          <span class="status ${statusClass(s.status)}">${esc(s.status_label)}</span>
+          <div class="muted" style="margin-top:8px">已訂 ${s.booked}/${s.capacity} 位｜剩 ${s.remaining} 位</div>
+        </button>`).join('');
+      grid.querySelectorAll('.sailing-card').forEach(btn => {
+        btn.addEventListener('click', () => {
+          grid.querySelectorAll('.sailing-card').forEach(b => b.classList.remove('selected'));
+          btn.classList.add('selected');
+          selectedSailing = json.sailings.find(s => s.date === btn.dataset.date && s.time === btn.dataset.time);
+          selectedBox.innerHTML = `<strong>${esc(selectedSailing.date)}（${weekday(selectedSailing.date)}）${esc(selectedSailing.time)}</strong><br>${esc(selectedSailing.status_label)}｜剩餘 ${selectedSailing.remaining} 位`;
+          resultBox.className = 'result';
+          resultBox.innerHTML = '';
+        });
+      });
+    }
+    document.getElementById('load-month').addEventListener('click', loadSailings);
+    passengerCount.addEventListener('input', renderPassengers);
+    document.getElementById('preorder-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      resultBox.className = 'result';
+      if (!selectedSailing) {
+        resultBox.className = 'result err';
+        resultBox.textContent = '請先選擇出航日期與時間。';
+        return;
+      }
+      const n = parseInt(passengerCount.value, 10);
+      if (n > selectedSailing.remaining) {
+        resultBox.className = 'result err';
+        resultBox.textContent = `此船班目前只剩 ${selectedSailing.remaining} 位，請調整人數或改選其他船班。`;
+        return;
+      }
+      const fd = new FormData(e.target);
+      const passengers = Array.from({length:n}, (_, i) => ({
+        name: fd.get(`p_name_${i}`),
+        national_id: fd.get(`p_id_${i}`),
+        birth_date: fd.get(`p_birth_${i}`),
+        phone: fd.get(`p_phone_${i}`),
+      }));
+      const btn = e.submitter;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 送出中...';
+      try {
+        const res = await fetch('/api/neihai/preorders', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            sailing_date: selectedSailing.date,
+            sailing_time: selectedSailing.time,
+            agency_name: document.getElementById('agency-name').value,
+            notes: document.getElementById('notes').value,
+            passengers,
+          })
+        });
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error || '送出失敗');
+        resultBox.className = 'result ok';
+        resultBox.innerHTML = `預購已送出！<br>訂單編號：<strong>${esc(json.booking_ref)}</strong><br>${esc(json.message)}。潮旅將再與您確認最終出航資訊。`;
+        e.target.reset();
+        passengerCount.value = 1;
+        renderPassengers();
+        await loadSailings();
+      } catch (err) {
+        resultBox.className = 'result err';
+        resultBox.textContent = err.message || '送出失敗，請稍後再試或改用 LINE 聯繫。';
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i> 送出預購訂單';
+      }
+    });
+    monthInput.value = ymToday();
+    renderPassengers();
+    loadSailings();
+  </script>
+</body>
+</html>

@@ -14,6 +14,7 @@ DELETE /api/admin/tours/<id>→ 刪除行程
 import os
 import re
 import json
+from datetime import date, datetime, timedelta
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -122,6 +123,49 @@ def init_db():
             waitlisted   INT  NOT NULL DEFAULT 0,
             is_active    BOOLEAN DEFAULT TRUE,
             created_at   TIMESTAMP DEFAULT NOW()
+        )
+    """)
+
+
+    # neihai preorder 資料表（小城故事・內海巡禮）
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS neihai_sailings (
+            id            SERIAL PRIMARY KEY,
+            sailing_date  DATE NOT NULL,
+            sailing_time  VARCHAR(5) NOT NULL,
+            capacity      INT NOT NULL DEFAULT 13,
+            min_people    INT NOT NULL DEFAULT 6,
+            is_active     BOOLEAN DEFAULT TRUE,
+            notes         TEXT,
+            created_at    TIMESTAMP DEFAULT NOW(),
+            updated_at    TIMESTAMP DEFAULT NOW(),
+            UNIQUE (sailing_date, sailing_time)
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS neihai_preorders (
+            id              SERIAL PRIMARY KEY,
+            booking_ref     VARCHAR(40) UNIQUE,
+            sailing_id      INT NOT NULL REFERENCES neihai_sailings(id) ON DELETE CASCADE,
+            agency_name     VARCHAR(120),
+            contact_name    VARCHAR(100) NOT NULL,
+            contact_phone   VARCHAR(50) NOT NULL,
+            passenger_count INT NOT NULL,
+            status          VARCHAR(30) NOT NULL DEFAULT 'pending_departure',
+            notes           TEXT,
+            created_at      TIMESTAMP DEFAULT NOW(),
+            updated_at      TIMESTAMP DEFAULT NOW()
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS neihai_passengers (
+            id              SERIAL PRIMARY KEY,
+            preorder_id     INT NOT NULL REFERENCES neihai_preorders(id) ON DELETE CASCADE,
+            name            VARCHAR(100) NOT NULL,
+            national_id     VARCHAR(30) NOT NULL,
+            birth_date      DATE NOT NULL,
+            phone           VARCHAR(50) NOT NULL,
+            created_at      TIMESTAMP DEFAULT NOW()
         )
     """)
 
@@ -623,6 +667,307 @@ def get_slots():
         return jsonify(ok=True, slots=rows)
     except Exception as e:
         return jsonify(ok=False, error=str(e)), 500
+
+
+
+# ─── 小城故事・內海巡禮預購 API ─────────────────────────────
+NEIHAI_TIMES = ("09:00", "11:00")
+NEIHAI_DEFAULT_CAPACITY = 13
+NEIHAI_MIN_PEOPLE = 6
+NEIHAI_VALID_STATUSES = {
+    "pending_departure",
+    "confirmed_departure",
+    "confirmed",
+    "cancelled",
+}
+
+
+@app.route('/neihai-preorder')
+def neihai_preorder_page():
+    return send_from_directory('.', 'neihai-preorder.html')
+
+
+def _parse_month(value):
+    value = (value or date.today().strftime("%Y-%m")).strip()
+    try:
+        start = datetime.strptime(value, "%Y-%m").date().replace(day=1)
+    except ValueError:
+        raise ValueError("月份格式需為 YYYY-MM")
+    if start.month == 12:
+        end = start.replace(year=start.year + 1, month=1)
+    else:
+        end = start.replace(month=start.month + 1)
+    return start, end
+
+
+def _parse_sailing_date(value):
+    try:
+        return datetime.strptime((value or "").strip(), "%Y-%m-%d").date()
+    except ValueError:
+        raise ValueError("出航日期格式需為 YYYY-MM-DD")
+
+
+def _normalize_neihai_time(value):
+    value = (value or "").strip()
+    if value in ("9:00", "09"):
+        value = "09:00"
+    if value in ("11:00", "11"):
+        value = "11:00"
+    if value not in NEIHAI_TIMES:
+        raise ValueError("出航時間僅開放 09:00、11:00")
+    return value
+
+
+def _sailing_status(booked, capacity, min_people, is_active=True):
+    booked = int(booked or 0)
+    capacity = int(capacity or NEIHAI_DEFAULT_CAPACITY)
+    min_people = int(min_people or NEIHAI_MIN_PEOPLE)
+    remaining = max(0, capacity - booked)
+    if not is_active:
+        return "closed", "已關閉", remaining, max(0, min_people - booked)
+    if remaining <= 0:
+        return "full", "已額滿", 0, 0
+    if booked >= min_people:
+        return "guaranteed", f"已達 {booked} 人，可發船", remaining, 0
+    needed = max(0, min_people - booked)
+    return "forming", f"待成團，還差 {needed} 人", remaining, needed
+
+
+def _neihai_month_availability(start, end):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT
+          s.id, s.sailing_date, s.sailing_time, s.capacity, s.min_people, s.is_active, s.notes,
+          COALESCE(SUM(CASE WHEN p.status <> 'cancelled' THEN p.passenger_count ELSE 0 END), 0) AS booked
+        FROM neihai_sailings s
+        LEFT JOIN neihai_preorders p ON p.sailing_id = s.id
+        WHERE s.sailing_date >= %s AND s.sailing_date < %s
+        GROUP BY s.id
+    """, (start, end))
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+
+    overrides = {}
+    for r in rows:
+        key = (str(r["sailing_date"]), r["sailing_time"])
+        overrides[key] = dict(r)
+
+    items = []
+    d = start
+    while d < end:
+        for sailing_time in NEIHAI_TIMES:
+            key = (str(d), sailing_time)
+            row = overrides.get(key, {})
+            capacity = int(row.get("capacity") or NEIHAI_DEFAULT_CAPACITY)
+            min_people = int(row.get("min_people") or NEIHAI_MIN_PEOPLE)
+            booked = int(row.get("booked") or 0)
+            is_active = row.get("is_active", True)
+            code, label, remaining, needed = _sailing_status(booked, capacity, min_people, is_active)
+            items.append({
+                "id": row.get("id"),
+                "date": str(d),
+                "time": sailing_time,
+                "capacity": capacity,
+                "min_people": min_people,
+                "booked": booked,
+                "remaining": remaining,
+                "needed_to_go": needed,
+                "status": code,
+                "status_label": label,
+                "is_active": bool(is_active),
+                "notes": row.get("notes") or "",
+            })
+        d += timedelta(days=1)
+    return items
+
+
+@app.route('/api/neihai/sailings', methods=['GET'])
+def neihai_sailings():
+    try:
+        start, end = _parse_month(request.args.get("month"))
+        return jsonify(
+            ok=True,
+            month=start.strftime("%Y-%m"),
+            product="小城故事・內海巡禮",
+            capacity=NEIHAI_DEFAULT_CAPACITY,
+            min_people=NEIHAI_MIN_PEOPLE,
+            sailings=_neihai_month_availability(start, end),
+        )
+    except ValueError as e:
+        return jsonify(ok=False, error=str(e)), 400
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.route('/api/neihai/preorders', methods=['POST'])
+def create_neihai_preorder():
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        sailing_date = _parse_sailing_date(data.get("sailing_date"))
+        sailing_time = _normalize_neihai_time(data.get("sailing_time"))
+    except ValueError as e:
+        return jsonify(ok=False, error=str(e)), 400
+
+    passengers = data.get("passengers") or []
+    if not isinstance(passengers, list) or not (1 <= len(passengers) <= NEIHAI_DEFAULT_CAPACITY):
+        return jsonify(ok=False, error="乘客人數需為 1 至 13 人"), 400
+
+    clean_passengers = []
+    for idx, p in enumerate(passengers, start=1):
+        name = (p.get("name") or "").strip()
+        national_id = (p.get("national_id") or "").strip().upper()
+        phone = (p.get("phone") or "").strip()
+        birth = (p.get("birth_date") or "").strip()
+        if not all([name, national_id, phone, birth]):
+            return jsonify(ok=False, error=f"第 {idx} 位乘客資料未填完整"), 400
+        try:
+            birth_date = datetime.strptime(birth, "%Y-%m-%d").date()
+        except ValueError:
+            return jsonify(ok=False, error=f"第 {idx} 位乘客生日格式需為 YYYY-MM-DD"), 400
+        clean_passengers.append({
+            "name": name,
+            "national_id": national_id,
+            "birth_date": birth_date,
+            "phone": phone,
+        })
+
+    contact_name = clean_passengers[0]["name"]
+    contact_phone = (data.get("contact_phone") or clean_passengers[0]["phone"]).strip()
+    agency_name = (data.get("agency_name") or "").strip()
+    notes = (data.get("notes") or "").strip()
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO neihai_sailings (sailing_date, sailing_time, capacity, min_people)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (sailing_date, sailing_time) DO NOTHING
+        """, (sailing_date, sailing_time, NEIHAI_DEFAULT_CAPACITY, NEIHAI_MIN_PEOPLE))
+        cur.execute("""
+            SELECT * FROM neihai_sailings
+            WHERE sailing_date=%s AND sailing_time=%s
+            FOR UPDATE
+        """, (sailing_date, sailing_time))
+        sailing = cur.fetchone()
+        if not sailing or not sailing["is_active"]:
+            conn.rollback(); cur.close(); conn.close()
+            return jsonify(ok=False, error="此船班目前未開放預購"), 400
+
+        cur.execute("""
+            SELECT COALESCE(SUM(passenger_count), 0) AS booked
+            FROM neihai_preorders
+            WHERE sailing_id=%s AND status <> 'cancelled'
+        """, (sailing["id"],))
+        booked = int(cur.fetchone()["booked"] or 0)
+        passenger_count = len(clean_passengers)
+        capacity = int(sailing["capacity"] or NEIHAI_DEFAULT_CAPACITY)
+        if booked + passenger_count > capacity:
+            conn.rollback(); cur.close(); conn.close()
+            return jsonify(ok=False, error=f"此船班剩餘 {max(0, capacity - booked)} 位，不足以容納本次預購人數"), 400
+
+        status = "confirmed_departure" if booked + passenger_count >= int(sailing["min_people"]) else "pending_departure"
+        cur.execute("""
+            INSERT INTO neihai_preorders
+              (sailing_id, agency_name, contact_name, contact_phone, passenger_count, status, notes)
+            VALUES (%s,%s,%s,%s,%s,%s,%s)
+            RETURNING id, created_at
+        """, (sailing["id"], agency_name, contact_name, contact_phone, passenger_count, status, notes))
+        order = cur.fetchone()
+        booking_ref = f"NH{sailing_date.strftime('%Y%m%d')}{sailing_time.replace(':', '')}-{int(order['id']):04d}"
+        cur.execute("UPDATE neihai_preorders SET booking_ref=%s WHERE id=%s", (booking_ref, order["id"]))
+        for p in clean_passengers:
+            cur.execute("""
+                INSERT INTO neihai_passengers (preorder_id, name, national_id, birth_date, phone)
+                VALUES (%s,%s,%s,%s,%s)
+            """, (order["id"], p["name"], p["national_id"], p["birth_date"], p["phone"]))
+
+        conn.commit(); cur.close(); conn.close()
+        code, label, remaining, needed = _sailing_status(booked + passenger_count, capacity, sailing["min_people"], True)
+        return jsonify(
+            ok=True,
+            id=order["id"],
+            booking_ref=booking_ref,
+            created_at=str(order["created_at"]),
+            sailing_date=str(sailing_date),
+            sailing_time=sailing_time,
+            passenger_count=passenger_count,
+            sailing_status=code,
+            sailing_status_label=label,
+            remaining=remaining,
+            needed_to_go=needed,
+            message="預購已送出，已達發船門檻" if code == "guaranteed" else f"預購已送出，尚差 {needed} 人成行",
+        )
+    except Exception as e:
+        return jsonify(ok=False, error=f"伺服器錯誤：{e}"), 500
+
+
+@app.route('/api/admin/neihai/preorders', methods=['GET'])
+def admin_neihai_preorders():
+    if not is_admin():
+        return jsonify(ok=False, error='未授權'), 401
+    try:
+        start, end = _parse_month(request.args.get("month"))
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT p.*, s.sailing_date, s.sailing_time, s.capacity, s.min_people
+            FROM neihai_preorders p
+            JOIN neihai_sailings s ON s.id = p.sailing_id
+            WHERE s.sailing_date >= %s AND s.sailing_date < %s
+            ORDER BY s.sailing_date, s.sailing_time, p.created_at
+        """, (start, end))
+        orders = [dict(r) for r in cur.fetchall()]
+        ids = [o["id"] for o in orders]
+        passengers_by_order = {i: [] for i in ids}
+        if ids:
+            cur.execute("""
+                SELECT * FROM neihai_passengers
+                WHERE preorder_id = ANY(%s)
+                ORDER BY preorder_id, id
+            """, (ids,))
+            for r in cur.fetchall():
+                r = dict(r)
+                r["birth_date"] = str(r["birth_date"])
+                if r.get("created_at"):
+                    r["created_at"] = str(r["created_at"])
+                passengers_by_order[r["preorder_id"]].append(r)
+        cur.close(); conn.close()
+
+        for o in orders:
+            for k in ("sailing_date", "created_at", "updated_at"):
+                if o.get(k): o[k] = str(o[k])
+            o["passengers"] = passengers_by_order.get(o["id"], [])
+
+        availability = _neihai_month_availability(start, end)
+        return jsonify(ok=True, month=start.strftime("%Y-%m"), orders=orders, sailings=availability)
+    except ValueError as e:
+        return jsonify(ok=False, error=str(e)), 400
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.route('/api/admin/neihai/preorders/<int:order_id>', methods=['PATCH'])
+def admin_update_neihai_preorder(order_id):
+    if not is_admin():
+        return jsonify(ok=False, error='未授權'), 401
+    data = request.get_json(force=True, silent=True) or {}
+    status = (data.get("status") or "").strip()
+    if status not in NEIHAI_VALID_STATUSES:
+        return jsonify(ok=False, error="狀態不正確"), 400
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("""
+            UPDATE neihai_preorders
+            SET status=%s, updated_at=NOW()
+            WHERE id=%s
+        """, (status, order_id))
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
 
 
 # ─── 梯次名額 CRUD（管理員）────────────────────────────────────
