@@ -453,8 +453,13 @@ const TOUR_UI = {
 };
 function tourUI(k){ return (TOUR_UI[window.__lang || 'zh-tw'] || TOUR_UI['zh-tw'])[k]; }
 
-function isNeihaiTourTitle(title) {
-  return /小城故事|內海巡禮|内海巡礼|Inner-Sea Cruise/i.test(title || '');
+/* 行程標題 → 預購表單對照表；之後有新預購行程在此加一行即可 */
+const PREORDER_LINKS = [
+  { pattern: /小城故事|內海巡禮|内海巡礼|Inner-Sea Cruise/i, url: '/neihai-preorder.html', icon: 'fa-ship' },
+  { pattern: /追風|音樂燈光節|音楽祭|Music Festival/i,        url: '/preorder/festival',    icon: 'fa-music' },
+];
+function preorderLinkFor(title) {
+  return PREORDER_LINKS.find(m => m.pattern.test(title || '')) || null;
 }
 
 function renderTourCard(tour) {
@@ -488,9 +493,10 @@ function renderTourCard(tour) {
     ? `<span class="meta-item price"><i class="fas fa-tag"></i> ${L.price_display}</span>` : '';
 
   const btnClass = isHero ? 'btn btn-card btn-card--hero' : 'btn btn-card';
-  const neihaiCardCta = isNeihaiTourTitle(L.title)
-    ? `<a href="/neihai-preorder.html" class="${btnClass}" style="margin-top:10px;text-decoration:none;text-align:center">
-        <i class="fas fa-ship"></i> 預購訂位
+  const cardPreorder = preorderLinkFor(L.title);
+  const neihaiCardCta = cardPreorder
+    ? `<a href="${cardPreorder.url}" class="${btnClass}" style="margin-top:10px;text-decoration:none;text-align:center">
+        <i class="fas ${cardPreorder.icon}"></i> 預購訂位
       </a>`
     : '';
 
@@ -598,9 +604,10 @@ function renderTourModal(tour) {
        </div>`
     : `<h2>${title}</h2>
        <span class="modal-tag">${dur || ''}${pdisp ? '｜' + pdisp : ''}</span>`;
-  const neihaiModalCta = isNeihaiTourTitle(title)
-    ? `<a href="/neihai-preorder.html" class="btn btn-primary">
-        <i class="fas fa-ship"></i> 前往預購訂位
+  const modalPreorder = preorderLinkFor(title);
+  const neihaiModalCta = modalPreorder
+    ? `<a href="${modalPreorder.url}" class="btn btn-primary">
+        <i class="fas ${modalPreorder.icon}"></i> 前往預購訂位
       </a>`
     : `<a href="#contact" class="btn btn-primary" onclick="closeModal()">
         <i class="fas fa-comment-dots"></i> ${tourUI('detail')}
