@@ -700,6 +700,55 @@ def send_contact_email(data):
         print(f'[EMAIL] 寄信失敗（不影響表單儲存）：{e}')
 
 
+def send_preorder_email(info):
+    """行程預購新訂單通知信（內海巡禮／音樂節等預購共用）。
+    沿用諮詢信的 SMTP 設定；寄信失敗不影響訂單建立。
+    為保護個資，信中不含完整身分證字號，完整資料請至後台 /admin 檢視。"""
+    sender    = os.environ.get('EMAIL_USER', '')
+    password  = os.environ.get('EMAIL_PASS', '')
+    smtp_host = os.environ.get('SMTP_HOST', 'smtpout.secureserver.net')
+    smtp_port = int(os.environ.get('SMTP_PORT', '465'))
+    recipient = os.environ.get('PREORDER_NOTIFY_EMAIL', 'dodoken1002@phbay.net')
+    if not sender or not password:
+        print('[EMAIL] 未設定 EMAIL_USER / EMAIL_PASS，跳過預購通知')
+        return
+
+    status_map = {'confirmed_departure': '已達成行門檻（可成行）', 'pending_departure': '待成團',
+                  'confirmed': '人工確認', 'cancelled': '已取消'}
+    when = f"{info.get('date', '')} {info.get('time', '')}".strip()
+    names = '\n'.join(f"  {i}. {n}" for i, n in enumerate(info.get('passenger_names', []), 1)) or '  （無）'
+    product = info.get('product', '預購行程')
+    body = f"""潮旅國際旅行社 — 新預購通知
+
+行程：{product}
+訂單編號：{info.get('booking_ref', '')}
+出發班次：{when}
+預購人數：{info.get('passenger_count', '')} 人
+訂單狀態：{status_map.get(info.get('status', ''), info.get('status', ''))}
+業者/代號：{info.get('agency_name') or '（未填，可能為一般消費者）'}
+主要聯絡：{info.get('contact_name', '')}｜{info.get('contact_phone', '')}
+備註：{info.get('notes') or '（未填）'}
+
+乘客名單：
+{names}
+
+※ 身分證字號等完整資料請至後台 /admin 檢視。
+請盡快與客戶確認出發資訊。
+"""
+    msg = MIMEMultipart()
+    msg['From']    = f'潮旅國際旅行社 <{sender}>'
+    msg['To']      = recipient
+    msg['Subject'] = f'【新預購】{product}｜{when}｜{info.get("passenger_count", "")}人｜{info.get("booking_ref", "")}'
+    msg.attach(MIMEText(body, 'plain', 'utf-8'))
+    try:
+        with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as server:
+            server.login(sender, password)
+            server.sendmail(sender, recipient, msg.as_string())
+        print(f'[EMAIL] 預購通知信已寄出至 {recipient}')
+    except Exception as e:
+        print(f'[EMAIL] 預購通知寄信失敗（不影響訂單）：{e}')
+
+
 # ─── 梯次名額 API（公開）─────────────────────────────────────
 @app.route('/api/slots', methods=['GET'])
 def get_slots():
@@ -1034,6 +1083,20 @@ def create_neihai_preorder():
             """, (order["id"], p["name"], p["national_id"], p["birth_date"], p["phone"]))
 
         conn.commit(); cur.close(); conn.close()
+
+        try:
+            send_preorder_email({
+                'product': '小城故事・內海巡禮',
+                'booking_ref': booking_ref,
+                'date': str(sailing_date), 'time': sailing_time,
+                'passenger_count': passenger_count, 'status': status,
+                'agency_name': agency_name, 'contact_name': contact_name,
+                'contact_phone': contact_phone, 'notes': notes,
+                'passenger_names': [p['name'] for p in clean_passengers],
+            })
+        except Exception as _e:
+            print(f'[EMAIL] 內海預購通知呼叫失敗（不影響訂單）：{_e}')
+
         code, label, remaining, needed = _sailing_status(booked + passenger_count, capacity, sailing["min_people"], True)
         return jsonify(
             ok=True,
@@ -1323,6 +1386,19 @@ def api_preorder_create(slug):
                 VALUES (%s,%s,%s,%s,%s)
             """, (order['id'], ps['name'], ps['national_id'], ps['birth_date'], ps['phone']))
         conn.commit(); cur.close(); conn.close()
+
+        try:
+            send_preorder_email({
+                'product': p.get('name') or slug,
+                'booking_ref': booking_ref,
+                'date': str(dep_date), 'time': dep_time,
+                'passenger_count': len(clean), 'status': status,
+                'agency_name': agency_name, 'contact_name': contact_name,
+                'contact_phone': contact_phone, 'notes': notes,
+                'passenger_names': [ps['name'] for ps in clean],
+            })
+        except Exception as _e:
+            print(f'[EMAIL] 預購通知呼叫失敗（不影響訂單）：{_e}')
 
         code, label, remaining = _preorder_slot_status(booked + len(clean), p['capacity'], p['min_people'])
         return jsonify(
@@ -1803,7 +1879,8 @@ def reviews_page():
 def dynamic_sitemap():
     urls = [(f'{SITE}/', '1.0', 'weekly'), (f'{SITE}/faq.html', '0.8', 'monthly'),
             (f'{SITE}/blog', '0.7', 'weekly'), (f'{SITE}/reviews', '0.7', 'weekly'),
-            (f'{SITE}/tides', '0.7', 'daily')]
+            (f'{SITE}/tides', '0.7', 'daily'),
+            (f'{SITE}/neihai-preorder.html', '0.8', 'weekly')]
     try:
         conn = get_db(); cur = conn.cursor()
         cur.execute("SELECT slug, COALESCE(updated_at,published_at,created_at) AS m FROM posts WHERE is_published=TRUE")
