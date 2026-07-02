@@ -305,6 +305,22 @@ ul { list-style: none; }
   display: block;
 }
 
+/* 活動促銷（正方形圖：天空藍底、完整置中、不裁切） */
+.slide-promo {
+  background: #bfe3f7;
+  min-height: 56vw;
+  max-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.slide-promo img {
+  max-width: 100%;
+  max-height: 100vh;
+  object-fit: contain;
+  display: block;
+}
+
 /* 第 3 格：潮旅主視覺（原 hero 樣式） */
 .slide-hero {
   min-height: 100vh;
