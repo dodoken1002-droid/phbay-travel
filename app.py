@@ -700,6 +700,70 @@ def _parse_month(value):
     return start, end
 
 
+# ─── 中央氣象署潮汐預報（F-A0021-001）───
+CWA_API_KEY = os.environ.get('CWA_API_KEY', '')
+TIDE_LOCATIONS = ("澎湖縣馬公市", "澎湖縣湖西鄉", "澎湖縣白沙鄉",
+                  "澎湖縣西嶼鄉", "澎湖縣望安鄉", "澎湖縣七美鄉")
+TIDE_CACHE_TTL = 6 * 3600  # 潮汐預報更新頻率低，快取 6 小時
+_tide_cache = {}  # location -> {'at': epoch, 'data': {...}}
+
+
+def _fetch_cwa_tides(location):
+    """呼叫氣象署 API 取單一鄉市未來一個月潮汐預報，整理成精簡格式。"""
+    import urllib.request
+    import urllib.parse
+    import time as _time
+    cached = _tide_cache.get(location)
+    if cached and _time.time() - cached['at'] < TIDE_CACHE_TTL:
+        return cached['data']
+    qs = urllib.parse.urlencode({'Authorization': CWA_API_KEY, 'LocationName': location})
+    url = f'https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-A0021-001?{qs}'
+    with urllib.request.urlopen(url, timeout=15) as resp:
+        raw = json.load(resp)
+    if not raw.get('success') or not raw.get('records', {}).get('TideForecasts'):
+        raise RuntimeError('氣象署回應異常')
+    loc = raw['records']['TideForecasts'][0]['Location']
+    days = []
+    # 氣象署回傳的 Daily 不保證依日期排序，需自行排序再取用
+    for d in sorted(loc['TimePeriods']['Daily'], key=lambda x: x.get('Date') or ''):
+        days.append({
+            'date': d.get('Date'),
+            'lunar': d.get('LunarDate'),
+            'range': d.get('TideRange'),  # 大潮/中潮/小潮
+            'tides': [{
+                'time': t.get('DateTime'),
+                'type': t.get('Tide'),  # 滿潮/乾潮
+                'height_cm': t.get('TideHeights', {}).get('AboveTWVD'),
+            } for t in (d.get('Time') or [])],
+        })
+    data = {'location': loc['LocationName'], 'days': days}
+    _tide_cache[location] = {'at': _time.time(), 'data': data}
+    return data
+
+
+@app.route('/api/tides')
+def api_tides():
+    location = (request.args.get('location') or TIDE_LOCATIONS[0]).strip()
+    if location not in TIDE_LOCATIONS:
+        return jsonify(ok=False, error='地點僅限澎湖縣各鄉市'), 400
+    if not CWA_API_KEY:
+        return jsonify(ok=False, error='潮汐服務尚未設定'), 503
+    try:
+        data = _fetch_cwa_tides(location)
+        return jsonify(ok=True, source='中央氣象署', **data)
+    except Exception:
+        # 若氣象署暫時故障，回傳過期快取聊勝於無
+        stale = _tide_cache.get(location)
+        if stale:
+            return jsonify(ok=True, source='中央氣象署', stale=True, **stale['data'])
+        return jsonify(ok=False, error='暫時無法取得潮汐資料，請稍後再試'), 502
+
+
+@app.route('/tides')
+def tides_page():
+    return send_from_directory('.', 'tides.html')
+
+
 def _taiwan_now():
     """台灣當前時間（UTC+8，台灣無夏令時間；主機時區可能是 UTC，不能用本地時間）。"""
     return datetime.utcnow() + timedelta(hours=8)
@@ -1386,7 +1450,8 @@ def reviews_page():
 @app.route('/sitemap.xml')
 def dynamic_sitemap():
     urls = [(f'{SITE}/', '1.0', 'weekly'), (f'{SITE}/faq.html', '0.8', 'monthly'),
-            (f'{SITE}/blog', '0.7', 'weekly'), (f'{SITE}/reviews', '0.7', 'weekly')]
+            (f'{SITE}/blog', '0.7', 'weekly'), (f'{SITE}/reviews', '0.7', 'weekly'),
+            (f'{SITE}/tides', '0.7', 'daily')]
     try:
         conn = get_db(); cur = conn.cursor()
         cur.execute("SELECT slug, COALESCE(updated_at,published_at,created_at) AS m FROM posts WHERE is_published=TRUE")
