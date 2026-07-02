@@ -1481,6 +1481,8 @@ ul { list-style: none; }
   }
   .nav-links.open { display: flex; }
   .nav-links a { padding: 12px 16px; border-radius: 8px; font-size: 1rem; }
+  /* 項目變多時避免超出矮螢幕：選單內部可捲動 */
+  .nav-links { max-height: calc(100vh - var(--navbar-h) - 60px); overflow-y: auto; }
 
   /* 手機版子選單：改為內嵌常駐顯示（無 hover） */
   .nav-submenu {
