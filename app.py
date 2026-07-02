@@ -666,11 +666,39 @@ def admin_delete_tour(tour_id):
 
 
 # ─── 寄送諮詢通知信 ────────────────────────────────────────
+def _smtp_send(sender, password, recipient, msg):
+    """寄信：依序嘗試埠。優先用 SMTP_PORT（若有設），再退到 465(SSL)、587(STARTTLS)。
+    某些主機（如 Railway 對 GoDaddy 465）會逾時，改用 587 STARTTLS 通常可通。
+    回傳 (ok: bool, detail: str)。"""
+    host = os.environ.get('SMTP_HOST', 'smtpout.secureserver.net')
+    forced = os.environ.get('SMTP_PORT')
+    candidates = []
+    if forced and forced.isdigit():
+        candidates.append(int(forced))
+    for p in (465, 587):
+        if p not in candidates:
+            candidates.append(p)
+    errors = []
+    for port in candidates:
+        try:
+            if port == 465:
+                with smtplib.SMTP_SSL(host, port, timeout=15) as s:
+                    s.login(sender, password)
+                    s.sendmail(sender, recipient, msg.as_string())
+            else:
+                with smtplib.SMTP(host, port, timeout=15) as s:
+                    s.ehlo(); s.starttls(); s.ehlo()
+                    s.login(sender, password)
+                    s.sendmail(sender, recipient, msg.as_string())
+            return True, f'{host}:{port}'
+        except Exception as e:
+            errors.append(f'{host}:{port} → {e}')
+    return False, ' ; '.join(errors)
+
+
 def send_contact_email(data):
     sender    = os.environ.get('EMAIL_USER', '')
     password  = os.environ.get('EMAIL_PASS', '')
-    smtp_host = os.environ.get('SMTP_HOST', 'smtpout.secureserver.net')
-    smtp_port = int(os.environ.get('SMTP_PORT', '465'))
     recipient = 'dodoken1002@phbay.net'
     if not sender or not password:
         print('[EMAIL] 未設定 EMAIL_USER / EMAIL_PASS，跳過寄信')
@@ -699,13 +727,11 @@ def send_contact_email(data):
     msg['Subject'] = f'【新諮詢】{data.get("name", "")} — {data.get("travel_date", "")} ~ {data.get("travel_date_end", "")}'
     msg.attach(MIMEText(body, 'plain', 'utf-8'))
 
-    try:
-        with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as server:
-            server.login(sender, password)
-            server.sendmail(sender, recipient, msg.as_string())
-        print(f'[EMAIL] 通知信已寄出至 {recipient}')
-    except Exception as e:
-        print(f'[EMAIL] 寄信失敗（不影響表單儲存）：{e}')
+    ok, detail = _smtp_send(sender, password, recipient, msg)
+    if ok:
+        print(f'[EMAIL] 通知信已寄出（{detail}）→ {recipient}')
+    else:
+        print(f'[EMAIL] 寄信失敗（不影響表單儲存）：{detail}')
 
 
 def send_preorder_email(info):
@@ -714,8 +740,6 @@ def send_preorder_email(info):
     為保護個資，信中不含完整身分證字號，完整資料請至後台 /admin 檢視。"""
     sender    = os.environ.get('EMAIL_USER', '')
     password  = os.environ.get('EMAIL_PASS', '')
-    smtp_host = os.environ.get('SMTP_HOST', 'smtpout.secureserver.net')
-    smtp_port = int(os.environ.get('SMTP_PORT', '465'))
     recipient = os.environ.get('PREORDER_NOTIFY_EMAIL', 'dodoken1002@phbay.net')
     if not sender or not password:
         print('[EMAIL] 未設定 EMAIL_USER / EMAIL_PASS，跳過預購通知')
@@ -748,13 +772,11 @@ def send_preorder_email(info):
     msg['To']      = recipient
     msg['Subject'] = f'【新預購】{product}｜{when}｜{info.get("passenger_count", "")}人｜{info.get("booking_ref", "")}'
     msg.attach(MIMEText(body, 'plain', 'utf-8'))
-    try:
-        with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as server:
-            server.login(sender, password)
-            server.sendmail(sender, recipient, msg.as_string())
-        print(f'[EMAIL] 預購通知信已寄出至 {recipient}')
-    except Exception as e:
-        print(f'[EMAIL] 預購通知寄信失敗（不影響訂單）：{e}')
+    ok, detail = _smtp_send(sender, password, recipient, msg)
+    if ok:
+        print(f'[EMAIL] 預購通知信已寄出（{detail}）→ {recipient}')
+    else:
+        print(f'[EMAIL] 預購通知寄信失敗（不影響訂單）：{detail}')
 
 
 # ─── 梯次名額 API（公開）─────────────────────────────────────
@@ -1283,26 +1305,21 @@ def admin_email_test():
     if not is_admin():
         return jsonify(ok=False, error='未授權'), 401
     sender = os.environ.get('EMAIL_USER', ''); password = os.environ.get('EMAIL_PASS', '')
-    smtp_host = os.environ.get('SMTP_HOST', 'smtpout.secureserver.net')
-    smtp_port = int(os.environ.get('SMTP_PORT', '465'))
     recipient = os.environ.get('PREORDER_NOTIFY_EMAIL', 'dodoken1002@phbay.net')
     if not sender or not password:
         return jsonify(ok=False, configured=False,
                        error='Railway 未設定 EMAIL_USER / EMAIL_PASS，所以不會寄任何通知信。')
-    try:
-        msg = MIMEMultipart()
-        msg['From'] = f'潮旅國際旅行社 <{sender}>'
-        msg['To'] = recipient
-        msg['Subject'] = '【測試】潮旅預購通知信設定測試'
-        msg.attach(MIMEText('這是一封測試信。收到代表預購通知 email 設定正常，'
-                            '日後有新預購訂單會自動寄到此信箱。', 'plain', 'utf-8'))
-        with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as server:
-            server.login(sender, password)
-            server.sendmail(sender, recipient, msg.as_string())
-        return jsonify(ok=True, configured=True, sent_to=recipient,
-                       message=f'測試信已寄出至 {recipient}，請查收。')
-    except Exception as e:
-        return jsonify(ok=False, configured=True, error=f'SMTP 寄信失敗：{e}')
+    msg = MIMEMultipart()
+    msg['From'] = f'潮旅國際旅行社 <{sender}>'
+    msg['To'] = recipient
+    msg['Subject'] = '【測試】潮旅預購通知信設定測試'
+    msg.attach(MIMEText('這是一封測試信。收到代表預購通知 email 設定正常，'
+                        '日後有新預購訂單會自動寄到此信箱。', 'plain', 'utf-8'))
+    ok, detail = _smtp_send(sender, password, recipient, msg)
+    if ok:
+        return jsonify(ok=True, configured=True, sent_to=recipient, via=detail,
+                       message=f'測試信已透過 {detail} 寄出至 {recipient}，請查收。')
+    return jsonify(ok=False, configured=True, error=f'各埠皆寄信失敗：{detail}')
 
 
 # ─── 通用預購系統（音樂節等；每個行程一筆 preorder_products）───
