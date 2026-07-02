@@ -168,6 +168,14 @@ def init_db():
             created_at      TIMESTAMP DEFAULT NOW()
         )
     """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS neihai_preorder_logs (
+            id           SERIAL PRIMARY KEY,
+            preorder_id  INT NOT NULL REFERENCES neihai_preorders(id) ON DELETE CASCADE,
+            summary      TEXT NOT NULL,
+            changed_at   TIMESTAMP DEFAULT NOW()
+        )
+    """)
 
     # 通用預購系統資料表（音樂節等新行程；內海仍走既有 neihai_* 表）
     cur.execute("""
@@ -1146,12 +1154,24 @@ def admin_neihai_preorders():
                 if r.get("created_at"):
                     r["created_at"] = str(r["created_at"])
                 passengers_by_order[r["preorder_id"]].append(r)
+        logs_by_order = {i: [] for i in ids}
+        if ids:
+            cur.execute("""
+                SELECT preorder_id, summary, changed_at FROM neihai_preorder_logs
+                WHERE preorder_id = ANY(%s)
+                ORDER BY preorder_id, changed_at DESC
+            """, (ids,))
+            for r in cur.fetchall():
+                r = dict(r)
+                logs_by_order[r["preorder_id"]].append(
+                    {"summary": r["summary"], "changed_at": str(r["changed_at"])})
         cur.close(); conn.close()
 
         for o in orders:
             for k in ("sailing_date", "created_at", "updated_at"):
                 if o.get(k): o[k] = str(o[k])
             o["passengers"] = passengers_by_order.get(o["id"], [])
+            o["logs"] = logs_by_order.get(o["id"], [])
 
         availability = _neihai_month_availability(start, end)
         return jsonify(ok=True, month=start.strftime("%Y-%m"), orders=orders, sailings=availability)
@@ -1161,26 +1181,128 @@ def admin_neihai_preorders():
         return jsonify(ok=False, error=str(e)), 500
 
 
+NEIHAI_STATUS_LABELS = {
+    "pending_departure": "待成團", "confirmed_departure": "已達發船門檻",
+    "confirmed": "人工確認", "cancelled": "已取消",
+}
+
+
 @app.route('/api/admin/neihai/preorders/<int:order_id>', methods=['PATCH'])
 def admin_update_neihai_preorder(order_id):
+    """更新內海預購訂單：可改狀態、聯絡/業者/備註、以及各乘客資料；
+    所有實際變更會寫入 neihai_preorder_logs 留下修改紀錄。"""
     if not is_admin():
         return jsonify(ok=False, error='未授權'), 401
     data = request.get_json(force=True, silent=True) or {}
-    status = (data.get("status") or "").strip()
-    if status not in NEIHAI_VALID_STATUSES:
-        return jsonify(ok=False, error="狀態不正確"), 400
     try:
         conn = get_db(); cur = conn.cursor()
-        cur.execute("""
-            UPDATE neihai_preorders
-            SET status=%s, updated_at=NOW()
-            WHERE id=%s
-        """, (status, order_id))
+        cur.execute("SELECT * FROM neihai_preorders WHERE id=%s", (order_id,))
+        order = cur.fetchone()
+        if not order:
+            cur.close(); conn.close()
+            return jsonify(ok=False, error="找不到訂單"), 404
+        order = dict(order)
+
+        changes = []
+        set_parts, params = [], []
+
+        if "status" in data:
+            new_status = (data.get("status") or "").strip()
+            if new_status not in NEIHAI_VALID_STATUSES:
+                cur.close(); conn.close()
+                return jsonify(ok=False, error="狀態不正確"), 400
+            if new_status != order["status"]:
+                changes.append(f"狀態：{NEIHAI_STATUS_LABELS.get(order['status'], order['status'])}"
+                               f" → {NEIHAI_STATUS_LABELS.get(new_status, new_status)}")
+                set_parts.append("status=%s"); params.append(new_status)
+
+        for field, label in (("agency_name", "業者"), ("contact_name", "主要聯絡姓名"),
+                             ("contact_phone", "聯絡電話"), ("notes", "備註")):
+            if field in data:
+                new_val = (data.get(field) or "").strip()
+                old_val = order.get(field) or ""
+                if field in ("contact_name", "contact_phone") and not new_val:
+                    cur.close(); conn.close()
+                    return jsonify(ok=False, error=f"{label}不可空白"), 400
+                if new_val != old_val:
+                    changes.append(f"{label}：{old_val or '（空）'} → {new_val or '（空）'}")
+                    set_parts.append(f"{field}=%s"); params.append(new_val)
+
+        if set_parts:
+            set_parts.append("updated_at=NOW()")
+            cur.execute(f"UPDATE neihai_preorders SET {', '.join(set_parts)} WHERE id=%s",
+                        tuple(params) + (order_id,))
+
+        passengers = data.get("passengers")
+        if isinstance(passengers, list):
+            cur.execute("SELECT * FROM neihai_passengers WHERE preorder_id=%s", (order_id,))
+            existing = {r["id"]: dict(r) for r in cur.fetchall()}
+            for i, p in enumerate(passengers, 1):
+                cur_p = existing.get(p.get("id"))
+                if not cur_p:
+                    continue
+                pset, pparams = [], []
+                for f, label in (("name", "姓名"), ("national_id", "身分證字號"),
+                                 ("birth_date", "生日"), ("phone", "電話")):
+                    if f not in p:
+                        continue
+                    new_v = str(p.get(f) or "").strip()
+                    if f == "national_id":
+                        new_v = new_v.upper()
+                    if f == "birth_date":
+                        try:
+                            new_v = str(datetime.strptime(new_v, "%Y-%m-%d").date())
+                        except ValueError:
+                            cur.close(); conn.close()
+                            return jsonify(ok=False, error=f"第 {i} 位乘客生日格式需為 YYYY-MM-DD"), 400
+                    elif not new_v:
+                        cur.close(); conn.close()
+                        return jsonify(ok=False, error=f"第 {i} 位乘客{label}不可空白"), 400
+                    old_v = str(cur_p.get(f) or "")
+                    if new_v != old_v:
+                        changes.append(f"乘客「{cur_p['name']}」{label}：{old_v} → {new_v}")
+                        pset.append(f"{f}=%s"); pparams.append(new_v)
+                if pset:
+                    cur.execute(f"UPDATE neihai_passengers SET {', '.join(pset)} WHERE id=%s",
+                                tuple(pparams) + (cur_p["id"],))
+
+        if changes:
+            cur.execute("INSERT INTO neihai_preorder_logs (preorder_id, summary) VALUES (%s,%s)",
+                        (order_id, "；".join(changes)))
         conn.commit(); cur.close(); conn.close()
-        return jsonify(ok=True)
+        return jsonify(ok=True, changed=len(changes),
+                       summary=("；".join(changes) if changes else "無變更"))
     except Exception as e:
         return jsonify(ok=False, error=str(e)), 500
 
+
+
+@app.route('/api/admin/email-test', methods=['GET', 'POST'])
+def admin_email_test():
+    """診斷用：實際嘗試寄一封測試信，回傳成功或真實 SMTP 錯誤訊息。"""
+    if not is_admin():
+        return jsonify(ok=False, error='未授權'), 401
+    sender = os.environ.get('EMAIL_USER', ''); password = os.environ.get('EMAIL_PASS', '')
+    smtp_host = os.environ.get('SMTP_HOST', 'smtpout.secureserver.net')
+    smtp_port = int(os.environ.get('SMTP_PORT', '465'))
+    recipient = os.environ.get('PREORDER_NOTIFY_EMAIL', 'dodoken1002@phbay.net')
+    if not sender or not password:
+        return jsonify(ok=False, configured=False,
+                       error='Railway 未設定 EMAIL_USER / EMAIL_PASS，所以不會寄任何通知信。')
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = f'潮旅國際旅行社 <{sender}>'
+        msg['To'] = recipient
+        msg['Subject'] = '【測試】潮旅預購通知信設定測試'
+        msg.attach(MIMEText('這是一封測試信。收到代表預購通知 email 設定正常，'
+                            '日後有新預購訂單會自動寄到此信箱。', 'plain', 'utf-8'))
+        with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as server:
+            server.login(sender, password)
+            server.sendmail(sender, recipient, msg.as_string())
+        return jsonify(ok=True, configured=True, sent_to=recipient,
+                       message=f'測試信已寄出至 {recipient}，請查收。')
+    except Exception as e:
+        return jsonify(ok=False, configured=True, error=f'SMTP 寄信失敗：{e}')
 
 
 # ─── 通用預購系統（音樂節等；每個行程一筆 preorder_products）───
