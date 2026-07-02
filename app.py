@@ -14,6 +14,7 @@ DELETE /api/admin/tours/<id>→ 刪除行程
 import os
 import re
 import json
+import base64
 from datetime import date, datetime, timedelta
 import smtplib
 from email.mime.text import MIMEText
@@ -666,6 +667,47 @@ def admin_delete_tour(tour_id):
 
 
 # ─── 寄送諮詢通知信 ────────────────────────────────────────
+def _gmail_api_send(sender, recipient, msg):
+    """透過 Gmail API（HTTPS）寄信，繞過 Railway 封鎖的 SMTP 埠。
+    需環境變數 GMAIL_SERVICE_ACCOUNT_JSON（服務帳號金鑰 JSON 全文），且該服務帳號已於
+    Google Workspace 後台完成「網域範圍委派」授權 gmail.send。sender 為被代寄的信箱。
+    回傳 (ok: bool, detail: str)。"""
+    raw_json = os.environ.get('GMAIL_SERVICE_ACCOUNT_JSON', '').strip()
+    if not raw_json:
+        return False, 'GMAIL_SERVICE_ACCOUNT_JSON 未設定'
+    try:
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+        info = json.loads(raw_json)
+        creds = service_account.Credentials.from_service_account_info(
+            info, scopes=['https://www.googleapis.com/auth/gmail.send'], subject=sender)
+        gmail = build('gmail', 'v1', credentials=creds, cache_discovery=False)
+        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+        gmail.users().messages().send(userId='me', body={'raw': raw}).execute()
+        return True, 'gmail-api'
+    except Exception as e:
+        return False, f'Gmail API 失敗：{e}'
+
+
+def _deliver(sender, recipient, msg):
+    """統一寄信入口：優先 Gmail API（HTTPS，繞過 SMTP 封鎖），否則退回 SMTP 多埠。
+    回傳 (ok: bool, detail: str)。"""
+    if os.environ.get('GMAIL_SERVICE_ACCOUNT_JSON', '').strip():
+        ok, detail = _gmail_api_send(sender, recipient, msg)
+        if ok:
+            return True, detail
+        gmail_err = detail
+    else:
+        gmail_err = None
+    password = os.environ.get('EMAIL_PASS', '')
+    if password:
+        ok, detail = _smtp_send(sender, password, recipient, msg)
+        if ok:
+            return True, detail
+        return False, (f'Gmail API →{gmail_err}；SMTP →{detail}' if gmail_err else detail)
+    return False, (gmail_err or '未設定寄信方式（GMAIL_SERVICE_ACCOUNT_JSON 或 EMAIL_PASS）')
+
+
 def _smtp_send(sender, password, recipient, msg):
     """寄信：依序嘗試埠。優先用 SMTP_PORT（若有設），再退到 465(SSL)、587(STARTTLS)。
     某些主機（如 Railway 對 GoDaddy 465）會逾時，改用 587 STARTTLS 通常可通。
@@ -698,10 +740,9 @@ def _smtp_send(sender, password, recipient, msg):
 
 def send_contact_email(data):
     sender    = os.environ.get('EMAIL_USER', '')
-    password  = os.environ.get('EMAIL_PASS', '')
     recipient = 'dodoken1002@phbay.net'
-    if not sender or not password:
-        print('[EMAIL] 未設定 EMAIL_USER / EMAIL_PASS，跳過寄信')
+    if not sender or not (os.environ.get('GMAIL_SERVICE_ACCOUNT_JSON', '').strip() or os.environ.get('EMAIL_PASS', '')):
+        print('[EMAIL] 未設定寄信方式（EMAIL_USER + GMAIL_SERVICE_ACCOUNT_JSON 或 EMAIL_PASS），跳過寄信')
         return
 
     body = f"""潮旅國際旅行社 — 新諮詢通知
@@ -727,7 +768,7 @@ def send_contact_email(data):
     msg['Subject'] = f'【新諮詢】{data.get("name", "")} — {data.get("travel_date", "")} ~ {data.get("travel_date_end", "")}'
     msg.attach(MIMEText(body, 'plain', 'utf-8'))
 
-    ok, detail = _smtp_send(sender, password, recipient, msg)
+    ok, detail = _deliver(sender, recipient, msg)
     if ok:
         print(f'[EMAIL] 通知信已寄出（{detail}）→ {recipient}')
     else:
@@ -739,10 +780,9 @@ def send_preorder_email(info):
     沿用諮詢信的 SMTP 設定；寄信失敗不影響訂單建立。
     為保護個資，信中不含完整身分證字號，完整資料請至後台 /admin 檢視。"""
     sender    = os.environ.get('EMAIL_USER', '')
-    password  = os.environ.get('EMAIL_PASS', '')
     recipient = os.environ.get('PREORDER_NOTIFY_EMAIL', 'dodoken1002@phbay.net')
-    if not sender or not password:
-        print('[EMAIL] 未設定 EMAIL_USER / EMAIL_PASS，跳過預購通知')
+    if not sender or not (os.environ.get('GMAIL_SERVICE_ACCOUNT_JSON', '').strip() or os.environ.get('EMAIL_PASS', '')):
+        print('[EMAIL] 未設定寄信方式（EMAIL_USER + GMAIL_SERVICE_ACCOUNT_JSON 或 EMAIL_PASS），跳過預購通知')
         return
 
     status_map = {'confirmed_departure': '已達成行門檻（可成行）', 'pending_departure': '待成團',
@@ -772,7 +812,7 @@ def send_preorder_email(info):
     msg['To']      = recipient
     msg['Subject'] = f'【新預購】{product}｜{when}｜{info.get("passenger_count", "")}人｜{info.get("booking_ref", "")}'
     msg.attach(MIMEText(body, 'plain', 'utf-8'))
-    ok, detail = _smtp_send(sender, password, recipient, msg)
+    ok, detail = _deliver(sender, recipient, msg)
     if ok:
         print(f'[EMAIL] 預購通知信已寄出（{detail}）→ {recipient}')
     else:
@@ -1304,18 +1344,20 @@ def admin_email_test():
     """診斷用：實際嘗試寄一封測試信，回傳成功或真實 SMTP 錯誤訊息。"""
     if not is_admin():
         return jsonify(ok=False, error='未授權'), 401
-    sender = os.environ.get('EMAIL_USER', ''); password = os.environ.get('EMAIL_PASS', '')
+    sender = os.environ.get('EMAIL_USER', '')
     recipient = os.environ.get('PREORDER_NOTIFY_EMAIL', 'dodoken1002@phbay.net')
-    if not sender or not password:
+    has_gmail = bool(os.environ.get('GMAIL_SERVICE_ACCOUNT_JSON', '').strip())
+    has_smtp = bool(os.environ.get('EMAIL_PASS', ''))
+    if not sender or not (has_gmail or has_smtp):
         return jsonify(ok=False, configured=False,
-                       error='Railway 未設定 EMAIL_USER / EMAIL_PASS，所以不會寄任何通知信。')
+                       error='未設定寄信方式：需 EMAIL_USER，且至少一種管道 GMAIL_SERVICE_ACCOUNT_JSON（建議，走 HTTPS）或 EMAIL_PASS（SMTP，Railway 會擋）。')
     msg = MIMEMultipart()
     msg['From'] = f'潮旅國際旅行社 <{sender}>'
     msg['To'] = recipient
     msg['Subject'] = '【測試】潮旅預購通知信設定測試'
     msg.attach(MIMEText('這是一封測試信。收到代表預購通知 email 設定正常，'
                         '日後有新預購訂單會自動寄到此信箱。', 'plain', 'utf-8'))
-    ok, detail = _smtp_send(sender, password, recipient, msg)
+    ok, detail = _deliver(sender, recipient, msg)
     if ok:
         return jsonify(ok=True, configured=True, sent_to=recipient, via=detail,
                        message=f'測試信已透過 {detail} 寄出至 {recipient}，請查收。')
