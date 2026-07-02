@@ -775,12 +775,17 @@ def _fetch_cwa_tides(location):
     import urllib.request
     import urllib.parse
     import time as _time
+    import ssl
     cached = _tide_cache.get(location)
     if cached and _time.time() - cached['at'] < TIDE_CACHE_TTL:
         return cached['data']
     qs = urllib.parse.urlencode({'Authorization': CWA_API_KEY, 'LocationName': location})
     url = f'https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-A0021-001?{qs}'
-    with urllib.request.urlopen(url, timeout=15) as resp:
+    # 氣象署部分節點的憑證缺 SKI 欄位，Python 3.13 預設的嚴格檢查會拒絕；
+    # 保留完整鏈驗證與主機名檢查，僅關閉 VERIFY_X509_STRICT。
+    ctx = ssl.create_default_context()
+    ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
+    with urllib.request.urlopen(url, timeout=15, context=ctx) as resp:
         raw = json.load(resp)
     if not raw.get('success') or not raw.get('records', {}).get('TideForecasts'):
         raise RuntimeError('氣象署回應異常')

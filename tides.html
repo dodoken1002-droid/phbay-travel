@@ -48,33 +48,33 @@
 </head>
 <body>
   <div class="top-banner"><div class="banner-static"><span>潮旅國際旅行社</span><span class="banner-sep">｜</span><span>2026 澎湖追風音樂燈光節 官方合作旅行社</span><span class="banner-sep">｜</span><span>電話：06-9271288</span></div></div>
-  <nav class="navbar" id="navbar"><div class="nav-container"><a href="/" class="nav-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a><button class="nav-toggle" id="nav-toggle" aria-label="選單"><span></span><span></span><span></span></button><ul class="nav-links" id="nav-links"><li><a href="/">首頁</a></li><li><a href="/#tours">行程介紹</a></li><li class="nav-item has-submenu"><a href="/neihai-preorder.html">預購行程 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/neihai-preorder.html">內海行程</a></li><li><a href="/preorder/festival">追風音樂節</a></li></ul></li><li class="nav-item has-submenu"><a href="/blog">旅遊大小事 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/tides">潮汐查詢系統</a></li><li><a href="/blog">旅遊文章分享</a></li><li><a href="/reviews">旅客評價</a></li></ul></li><li class="nav-item has-submenu"><a href="/#about">關於我們 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/#contact">聯絡資訊</a></li></ul></li></ul></div></nav>
+  <nav class="navbar" id="navbar"><div class="nav-container"><a href="/" class="nav-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a><button class="nav-toggle" id="nav-toggle" aria-label="選單"><span></span><span></span><span></span></button><ul class="nav-links" id="nav-links"><li><a href="/" data-i18n="nav.home">首頁</a></li><li><a href="/#tours" data-i18n="nav.tours">行程介紹</a></li><li class="nav-item has-submenu"><a href="/neihai-preorder.html" data-i18n="nav.preorder">預購行程 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/neihai-preorder.html" data-i18n="nav.neihai">內海行程</a></li><li><a href="/preorder/festival" data-i18n="nav.festival">追風音樂節</a></li></ul></li><li class="nav-item has-submenu"><a href="/blog" data-i18n="nav.travel">旅遊大小事 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/tides" data-i18n="nav.tides">潮汐查詢系統</a></li><li><a href="/blog" data-i18n="nav.articles">旅遊文章分享</a></li><li><a href="/reviews" data-i18n="nav.reviews">旅客評價</a></li></ul></li><li class="nav-item has-submenu"><a href="/#about" data-i18n="nav.about">關於我們 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/#contact" data-i18n="nav.contactInfo">聯絡資訊</a></li></ul></li><li class="lang-switch"><button class="lang-btn" id="lang-btn" aria-label="Language">🌐 <span id="lang-current">中文</span> <i class="fas fa-chevron-down" style="font-size:.7em"></i></button><ul class="lang-menu" id="lang-menu"><li><button data-lang="zh-tw">繁體中文</button></li><li><button data-lang="en">English</button></li><li><button data-lang="ja">日本語</button></li><li><button data-lang="ko">한국어</button></li><li><button data-lang="zh-cn">简体中文</button></li></ul></li></ul></div></nav>
 
   <main>
     <div class="tide-wrap">
-      <h1><i class="fas fa-water" style="color:var(--blue-main)"></i> 澎湖潮汐預報查詢</h1>
-      <p class="tide-sub" style="text-align:center">規劃<strong>奎壁山摩西分海、潮間帶體驗</strong>前，先看滿潮／乾潮時間。
+      <h1><i class="fas fa-water" style="color:var(--blue-main)"></i> <span data-i18n="tide.title">澎湖潮汐預報查詢</span></h1>
+      <p class="tide-sub" style="text-align:center" data-i18n-html="tide.sub">規劃<strong>奎壁山摩西分海、潮間帶體驗</strong>前，先看滿潮／乾潮時間。
         資料來源：中央氣象署（僅供行程規劃參考，實際請以現場公告與管理單位指示為準）。</p>
 
       <div class="tide-controls">
-        <label for="tide-loc">地點</label>
+        <label for="tide-loc" data-i18n="tide.loc">地點</label>
         <select id="tide-loc">
-          <option value="澎湖縣馬公市">馬公市</option>
-          <option value="澎湖縣湖西鄉" selected>湖西鄉（奎壁山）</option>
-          <option value="澎湖縣白沙鄉">白沙鄉</option>
-          <option value="澎湖縣西嶼鄉">西嶼鄉</option>
-          <option value="澎湖縣望安鄉">望安鄉</option>
-          <option value="澎湖縣七美鄉">七美鄉</option>
+          <option value="澎湖縣馬公市" data-i18n="tide.loc.magong">馬公市</option>
+          <option value="澎湖縣湖西鄉" selected data-i18n="tide.loc.huxi">湖西鄉（奎壁山）</option>
+          <option value="澎湖縣白沙鄉" data-i18n="tide.loc.baisha">白沙鄉</option>
+          <option value="澎湖縣西嶼鄉" data-i18n="tide.loc.xiyu">西嶼鄉</option>
+          <option value="澎湖縣望安鄉" data-i18n="tide.loc.wangan">望安鄉</option>
+          <option value="澎湖縣七美鄉" data-i18n="tide.loc.qimei">七美鄉</option>
         </select>
-        <label for="tide-date">選擇日期</label>
+        <label for="tide-date" data-i18n="tide.date">選擇日期</label>
         <input type="date" id="tide-date" />
       </div>
 
       <div class="tide-chart-box">
-        <div class="tide-chart-title">潮汐高度變化圖表</div>
+        <div class="tide-chart-title" data-i18n="tide.chartTitle">潮汐高度變化圖表</div>
         <canvas id="tide-chart" height="150"></canvas>
       </div>
-      <p class="tide-note">
+      <p class="tide-note" data-i18n-html="tide.note">
         ・潮高基準：台灣高程基準（TWVD2001），單位公分；正值高於平均海平面。<br>
         ・<span style="color:#c99700;font-weight:700">○ 滿潮</span>／<span style="color:#4e9a2e;font-weight:700">○ 乾潮</span>；曲線為兩點間之估計走勢，非實測連續值。<br>
         ・<span style="background:rgba(126,217,140,.35);padding:1px 8px;border-radius:4px">綠色區塊</span>為<strong>乾潮前後約 2 小時</strong>之估計觀察時段，<strong>非官方步道開放公告</strong>；奎壁山實際開放請以澎湖縣政府與現場管制為準。<br>
@@ -84,9 +84,9 @@
       <div id="tide-days" class="tide-days"><p class="tide-loading">載入中…</p></div>
 
       <div class="blog-cta" style="margin-top:36px;background:var(--blue-pale);border-radius:16px;padding:28px;text-align:center">
-        <h3 style="color:var(--blue-dark);margin-bottom:10px">想搭配潮汐玩奎壁山、潮間帶？</h3>
-        <a href="/#contact" class="btn btn-primary"><i class="fas fa-comment-dots"></i> 線上諮詢</a>
-        <a href="/blog" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-book-open"></i> 看玩法攻略</a>
+        <h3 style="color:var(--blue-dark);margin-bottom:10px" data-i18n="tide.ctaTitle">想搭配潮汐玩奎壁山、潮間帶？</h3>
+        <a href="/#contact" class="btn btn-primary"><i class="fas fa-comment-dots"></i> <span data-i18n="tide.ctaConsult">線上諮詢</span></a>
+        <a href="/blog" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-book-open"></i> <span data-i18n="tide.ctaBlog">看玩法攻略</span></a>
       </div>
     </div>
   </main>
@@ -94,10 +94,38 @@
   <footer class="footer"><div class="container"><div class="footer-bottom"><p>© 2026 潮旅國際旅行社 All Rights Reserved.｜<a href="/" style="color:inherit">官網</a>｜<a href="/blog" style="color:inherit">部落格</a>｜<a href="/reviews" style="color:inherit">旅客評價</a>｜潮汐資料來源：中央氣象署</p></div></div></footer>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="/i18n.js"></script>
   <script>
   (function(){
     var t=document.getElementById('nav-toggle'),l=document.getElementById('nav-links');
     if(t)t.addEventListener('click',function(){l.classList.toggle('open')});
+
+    // 圖表與卡片的動態文字翻譯（靜態文字走 i18n.js data-i18n）
+    var TIDE_L = {
+      'zh-tw':{high:'滿潮',low:'乾潮',now:'現在',obs:'乾潮觀察時段（估）',y:'潮汐高度（cm）',
+               wd:['日','一','二','三','四','五','六'],
+               range:{'大':'大潮','中':'中潮','小':'小潮','大潮':'大潮','中潮':'中潮','小潮':'小潮'},
+               loading:'載入中…',fail:'暫時無法取得潮汐資料，請稍後再試。'},
+      'en':{high:'High tide',low:'Low tide',now:'Now',obs:'Low-tide window (est.)',y:'Tide height (cm)',
+            wd:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
+            range:{'大':'Spring tide','中':'Mid tide','小':'Neap tide','大潮':'Spring tide','中潮':'Mid tide','小潮':'Neap tide'},
+            loading:'Loading…',fail:'Tide data is temporarily unavailable. Please try again later.'},
+      'ja':{high:'満潮',low:'干潮',now:'現在',obs:'干潮観察時間帯（推定）',y:'潮位（cm）',
+            wd:['日','月','火','水','木','金','土'],
+            range:{'大':'大潮','中':'中潮','小':'小潮','大潮':'大潮','中潮':'中潮','小潮':'小潮'},
+            loading:'読み込み中…',fail:'潮汐データを取得できません。しばらくしてからお試しください。'},
+      'ko':{high:'만조',low:'간조',now:'현재',obs:'간조 관찰 시간대(추정)',y:'조위 (cm)',
+            wd:['일','월','화','수','목','금','토'],
+            range:{'大':'사리','中':'중조','小':'조금','大潮':'사리','中潮':'중조','小潮':'조금'},
+            loading:'로딩 중…',fail:'조석 데이터를 불러올 수 없습니다. 잠시 후 다시 시도해 주세요.'},
+      'zh-cn':{high:'满潮',low:'干潮',now:'现在',obs:'干潮观察时段（估）',y:'潮汐高度（cm）',
+               wd:['日','一','二','三','四','五','六'],
+               range:{'大':'大潮','中':'中潮','小':'小潮','大潮':'大潮','中潮':'中潮','小潮':'小潮'},
+               loading:'加载中…',fail:'暂时无法获取潮汐数据，请稍后再试。'}
+    };
+    function TL(){ return TIDE_L[window.__lang||'zh-tw']||TIDE_L['zh-tw']; }
+    function typeName(t){ return t==='滿潮'?TL().high:(t==='乾潮'?TL().low:t); }
+    function rangeName(r){ return TL().range[r]||r||''; }
 
     var chart=null;
     var locSel=document.getElementById('tide-loc');
@@ -138,7 +166,7 @@
         ctx.fillStyle='rgba(126,217,140,.35)';
         ctx.fillRect(x0,area.top,x1-x0,area.bottom-area.top);
         ctx.fillStyle='#e53e3e';ctx.font='bold 12px sans-serif';ctx.textAlign='center';
-        ctx.fillText('乾潮觀察時段（估）',(x0+x1)/2,area.top-20);
+        ctx.fillText(TL().obs,(x0+x1)/2,area.top-20);
         ctx.fillText(fmtHM(b.start)+'-'+fmtHM(b.end),(x0+x1)/2,area.top-6);
         ctx.restore();
       });
@@ -153,7 +181,7 @@
         ctx.save();ctx.font='bold 12px sans-serif';ctx.textAlign='center';
         ctx.fillStyle=p.type==='滿潮'?'#8a6d00':'#3e7a24';
         var above=p.type==='滿潮';
-        ctx.fillText(p.type,x,above?y-14:y-14);
+        ctx.fillText(typeName(p.type),x,above?y-14:y-14);
         ctx.font='11px sans-serif';ctx.fillStyle='#666';
         ctx.fillText(fmtHM(p.ts)+'｜'+Math.round(p.h)+'cm',x,above?y-1+(-13+13):y+22);
         ctx.restore();
@@ -167,7 +195,7 @@
       ctx.save();ctx.strokeStyle='#e53e3e';ctx.setLineDash([5,4]);ctx.lineWidth=1.5;
       ctx.beginPath();ctx.moveTo(x,c.chartArea.top);ctx.lineTo(x,c.chartArea.bottom);ctx.stroke();
       ctx.fillStyle='#e53e3e';ctx.font='bold 11px sans-serif';ctx.textAlign='center';
-      ctx.fillText('現在',x,c.chartArea.bottom+14);ctx.restore();
+      ctx.fillText(TL().now,x,c.chartArea.bottom+14);ctx.restore();
     }};
 
     function gradientStroke(context){
@@ -210,7 +238,7 @@
             x:{type:'linear',min:start,max:end,
                ticks:{stepSize:2*HOUR,callback:function(v){var d=new Date(v);return d.getHours()+':00'},font:{size:11},maxRotation:0},
                grid:{color:'#eef2f5'}},
-            y:{title:{display:true,text:'潮汐高度（cm）'},grid:{color:function(ctx){return ctx.tick.value===0?'#9db3c2':'#eef2f5'},lineWidth:function(ctx){return ctx.tick.value===0?1.5:1}}}
+            y:{title:{display:true,text:TL().y},grid:{color:function(ctx){return ctx.tick.value===0?'#9db3c2':'#eef2f5'},lineWidth:function(ctx){return ctx.tick.value===0?1.5:1}}}
           },
           plugins:{legend:{display:false},
             tooltip:{callbacks:{
@@ -237,10 +265,10 @@
           var cls=t.type==='滿潮'?'hi':'lo';
           var mark=t.type==='滿潮'?'●':'○';
           var h=parseFloat(t.height_cm);
-          return '<tr><td class="'+cls+'">'+mark+' '+esc(t.type)+'</td><td>'+fmtHM(new Date(t.time).getTime())+'</td><td>'+(isNaN(h)?'-':Math.round(h)+' cm')+'</td></tr>';
+          return '<tr><td class="'+cls+'">'+mark+' '+esc(typeName(t.type))+'</td><td>'+fmtHM(new Date(t.time).getTime())+'</td><td>'+(isNaN(h)?'-':Math.round(h)+' cm')+'</td></tr>';
         }).join('');
-        var w=['日','一','二','三','四','五','六'][new Date(d.date+'T00:00:00').getDay()];
-        return '<div class="tide-day" data-date="'+esc(d.date)+'"><h3>'+esc(d.date)+'（'+w+'）<span class="range-tag">'+esc(d.range||'')+'</span></h3><table>'+rows+'</table></div>';
+        var w=TL().wd[new Date(d.date+'T00:00:00').getDay()];
+        return '<div class="tide-day" data-date="'+esc(d.date)+'"><h3>'+esc(d.date)+'（'+w+'）<span class="range-tag">'+esc(rangeName(d.range))+'</span></h3><table>'+rows+'</table></div>';
       }).join('');
       daysBox.querySelectorAll('.tide-day').forEach(function(el){
         el.addEventListener('click',function(){
@@ -252,7 +280,7 @@
     }
 
     function load(){
-      daysBox.innerHTML='<p class="tide-loading">載入中…</p>';
+      daysBox.innerHTML='<p class="tide-loading">'+TL().loading+'</p>';
       fetch('/api/tides?location='+encodeURIComponent(locSel.value))
         .then(function(r){return r.json()})
         .then(function(j){
@@ -272,8 +300,14 @@
           renderCards();
           renderDay(dateInput.value);
         })
-        .catch(function(){daysBox.innerHTML='<p class="tide-loading">暫時無法取得潮汐資料，請稍後再試。</p>'});
+        .catch(function(){daysBox.innerHTML='<p class="tide-loading">'+TL().fail+'</p>'});
     }
+    // 切換語言時，重新渲染卡片與圖表的動態文字
+    window.onLangChange=function(){
+      if(!state.days.length)return;
+      renderCards();
+      if(dateInput.value)renderDay(dateInput.value);
+    };
     locSel.addEventListener('change',load);
     dateInput.addEventListener('change',function(){if(dateInput.value)renderDay(dateInput.value)});
     load();

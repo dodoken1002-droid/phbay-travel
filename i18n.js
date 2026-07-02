@@ -49,7 +49,13 @@ const DICT = {
     'form.successLine2':'You can also add us on LINE: <strong>@phbay2018</strong> for a faster reply.',
     'banner.consult':'Enquire Now',
     'footer.quickLinks':'Quick Links', 'footer.contactInfo':'Contact Info',
-    'footer.owner':'Owner: Tang Wei-Ju', 'footer.hours':'Mon–Fri 08:30–17:30'
+    'footer.owner':'Owner: Tang Wei-Ju', 'footer.hours':'Mon–Fri 08:30–17:30',
+    'tide.title':'Penghu Tide Forecast',
+    'tide.sub':'Check high/low tide times before planning your <strong>Kuibishan "Moses Parting of the Sea"</strong> or intertidal-zone trip. Data source: Central Weather Administration (for planning reference only — always follow on-site announcements).',
+    'tide.loc':'Location', 'tide.date':'Select date', 'tide.chartTitle':'Tide Height Chart',
+    'tide.note':'・Datum: Taiwan Vertical Datum (TWVD2001), in centimeters; positive = above mean sea level.<br>・<span style="color:#c99700;font-weight:700">○ High tide</span> / <span style="color:#4e9a2e;font-weight:700">○ Low tide</span>; the curve is an estimated trend between points, not continuous measurements.<br>・<span style="background:rgba(126,217,140,.35);padding:1px 8px;border-radius:4px">Green zones</span> are estimated viewing windows of <strong>about 2 hours around low tide</strong> — <strong>NOT official walkway opening times</strong>; follow Penghu County Government and on-site control for Kuibishan access.<br>・Want tides built into your itinerary? <a href="/#contact" style="color:var(--blue-main)">Contact Phbay Travel</a> — local guides will find the best timing for you.',
+    'tide.ctaTitle':'Want to plan around the tides at Kuibishan?', 'tide.ctaConsult':'Contact Us', 'tide.ctaBlog':'Travel Guides',
+    'tide.loc.magong':'Magong City', 'tide.loc.huxi':'Huxi (Kuibishan)', 'tide.loc.baisha':'Baisha', 'tide.loc.xiyu':'Xiyu', 'tide.loc.wangan':'Wang’an', 'tide.loc.qimei':'Qimei'
   },
 
   /* ─────────── 日本語 ─────────── */
@@ -93,7 +99,13 @@ const DICT = {
     'form.successLine2':'LINE <strong>@phbay2018</strong> を追加いただくとより早くご返信できます。',
     'banner.consult':'今すぐ相談',
     'footer.quickLinks':'クイックリンク', 'footer.contactInfo':'連絡先',
-    'footer.owner':'代表者：唐瑋汝', 'footer.hours':'月〜金 08:30〜17:30'
+    'footer.owner':'代表者：唐瑋汝', 'footer.hours':'月〜金 08:30〜17:30',
+    'tide.title':'澎湖潮汐予報',
+    'tide.sub':'<strong>奎壁山「モーゼの割れた海」や潮間帯体験</strong>の前に、満潮・干潮の時間をチェック。データ出典：台湾中央気象署（旅行計画の参考用。実際は現地の案内に従ってください）。',
+    'tide.loc':'エリア', 'tide.date':'日付を選択', 'tide.chartTitle':'潮位変化グラフ',
+    'tide.note':'・基準面：台湾高程基準（TWVD2001）、単位はセンチ；プラスは平均海面より上。<br>・<span style="color:#c99700;font-weight:700">○ 満潮</span>／<span style="color:#4e9a2e;font-weight:700">○ 干潮</span>；曲線は2点間の推定であり、実測の連続値ではありません。<br>・<span style="background:rgba(126,217,140,.35);padding:1px 8px;border-radius:4px">緑のゾーン</span>は<strong>干潮前後約2時間</strong>の推定観察時間帯で、<strong>公式の歩道開放時間ではありません</strong>。奎壁山の開放は澎湖県政府と現地の管理に従ってください。<br>・潮汐に合わせた旅程は<a href="/#contact" style="color:var(--blue-main)">潮旅へご相談</a>ください。地元ガイドがベストなタイミングをご提案します。',
+    'tide.ctaTitle':'潮汐に合わせて奎壁山・潮間帯を楽しみたい？', 'tide.ctaConsult':'お問い合わせ', 'tide.ctaBlog':'旅行ガイド',
+    'tide.loc.magong':'馬公市', 'tide.loc.huxi':'湖西郷（奎壁山）', 'tide.loc.baisha':'白沙郷', 'tide.loc.xiyu':'西嶼郷', 'tide.loc.wangan':'望安郷', 'tide.loc.qimei':'七美郷'
   },
 
   /* ─────────── 한국어 ─────────── */
@@ -137,7 +149,13 @@ const DICT = {
     'form.successLine2':'LINE <strong>@phbay2018</strong>을 추가하시면 더 빠르게 답변드립니다.',
     'banner.consult':'지금 문의',
     'footer.quickLinks':'바로가기', 'footer.contactInfo':'연락처',
-    'footer.owner':'대표: 唐瑋汝', 'footer.hours':'월~금 08:30~17:30'
+    'footer.owner':'대표: 唐瑋汝', 'footer.hours':'월~금 08:30~17:30',
+    'tide.title':'펑후 조석 예보',
+    'tide.sub':'<strong>쿠이비산 ‘모세의 기적’, 조간대 체험</strong> 전에 만조·간조 시간을 확인하세요. 자료 출처: 대만 중앙기상서 (여행 계획 참고용이며, 실제로는 현장 안내를 따르세요).',
+    'tide.loc':'지역', 'tide.date':'날짜 선택', 'tide.chartTitle':'조위 변화 차트',
+    'tide.note':'・기준면: 대만 수직 기준(TWVD2001), 단위 cm; 양수는 평균 해수면 위.<br>・<span style="color:#c99700;font-weight:700">○ 만조</span>／<span style="color:#4e9a2e;font-weight:700">○ 간조</span>; 곡선은 두 점 사이의 추정 추세이며 실측 연속값이 아닙니다.<br>・<span style="background:rgba(126,217,140,.35);padding:1px 8px;border-radius:4px">녹색 구간</span>은 <strong>간조 전후 약 2시간</strong>의 추정 관찰 시간대로, <strong>공식 보도 개방 시간이 아닙니다</strong>. 쿠이비산 개방 여부는 펑후현 정부와 현장 통제를 따르세요.<br>・조석에 맞춘 일정이 필요하면 <a href="/#contact" style="color:var(--blue-main)">차오뤼 여행사에 문의</a>하세요. 현지 가이드가 최적의 시간을 잡아 드립니다.',
+    'tide.ctaTitle':'조석에 맞춰 쿠이비산·조간대를 즐기고 싶다면?', 'tide.ctaConsult':'문의하기', 'tide.ctaBlog':'여행 가이드',
+    'tide.loc.magong':'마공시', 'tide.loc.huxi':'후시향(쿠이비산)', 'tide.loc.baisha':'바이사향', 'tide.loc.xiyu':'시위향', 'tide.loc.wangan':'왕안향', 'tide.loc.qimei':'치메이향'
   },
 
   /* ─────────── 简体中文 ─────────── */
@@ -181,7 +199,13 @@ const DICT = {
     'form.successLine2':'也可直接加 LINE：<strong>@phbay2018</strong> 获得更快速的回复。',
     'banner.consult':'立即咨询',
     'footer.quickLinks':'快速链接', 'footer.contactInfo':'联系信息',
-    'footer.owner':'负责人：唐玮汝', 'footer.hours':'周一至周五 08:30–17:30'
+    'footer.owner':'负责人：唐玮汝', 'footer.hours':'周一至周五 08:30–17:30',
+    'tide.title':'澎湖潮汐预报查询',
+    'tide.sub':'规划<strong>奎壁山摩西分海、潮间带体验</strong>前，先看满潮／干潮时间。数据来源：中央气象署（仅供行程规划参考，实际请以现场公告与管理单位指示为准）。',
+    'tide.loc':'地点', 'tide.date':'选择日期', 'tide.chartTitle':'潮汐高度变化图表',
+    'tide.note':'・潮高基准：台湾高程基准（TWVD2001），单位厘米；正值高于平均海平面。<br>・<span style="color:#c99700;font-weight:700">○ 满潮</span>／<span style="color:#4e9a2e;font-weight:700">○ 干潮</span>；曲线为两点间之估计走势，非实测连续值。<br>・<span style="background:rgba(126,217,140,.35);padding:1px 8px;border-radius:4px">绿色区块</span>为<strong>干潮前后约 2 小时</strong>之估计观察时段，<strong>非官方步道开放公告</strong>；奎壁山实际开放请以澎湖县政府与现场管制为准。<br>・想把潮汐排进行程？<a href="/#contact" style="color:var(--blue-main)">在线咨询潮旅</a>，本地向导帮你抓最好的时间。',
+    'tide.ctaTitle':'想搭配潮汐玩奎壁山、潮间带？', 'tide.ctaConsult':'在线咨询', 'tide.ctaBlog':'看玩法攻略',
+    'tide.loc.magong':'马公市', 'tide.loc.huxi':'湖西乡（奎壁山）', 'tide.loc.baisha':'白沙乡', 'tide.loc.xiyu':'西屿乡', 'tide.loc.wangan':'望安乡', 'tide.loc.qimei':'七美乡'
   }
 };
 
