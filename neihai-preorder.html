@@ -146,6 +146,7 @@
       const res = await fetch(`/api/neihai/sailings?month=${encodeURIComponent(monthInput.value)}`);
       const json = await res.json();
       if (!json.ok) { grid.innerHTML = esc(json.error || '載入失敗'); return; }
+      if (!json.sailings.length) { grid.innerHTML = '<p class="muted">本月已無可預購的船班，請改選其他月份。</p>'; return; }
       grid.innerHTML = json.sailings.map(s => `
         <button type="button" class="sailing-card ${esc(s.status)}" data-date="${esc(s.date)}" data-time="${esc(s.time)}" ${['full','closed'].includes(s.status) ? 'disabled' : ''}>
           <div class="sailing-date">${esc(s.date)}（${weekday(s.date)}）</div>
@@ -224,6 +225,7 @@
       }
     });
     monthInput.value = ymToday();
+    monthInput.min = ymToday(); // 過去的月份不可選，避免誤填過期日期
     renderPassengers();
     loadSailings();
   </script>

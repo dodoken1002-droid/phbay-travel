@@ -700,6 +700,19 @@ def _parse_month(value):
     return start, end
 
 
+def _taiwan_now():
+    """台灣當前時間（UTC+8，台灣無夏令時間；主機時區可能是 UTC，不能用本地時間）。"""
+    return datetime.utcnow() + timedelta(hours=8)
+
+
+def _sailing_departed(sailing_date, sailing_time, now=None):
+    """判斷船班（日期＋HH:MM 時段）是否已過出航時間。"""
+    now = now or _taiwan_now()
+    hh, mm = sailing_time.split(':')
+    dep = datetime(sailing_date.year, sailing_date.month, sailing_date.day, int(hh), int(mm))
+    return dep <= now
+
+
 def _parse_sailing_date(value):
     try:
         return datetime.strptime((value or "").strip(), "%Y-%m-%d").date()
@@ -754,9 +767,13 @@ def _neihai_month_availability(start, end):
         overrides[key] = dict(r)
 
     items = []
+    now = _taiwan_now()
     d = start
     while d < end:
         for sailing_time in NEIHAI_TIMES:
+            # 已過出航時間的班次不再回傳，避免旅客誤選過期日期／時段
+            if _sailing_departed(d, sailing_time, now):
+                continue
             key = (str(d), sailing_time)
             row = overrides.get(key, {})
             capacity = int(row.get("capacity") or NEIHAI_DEFAULT_CAPACITY)
@@ -808,6 +825,8 @@ def create_neihai_preorder():
         sailing_time = _normalize_neihai_time(data.get("sailing_time"))
     except ValueError as e:
         return jsonify(ok=False, error=str(e)), 400
+    if _sailing_departed(sailing_date, sailing_time):
+        return jsonify(ok=False, error="此船班已過出航時間，請重新整理頁面選擇其他日期"), 400
 
     passengers = data.get("passengers") or []
     if not isinstance(passengers, list) or not (1 <= len(passengers) <= NEIHAI_DEFAULT_CAPACITY):
