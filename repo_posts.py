@@ -74,7 +74,8 @@ def sync_repo_posts(cursor, posts_dir: Path | str = POSTS_DIR) -> int:
             """INSERT INTO posts
                (slug, title, summary, content, cover_image, tags, author,
                 is_published, published_at)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE, NOW())
+               VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE,
+                       COALESCE(%s::timestamptz, NOW()))
                ON CONFLICT (slug) DO NOTHING""",
             (
                 post["slug"],
@@ -84,6 +85,7 @@ def sync_repo_posts(cursor, posts_dir: Path | str = POSTS_DIR) -> int:
                 post.get("cover_image", ""),
                 post["tags"],
                 post["author"],
+                (str(post["published_at"]).strip() or None) if post.get("published_at") else None,
             ),
         )
         inserted += max(cursor.rowcount, 0)
