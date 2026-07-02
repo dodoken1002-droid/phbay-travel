@@ -24,21 +24,25 @@
   </script>
   <style>
     .tide-wrap{max-width:960px;margin:0 auto;padding:36px 20px 60px}
-    .tide-wrap h1{font-size:clamp(1.5rem,4vw,2.1rem);color:var(--blue-dark);font-weight:800;margin-bottom:10px}
+    .tide-wrap h1{font-size:clamp(1.5rem,4vw,2.1rem);color:var(--blue-dark);font-weight:800;margin-bottom:10px;text-align:center}
     .tide-sub{color:var(--text-light);font-size:.92rem;margin-bottom:20px;line-height:1.7}
-    .tide-controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
-    .tide-controls select,.tide-controls button{padding:9px 14px;border:1px solid #cfdae4;border-radius:10px;font-size:.95rem;background:#fff}
+    .tide-controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:center;margin-bottom:18px}
+    .tide-controls select,.tide-controls input,.tide-controls button{padding:9px 14px;border:1px solid #cfdae4;border-radius:10px;font-size:.95rem;background:#fff}
     .tide-controls button{background:var(--blue-main);color:#fff;border:none;cursor:pointer;font-weight:700}
-    .tide-chart-box{background:#fff;border:1px solid #e6edf3;border-radius:14px;padding:16px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+    .tide-controls label{font-weight:700;color:var(--blue-dark)}
+    .tide-chart-box{background:#fff;border:1px solid #e6edf3;border-radius:14px;padding:18px 16px 10px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+    .tide-chart-title{text-align:center;font-weight:800;color:#333;margin-bottom:4px;font-size:1.05rem}
     .tide-note{font-size:.82rem;color:var(--text-light);margin-top:14px;line-height:1.7}
     .tide-days{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-top:24px}
-    .tide-day{background:#fff;border:1px solid #e6edf3;border-radius:12px;padding:14px 16px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+    .tide-day{background:#fff;border:1px solid #e6edf3;border-radius:12px;padding:14px 16px;box-shadow:0 2px 8px rgba(0,0,0,.04);cursor:pointer;transition:.15s}
+    .tide-day:hover{border-color:var(--blue-main);transform:translateY(-2px)}
+    .tide-day.active{border-color:var(--blue-main);box-shadow:0 4px 14px rgba(26,107,158,.18)}
     .tide-day h3{font-size:1rem;color:var(--blue-dark);margin-bottom:8px}
     .tide-day .range-tag{display:inline-block;font-size:.74rem;background:var(--blue-pale);color:var(--blue-main);border-radius:20px;padding:2px 10px;margin-left:6px}
     .tide-day table{width:100%;font-size:.88rem;border-collapse:collapse}
     .tide-day td{padding:4px 2px;color:var(--text-mid)}
-    .tide-day td.hi{color:#0b74b8;font-weight:700}
-    .tide-day td.lo{color:#c05621;font-weight:700}
+    .tide-day td.hi{color:#c99700;font-weight:700}
+    .tide-day td.lo{color:#4e9a2e;font-weight:700}
     .tide-loading{color:#888;text-align:center;padding:40px}
   </style>
 </head>
@@ -49,28 +53,31 @@
   <main>
     <div class="tide-wrap">
       <h1><i class="fas fa-water" style="color:var(--blue-main)"></i> 澎湖潮汐預報查詢</h1>
-      <p class="tide-sub">規劃<strong>奎壁山摩西分海、潮間帶體驗</strong>行程前，先看滿潮／乾潮時間。
-        圖表顯示未來 7 天潮高曲線；下方列出每日詳細時刻。資料來源：中央氣象署（僅供行程規劃參考，實際請以現場公告與管理單位指示為準）。</p>
+      <p class="tide-sub" style="text-align:center">規劃<strong>奎壁山摩西分海、潮間帶體驗</strong>前，先看滿潮／乾潮時間。
+        資料來源：中央氣象署（僅供行程規劃參考，實際請以現場公告與管理單位指示為準）。</p>
 
       <div class="tide-controls">
-        <label for="tide-loc" style="font-weight:700;color:var(--blue-dark)">地點</label>
+        <label for="tide-loc">地點</label>
         <select id="tide-loc">
           <option value="澎湖縣馬公市">馬公市</option>
-          <option value="澎湖縣湖西鄉">湖西鄉（奎壁山）</option>
+          <option value="澎湖縣湖西鄉" selected>湖西鄉（奎壁山）</option>
           <option value="澎湖縣白沙鄉">白沙鄉</option>
           <option value="澎湖縣西嶼鄉">西嶼鄉</option>
           <option value="澎湖縣望安鄉">望安鄉</option>
           <option value="澎湖縣七美鄉">七美鄉</option>
         </select>
-        <button id="tide-reload"><i class="fas fa-rotate"></i> 查詢</button>
+        <label for="tide-date">選擇日期</label>
+        <input type="date" id="tide-date" />
       </div>
 
       <div class="tide-chart-box">
-        <canvas id="tide-chart" height="130"></canvas>
+        <div class="tide-chart-title">潮汐高度變化圖表</div>
+        <canvas id="tide-chart" height="150"></canvas>
       </div>
       <p class="tide-note">
-        ・潮高基準：台灣高程基準（TWVD2001），單位公尺；正值高於平均海平面。<br>
-        ・<span style="color:#0b74b8;font-weight:700">▲ 滿潮</span>／<span style="color:#c05621;font-weight:700">▼ 乾潮</span>；曲線為兩點間之估計走勢，非實測連續值。<br>
+        ・潮高基準：台灣高程基準（TWVD2001），單位公分；正值高於平均海平面。<br>
+        ・<span style="color:#c99700;font-weight:700">○ 滿潮</span>／<span style="color:#4e9a2e;font-weight:700">○ 乾潮</span>；曲線為兩點間之估計走勢，非實測連續值。<br>
+        ・<span style="background:rgba(126,217,140,.35);padding:1px 8px;border-radius:4px">綠色區塊</span>為<strong>乾潮前後約 2 小時</strong>之估計觀察時段，<strong>非官方步道開放公告</strong>；奎壁山實際開放請以澎湖縣政府與現場管制為準。<br>
         ・想把潮汐排進行程？<a href="/#contact" style="color:var(--blue-main)">線上諮詢潮旅</a>，在地嚮導幫你抓最好的時間。
       </p>
 
@@ -94,27 +101,64 @@
 
     var chart=null;
     var locSel=document.getElementById('tide-loc');
+    var dateInput=document.getElementById('tide-date');
     var daysBox=document.getElementById('tide-days');
-    var DAYS_SHOWN=7;
+    var state={days:[],extremes:[]}; // extremes: 全部日期展平、依時間排序
+    var HOUR=3600*1000, OBS_WINDOW=2*HOUR; // 乾潮前後 2 小時估計觀察時段
+    var CARDS_SHOWN=7;
 
     function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]})}
+    function pad(n){return String(n).padStart(2,'0')}
+    function fmtHM(ts){var d=new Date(ts);return pad(d.getHours())+':'+pad(d.getMinutes())}
+    function dayBounds(dateStr){var s=new Date(dateStr+'T00:00:00').getTime();return[s,s+24*HOUR]}
 
     // 餘弦內插：兩個極值點之間的潮高走勢（標準潮汐近似）
-    function interpolate(extremes){
+    function interpolate(ex){
       var pts=[];
-      for(var i=0;i<extremes.length-1;i++){
-        var a=extremes[i],b=extremes[i+1];
-        var t0=a.ts,t1=b.ts,h0=a.h,h1=b.h;
-        var steps=Math.max(4,Math.round((t1-t0)/(15*60*1000))); // 每 15 分鐘一點
+      for(var i=0;i<ex.length-1;i++){
+        var t0=ex[i].ts,t1=ex[i+1].ts,h0=ex[i].h,h1=ex[i+1].h;
+        var steps=Math.max(4,Math.round((t1-t0)/(10*60*1000)));
         for(var s=0;s<steps;s++){
           var f=s/steps;
-          var h=h0+(h1-h0)*(1-Math.cos(Math.PI*f))/2;
-          pts.push({x:t0+(t1-t0)*f,y:h});
+          pts.push({x:t0+(t1-t0)*f,y:h0+(h1-h0)*(1-Math.cos(Math.PI*f))/2});
         }
       }
-      if(extremes.length)pts.push({x:extremes[extremes.length-1].ts,y:extremes[extremes.length-1].h});
+      if(ex.length)pts.push({x:ex[ex.length-1].ts,y:ex[ex.length-1].h});
       return pts;
     }
+
+    // 綠色觀察時段（乾潮±2h）＋紅字標籤
+    var bandsPlugin={id:'bands',beforeDatasetsDraw:function(c,args,opts){
+      var bands=c.$bands||[];var xs=c.scales.x,area=c.chartArea,ctx=c.ctx;
+      bands.forEach(function(b){
+        var x0=Math.max(xs.getPixelForValue(b.start),area.left);
+        var x1=Math.min(xs.getPixelForValue(b.end),area.right);
+        if(x1<=x0)return;
+        ctx.save();
+        ctx.fillStyle='rgba(126,217,140,.35)';
+        ctx.fillRect(x0,area.top,x1-x0,area.bottom-area.top);
+        ctx.fillStyle='#e53e3e';ctx.font='bold 12px sans-serif';ctx.textAlign='center';
+        ctx.fillText('乾潮觀察時段（估）',(x0+x1)/2,area.top-20);
+        ctx.fillText(fmtHM(b.start)+'-'+fmtHM(b.end),(x0+x1)/2,area.top-6);
+        ctx.restore();
+      });
+    }};
+
+    // 滿潮/乾潮文字標籤
+    var labelsPlugin={id:'ptLabels',afterDatasetsDraw:function(c){
+      var pts=c.$extremeLabels||[];var xs=c.scales.x,ys=c.scales.y,ctx=c.ctx,area=c.chartArea;
+      pts.forEach(function(p){
+        var x=xs.getPixelForValue(p.ts),y=ys.getPixelForValue(p.h);
+        if(x<area.left-4||x>area.right+4)return;
+        ctx.save();ctx.font='bold 12px sans-serif';ctx.textAlign='center';
+        ctx.fillStyle=p.type==='滿潮'?'#8a6d00':'#3e7a24';
+        var above=p.type==='滿潮';
+        ctx.fillText(p.type,x,above?y-14:y-14);
+        ctx.font='11px sans-serif';ctx.fillStyle='#666';
+        ctx.fillText(fmtHM(p.ts)+'｜'+Math.round(p.h)+'cm',x,above?y-1+(-13+13):y+22);
+        ctx.restore();
+      });
+    }};
 
     var nowLine={id:'nowLine',afterDraw:function(c){
       var now=Date.now(),xs=c.scales.x;
@@ -123,66 +167,88 @@
       ctx.save();ctx.strokeStyle='#e53e3e';ctx.setLineDash([5,4]);ctx.lineWidth=1.5;
       ctx.beginPath();ctx.moveTo(x,c.chartArea.top);ctx.lineTo(x,c.chartArea.bottom);ctx.stroke();
       ctx.fillStyle='#e53e3e';ctx.font='bold 11px sans-serif';ctx.textAlign='center';
-      ctx.fillText('現在',x,c.chartArea.top-4);ctx.restore();
+      ctx.fillText('現在',x,c.chartArea.bottom+14);ctx.restore();
     }};
 
-    function fmtTick(v){
-      var d=new Date(v);
-      return (d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':00';
-    }
-    function fmtTime(iso){
-      var d=new Date(iso);
-      return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+    function gradientStroke(context){
+      var c=context.chart,area=c.chartArea;
+      if(!area)return '#d4b400';
+      var g=c.ctx.createLinearGradient(0,area.top,0,area.bottom);
+      g.addColorStop(0,'#e8c62a');g.addColorStop(1,'#7ac943');
+      return g;
     }
 
-    function render(data){
-      var days=data.days.slice(0,DAYS_SHOWN);
-      var extremes=[];
-      days.forEach(function(d){(d.tides||[]).forEach(function(t){
-        var h=parseFloat(t.height_cm);
-        if(!isNaN(h)&&t.time)extremes.push({ts:new Date(t.time).getTime(),h:h/100,type:t.type});
-      })});
-      extremes.sort(function(a,b){return a.ts-b.ts});
-      var curve=interpolate(extremes);
-      var his=extremes.filter(function(e){return e.type==='滿潮'}).map(function(e){return{x:e.ts,y:e.h}});
-      var los=extremes.filter(function(e){return e.type==='乾潮'}).map(function(e){return{x:e.ts,y:e.h}});
+    function renderDay(dateStr){
+      var b=dayBounds(dateStr),start=b[0],end=b[1];
+      // 取本日極值 + 前後各一點（讓曲線延伸到圖表兩側）
+      var ex=state.extremes;
+      var idxs=[];
+      for(var i=0;i<ex.length;i++){if(ex[i].ts>=start&&ex[i].ts<end)idxs.push(i);}
+      if(!idxs.length){return}
+      var from=Math.max(0,idxs[0]-1),to=Math.min(ex.length-1,idxs[idxs.length-1]+1);
+      var seg=ex.slice(from,to+1);
+      var curve=interpolate(seg);
+      var dayEx=idxs.map(function(i){return ex[i]});
+      var markers=dayEx.map(function(e){return{x:e.ts,y:e.h}});
+      var bands=dayEx.filter(function(e){return e.type==='乾潮'}).map(function(e){
+        return{start:Math.max(start,e.ts-OBS_WINDOW),end:Math.min(end,e.ts+OBS_WINDOW)};
+      });
 
       if(chart)chart.destroy();
       chart=new Chart(document.getElementById('tide-chart'),{
         type:'line',
         data:{datasets:[
-          {label:'潮高走勢',data:curve,parsing:false,pointRadius:0,borderColor:'#1a6b9e',borderWidth:2,fill:{target:'origin'},backgroundColor:'rgba(26,107,158,.12)',tension:0},
-          {label:'滿潮',data:his,parsing:false,showLine:false,pointStyle:'triangle',pointRadius:6,backgroundColor:'#0b74b8'},
-          {label:'乾潮',data:los,parsing:false,showLine:false,pointStyle:'triangle',pointRotation:180,pointRadius:6,backgroundColor:'#c05621'}
+          {label:'潮高',data:curve,parsing:false,pointRadius:0,borderColor:gradientStroke,borderWidth:2.5,tension:0,fill:false},
+          {label:'滿/乾潮',data:markers,parsing:false,showLine:false,pointRadius:6,pointBorderWidth:2.5,
+           pointBackgroundColor:'#fff',pointBorderColor:function(ctx){
+             var e=dayEx[ctx.dataIndex];return e&&e.type==='滿潮'?'#d4a900':'#6cae3e';}}
         ]},
         options:{
-          animation:false,maintainAspectRatio:true,responsive:true,
+          animation:false,responsive:true,maintainAspectRatio:true,
+          layout:{padding:{top:38,bottom:16}},
           scales:{
-            x:{type:'linear',min:curve.length?curve[0].x:undefined,max:curve.length?curve[curve.length-1].x:undefined,
-               ticks:{callback:fmtTick,maxTicksLimit:8,font:{size:11}}},
-            y:{title:{display:true,text:'潮高 (m)'},grid:{color:'#eef2f5'}}
+            x:{type:'linear',min:start,max:end,
+               ticks:{stepSize:2*HOUR,callback:function(v){var d=new Date(v);return d.getHours()+':00'},font:{size:11},maxRotation:0},
+               grid:{color:'#eef2f5'}},
+            y:{title:{display:true,text:'潮汐高度（cm）'},grid:{color:function(ctx){return ctx.tick.value===0?'#9db3c2':'#eef2f5'},lineWidth:function(ctx){return ctx.tick.value===0?1.5:1}}}
           },
-          plugins:{
-            legend:{labels:{usePointStyle:true,font:{size:12}}},
+          plugins:{legend:{display:false},
             tooltip:{callbacks:{
-              title:function(items){var d=new Date(items[0].parsed.x);return (d.getMonth()+1)+'/'+d.getDate()+' '+fmtTime(d.toISOString())},
-              label:function(item){return item.dataset.label+'：'+item.parsed.y.toFixed(2)+' m'}
+              title:function(items){return fmtHM(items[0].parsed.x)},
+              label:function(item){return Math.round(item.parsed.y)+' cm'}
             }}
           }
         },
-        plugins:[nowLine]
+        plugins:[bandsPlugin,labelsPlugin,nowLine]
       });
+      chart.$bands=bands;
+      chart.$extremeLabels=dayEx;
+      chart.update();
 
+      document.querySelectorAll('.tide-day').forEach(function(el){
+        el.classList.toggle('active',el.dataset.date===dateStr);
+      });
+    }
+
+    function renderCards(){
+      var days=state.days.slice(0,CARDS_SHOWN);
       daysBox.innerHTML=days.map(function(d){
         var rows=(d.tides||[]).map(function(t){
           var cls=t.type==='滿潮'?'hi':'lo';
-          var mark=t.type==='滿潮'?'▲':'▼';
+          var mark=t.type==='滿潮'?'●':'○';
           var h=parseFloat(t.height_cm);
-          return '<tr><td class="'+cls+'">'+mark+' '+esc(t.type)+'</td><td>'+fmtTime(t.time)+'</td><td>'+(isNaN(h)?'-':(h/100).toFixed(2)+' m')+'</td></tr>';
+          return '<tr><td class="'+cls+'">'+mark+' '+esc(t.type)+'</td><td>'+fmtHM(new Date(t.time).getTime())+'</td><td>'+(isNaN(h)?'-':Math.round(h)+' cm')+'</td></tr>';
         }).join('');
         var w=['日','一','二','三','四','五','六'][new Date(d.date+'T00:00:00').getDay()];
-        return '<div class="tide-day"><h3>'+esc(d.date)+'（'+w+'）<span class="range-tag">'+esc(d.range||'')+'</span></h3><table>'+rows+'</table></div>';
+        return '<div class="tide-day" data-date="'+esc(d.date)+'"><h3>'+esc(d.date)+'（'+w+'）<span class="range-tag">'+esc(d.range||'')+'</span></h3><table>'+rows+'</table></div>';
       }).join('');
+      daysBox.querySelectorAll('.tide-day').forEach(function(el){
+        el.addEventListener('click',function(){
+          dateInput.value=el.dataset.date;
+          renderDay(el.dataset.date);
+          window.scrollTo({top:document.querySelector('.tide-chart-box').offsetTop-90,behavior:'smooth'});
+        });
+      });
     }
 
     function load(){
@@ -191,12 +257,25 @@
         .then(function(r){return r.json()})
         .then(function(j){
           if(!j.ok){daysBox.innerHTML='<p class="tide-loading">'+esc(j.error||'載入失敗')+'</p>';return}
-          render(j);
+          state.days=j.days;
+          state.extremes=[];
+          j.days.forEach(function(d){(d.tides||[]).forEach(function(t){
+            var h=parseFloat(t.height_cm);
+            if(!isNaN(h)&&t.time)state.extremes.push({ts:new Date(t.time).getTime(),h:h,type:t.type});
+          })});
+          state.extremes.sort(function(a,b){return a.ts-b.ts});
+          if(state.days.length){
+            dateInput.min=state.days[0].date;
+            dateInput.max=state.days[state.days.length-1].date;
+            if(!dateInput.value||dateInput.value<dateInput.min||dateInput.value>dateInput.max)dateInput.value=state.days[0].date;
+          }
+          renderCards();
+          renderDay(dateInput.value);
         })
         .catch(function(){daysBox.innerHTML='<p class="tide-loading">暫時無法取得潮汐資料，請稍後再試。</p>'});
     }
-    document.getElementById('tide-reload').addEventListener('click',load);
     locSel.addEventListener('change',load);
+    dateInput.addEventListener('change',function(){if(dateInput.value)renderDay(dateInput.value)});
     load();
   })();
   </script>
