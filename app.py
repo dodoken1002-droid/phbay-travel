@@ -169,6 +169,68 @@ def init_db():
         )
     """)
 
+    # 通用預購系統資料表（音樂節等新行程；內海仍走既有 neihai_* 表）
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS preorder_products (
+            id            SERIAL PRIMARY KEY,
+            slug          VARCHAR(50) UNIQUE NOT NULL,
+            name          VARCHAR(150) NOT NULL,
+            description   TEXT DEFAULT '',
+            slot_type     VARCHAR(10) NOT NULL DEFAULT 'daily',
+            times         VARCHAR(200) DEFAULT '',
+            duration_days INT NOT NULL DEFAULT 1,
+            capacity      INT,
+            min_people    INT NOT NULL DEFAULT 2,
+            max_party     INT NOT NULL DEFAULT 13,
+            date_start    DATE,
+            date_end      DATE,
+            badges        VARCHAR(300) DEFAULT '',
+            is_active     BOOLEAN DEFAULT TRUE,
+            created_at    TIMESTAMP DEFAULT NOW(),
+            updated_at    TIMESTAMP DEFAULT NOW()
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS preorder_orders (
+            id              SERIAL PRIMARY KEY,
+            booking_ref     VARCHAR(40) UNIQUE,
+            product_id      INT NOT NULL REFERENCES preorder_products(id) ON DELETE CASCADE,
+            departure_date  DATE NOT NULL,
+            departure_time  VARCHAR(5) DEFAULT '',
+            agency_name     VARCHAR(120),
+            contact_name    VARCHAR(100) NOT NULL,
+            contact_phone   VARCHAR(50) NOT NULL,
+            passenger_count INT NOT NULL,
+            status          VARCHAR(30) NOT NULL DEFAULT 'pending_departure',
+            notes           TEXT,
+            created_at      TIMESTAMP DEFAULT NOW(),
+            updated_at      TIMESTAMP DEFAULT NOW()
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS preorder_passengers (
+            id              SERIAL PRIMARY KEY,
+            order_id        INT NOT NULL REFERENCES preorder_orders(id) ON DELETE CASCADE,
+            name            VARCHAR(100) NOT NULL,
+            national_id     VARCHAR(30) NOT NULL,
+            birth_date      DATE NOT NULL,
+            phone           VARCHAR(50) NOT NULL,
+            created_at      TIMESTAMP DEFAULT NOW()
+        )
+    """)
+    # 種子商品：2026 追風音樂節主題行程（已存在則不動，後台/DB 可再調整）
+    cur.execute("""
+        INSERT INTO preorder_products
+            (slug, name, description, slot_type, duration_days, capacity,
+             min_people, max_party, date_start, date_end, badges)
+        VALUES
+            ('festival', '2026 澎湖追風音樂燈光節主題行程',
+             '三天兩夜套裝行程，搭配澎湖追風音樂燈光節（觀音亭園區，燈光展演 9/12–10/11）。選擇出發日後，回程日自動為第三天。行程細節與報價由專人與您確認。',
+             'daily', 3, NULL, 2, 13, DATE '2026-09-12', DATE '2026-10-09',
+             '兩人成行,三天兩夜,音樂節官方合作旅行社')
+        ON CONFLICT (slug) DO NOTHING
+    """)
+
     # posts 部落格資料表
     cur.execute("""
         CREATE TABLE IF NOT EXISTS posts (
@@ -1053,6 +1115,291 @@ def admin_update_neihai_preorder(order_id):
 
 
 
+# ─── 通用預購系統（音樂節等；每個行程一筆 preorder_products）───
+PREORDER_VALID_STATUSES = {'pending_departure', 'confirmed_departure', 'confirmed', 'cancelled'}
+
+
+def _get_product(slug, cur):
+    cur.execute("SELECT * FROM preorder_products WHERE slug=%s AND is_active=TRUE", (slug,))
+    return cur.fetchone()
+
+
+def _product_public(p):
+    return {
+        'slug': p['slug'], 'name': p['name'], 'description': p.get('description') or '',
+        'slot_type': p['slot_type'],
+        'times': [t.strip() for t in (p.get('times') or '').split(',') if t.strip()],
+        'duration_days': int(p['duration_days'] or 1),
+        'capacity': p['capacity'],  # None = 不設上限
+        'min_people': int(p['min_people'] or 2),
+        'max_party': int(p['max_party'] or 13),
+        'date_start': str(p['date_start'] or ''), 'date_end': str(p['date_end'] or ''),
+        'badges': [b.strip() for b in (p.get('badges') or '').split(',') if b.strip()],
+    }
+
+
+def _preorder_slot_status(booked, capacity, min_people):
+    """通用場次狀態；capacity=None 表示不設上限。"""
+    booked = int(booked or 0)
+    min_people = int(min_people or 2)
+    if capacity is not None and booked >= int(capacity):
+        return 'full', '已額滿', 0
+    remaining = (int(capacity) - booked) if capacity is not None else None
+    if booked >= min_people:
+        return 'guaranteed', f'已達 {booked} 人，確定成行', remaining
+    return 'forming', f'待成團，還差 {min_people - booked} 人', remaining
+
+
+def _preorder_availability(product, start, end):
+    """回傳 product 在 [start, end) 內、未過期的可預購場次。"""
+    conn = get_db(); cur = conn.cursor()
+    cur.execute("""
+        SELECT departure_date, departure_time,
+               COALESCE(SUM(CASE WHEN status <> 'cancelled' THEN passenger_count ELSE 0 END), 0) AS booked
+        FROM preorder_orders
+        WHERE product_id=%s AND departure_date >= %s AND departure_date < %s
+        GROUP BY departure_date, departure_time
+    """, (product['id'], start, end))
+    booked_map = {(str(r['departure_date']), r['departure_time'] or ''): int(r['booked'])
+                  for r in cur.fetchall()}
+    cur.close(); conn.close()
+
+    today = _taiwan_now().date()
+    lo = max(start, product['date_start'] or start)
+    hi = min(end - timedelta(days=1), product['date_end'] or (end - timedelta(days=1)))
+    times = [t.strip() for t in (product.get('times') or '').split(',') if t.strip()] \
+        if product['slot_type'] == 'times' else ['']
+    duration = int(product['duration_days'] or 1)
+
+    items = []
+    d = lo
+    now = _taiwan_now()
+    while d <= hi:
+        for tm in times:
+            if tm:  # 每日多時段：已過出航時間的不列
+                if _sailing_departed(d, tm, now):
+                    continue
+            elif d < today:  # 套裝行程：過去日期不列
+                continue
+            booked = booked_map.get((str(d), tm), 0)
+            code, label, remaining = _preorder_slot_status(booked, product['capacity'], product['min_people'])
+            item = {
+                'date': str(d), 'time': tm, 'booked': booked,
+                'remaining': remaining, 'status': code, 'status_label': label,
+            }
+            if duration > 1:
+                item['return_date'] = str(d + timedelta(days=duration - 1))
+            items.append(item)
+        d += timedelta(days=1)
+    return items
+
+
+@app.route('/api/preorder/<slug>')
+def api_preorder_product(slug):
+    try:
+        conn = get_db(); cur = conn.cursor()
+        p = _get_product(slug, cur)
+        cur.close(); conn.close()
+        if not p:
+            return jsonify(ok=False, error='找不到此預購行程'), 404
+        return jsonify(ok=True, product=_product_public(p))
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.route('/api/preorder/<slug>/slots')
+def api_preorder_slots(slug):
+    try:
+        conn = get_db(); cur = conn.cursor()
+        p = _get_product(slug, cur)
+        cur.close(); conn.close()
+        if not p:
+            return jsonify(ok=False, error='找不到此預購行程'), 404
+        start, end = _parse_month(request.args.get('month'))
+        return jsonify(ok=True, month=start.strftime('%Y-%m'),
+                       product=_product_public(p),
+                       slots=_preorder_availability(p, start, end))
+    except ValueError as e:
+        return jsonify(ok=False, error=str(e)), 400
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.route('/api/preorder/<slug>/orders', methods=['POST'])
+def api_preorder_create(slug):
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        conn = get_db(); cur = conn.cursor()
+        p = _get_product(slug, cur)
+        if not p:
+            cur.close(); conn.close()
+            return jsonify(ok=False, error='找不到此預購行程'), 404
+
+        try:
+            dep_date = _parse_sailing_date(data.get('departure_date'))
+        except ValueError as e:
+            cur.close(); conn.close()
+            return jsonify(ok=False, error=str(e)), 400
+        dep_time = (data.get('departure_time') or '').strip()
+
+        # 日期／時段驗證
+        if p['date_start'] and dep_date < p['date_start'] or p['date_end'] and dep_date > p['date_end']:
+            cur.close(); conn.close()
+            return jsonify(ok=False, error='出發日不在開放預購範圍內'), 400
+        if p['slot_type'] == 'times':
+            valid_times = [t.strip() for t in (p.get('times') or '').split(',') if t.strip()]
+            if dep_time not in valid_times:
+                cur.close(); conn.close()
+                return jsonify(ok=False, error='出發時間不正確'), 400
+            if _sailing_departed(dep_date, dep_time):
+                cur.close(); conn.close()
+                return jsonify(ok=False, error='此場次已過出發時間，請重新選擇'), 400
+        else:
+            dep_time = ''
+            if dep_date < _taiwan_now().date():
+                cur.close(); conn.close()
+                return jsonify(ok=False, error='出發日已過，請重新選擇'), 400
+
+        # 乘客驗證（同內海格式）
+        passengers = data.get('passengers') or []
+        max_party = int(p['max_party'] or 13)
+        if not isinstance(passengers, list) or not (1 <= len(passengers) <= max_party):
+            cur.close(); conn.close()
+            return jsonify(ok=False, error=f'乘客人數需為 1 至 {max_party} 人'), 400
+        clean = []
+        for idx, ps in enumerate(passengers, start=1):
+            name = (ps.get('name') or '').strip()
+            national_id = (ps.get('national_id') or '').strip().upper()
+            phone = (ps.get('phone') or '').strip()
+            birth = (ps.get('birth_date') or '').strip()
+            if not all([name, national_id, phone, birth]):
+                cur.close(); conn.close()
+                return jsonify(ok=False, error=f'第 {idx} 位旅客資料未填完整'), 400
+            try:
+                birth_date = datetime.strptime(birth, '%Y-%m-%d').date()
+            except ValueError:
+                cur.close(); conn.close()
+                return jsonify(ok=False, error=f'第 {idx} 位旅客生日格式需為 YYYY-MM-DD'), 400
+            clean.append({'name': name, 'national_id': national_id,
+                          'birth_date': birth_date, 'phone': phone})
+
+        contact_name = clean[0]['name']
+        contact_phone = (data.get('contact_phone') or clean[0]['phone']).strip()
+        agency_name = (data.get('agency_name') or '').strip()
+        notes = (data.get('notes') or '').strip()
+
+        # 同場次交易鎖（避免有名額上限的行程超賣）
+        lock_key = abs(hash((p['id'], str(dep_date), dep_time))) % (2 ** 31)
+        cur.execute('SELECT pg_advisory_xact_lock(%s)', (lock_key,))
+        cur.execute("""
+            SELECT COALESCE(SUM(passenger_count), 0) AS booked FROM preorder_orders
+            WHERE product_id=%s AND departure_date=%s AND departure_time=%s AND status <> 'cancelled'
+        """, (p['id'], dep_date, dep_time))
+        booked = int(cur.fetchone()['booked'] or 0)
+        if p['capacity'] is not None and booked + len(clean) > int(p['capacity']):
+            conn.rollback(); cur.close(); conn.close()
+            return jsonify(ok=False, error=f'此場次剩餘 {max(0, int(p["capacity"]) - booked)} 位，不足以容納本次人數'), 400
+
+        status = 'confirmed_departure' if booked + len(clean) >= int(p['min_people']) else 'pending_departure'
+        cur.execute("""
+            INSERT INTO preorder_orders
+              (product_id, departure_date, departure_time, agency_name,
+               contact_name, contact_phone, passenger_count, status, notes)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            RETURNING id, created_at
+        """, (p['id'], dep_date, dep_time, agency_name, contact_name,
+              contact_phone, len(clean), status, notes))
+        order = cur.fetchone()
+        booking_ref = f"{slug[:6].upper()}{dep_date.strftime('%Y%m%d')}-{int(order['id']):04d}"
+        cur.execute('UPDATE preorder_orders SET booking_ref=%s WHERE id=%s', (booking_ref, order['id']))
+        for ps in clean:
+            cur.execute("""
+                INSERT INTO preorder_passengers (order_id, name, national_id, birth_date, phone)
+                VALUES (%s,%s,%s,%s,%s)
+            """, (order['id'], ps['name'], ps['national_id'], ps['birth_date'], ps['phone']))
+        conn.commit(); cur.close(); conn.close()
+
+        code, label, remaining = _preorder_slot_status(booked + len(clean), p['capacity'], p['min_people'])
+        return jsonify(
+            ok=True, id=order['id'], booking_ref=booking_ref,
+            created_at=str(order['created_at']),
+            departure_date=str(dep_date), departure_time=dep_time,
+            passenger_count=len(clean),
+            slot_status=code, slot_status_label=label, remaining=remaining,
+            message='預購已送出，已確定成行' if code in ('guaranteed', 'full')
+                    else f'預購已送出，尚差 {int(p["min_people"]) - booked - len(clean)} 人成行',
+        )
+    except Exception as e:
+        return jsonify(ok=False, error=f'伺服器錯誤：{e}'), 500
+
+
+@app.route('/api/admin/preorder/orders', methods=['GET'])
+def admin_preorder_orders():
+    if not is_admin():
+        return jsonify(ok=False, error='未授權'), 401
+    try:
+        start, end = _parse_month(request.args.get('month'))
+        slug = (request.args.get('product') or '').strip()
+        conn = get_db(); cur = conn.cursor()
+        params = [start, end]
+        where = 'o.departure_date >= %s AND o.departure_date < %s'
+        if slug:
+            where += ' AND pr.slug = %s'
+            params.append(slug)
+        cur.execute(f"""
+            SELECT o.*, pr.slug AS product_slug, pr.name AS product_name,
+                   pr.duration_days, pr.min_people, pr.capacity
+            FROM preorder_orders o JOIN preorder_products pr ON pr.id = o.product_id
+            WHERE {where}
+            ORDER BY o.departure_date, o.departure_time, o.created_at
+        """, params)
+        orders = [dict(r) for r in cur.fetchall()]
+        ids = [o['id'] for o in orders]
+        passengers_by_order = {i: [] for i in ids}
+        if ids:
+            cur.execute('SELECT * FROM preorder_passengers WHERE order_id = ANY(%s) ORDER BY order_id, id', (ids,))
+            for r in cur.fetchall():
+                r = dict(r)
+                r['birth_date'] = str(r['birth_date'])
+                if r.get('created_at'): r['created_at'] = str(r['created_at'])
+                passengers_by_order[r['order_id']].append(r)
+        cur.execute('SELECT slug, name FROM preorder_products WHERE is_active=TRUE ORDER BY id')
+        products = [dict(r) for r in cur.fetchall()]
+        cur.close(); conn.close()
+        for o in orders:
+            for k in ('departure_date', 'created_at', 'updated_at'):
+                if o.get(k): o[k] = str(o[k])
+            o['passengers'] = passengers_by_order.get(o['id'], [])
+        return jsonify(ok=True, month=start.strftime('%Y-%m'), orders=orders, products=products)
+    except ValueError as e:
+        return jsonify(ok=False, error=str(e)), 400
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.route('/api/admin/preorder/orders/<int:order_id>', methods=['PATCH'])
+def admin_update_preorder(order_id):
+    if not is_admin():
+        return jsonify(ok=False, error='未授權'), 401
+    data = request.get_json(force=True, silent=True) or {}
+    status = (data.get('status') or '').strip()
+    if status not in PREORDER_VALID_STATUSES:
+        return jsonify(ok=False, error='狀態不正確'), 400
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute('UPDATE preorder_orders SET status=%s, updated_at=NOW() WHERE id=%s', (status, order_id))
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.route('/preorder/<slug>')
+def preorder_page(slug):
+    # 通用預購頁：同一模板，前端依 slug 讀取行程設定
+    return send_from_directory('.', 'preorder.html')
+
+
 # ─── 梯次名額 CRUD（管理員）────────────────────────────────────
 @app.route('/api/admin/slots', methods=['GET'])
 def admin_get_slots():
@@ -1271,7 +1618,7 @@ def admin_delete_post(pid):
 # ── 伺服器渲染：共用外殼 ──
 def _render_blog(title, desc, canonical, body, head_extra=''):
     nav = '''<div class="top-banner"><div class="banner-static"><span>潮旅國際旅行社</span><span class="banner-sep">｜</span><span>2026 澎湖追風音樂燈光節 官方合作旅行社</span><span class="banner-sep">｜</span><span>電話：06-9271288</span></div></div>
-<nav class="navbar" id="navbar"><div class="nav-container"><a href="/" class="nav-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a><button class="nav-toggle" id="nav-toggle" aria-label="選單"><span></span><span></span><span></span></button><ul class="nav-links" id="nav-links"><li><a href="/">首頁</a></li><li><a href="/#tours">行程介紹</a></li><li class="nav-item has-submenu"><a href="/neihai-preorder.html">預購行程 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/neihai-preorder.html">內海行程</a></li><li><a href="/#tours">追風音樂節</a></li></ul></li><li class="nav-item has-submenu"><a href="/blog">旅遊大小事 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/tides">潮汐查詢系統</a></li><li><a href="/blog">旅遊文章分享</a></li><li><a href="/reviews">旅客評價</a></li></ul></li><li class="nav-item has-submenu"><a href="/#about">關於我們 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/#contact">聯絡資訊</a></li></ul></li></ul></div></nav>'''
+<nav class="navbar" id="navbar"><div class="nav-container"><a href="/" class="nav-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a><button class="nav-toggle" id="nav-toggle" aria-label="選單"><span></span><span></span><span></span></button><ul class="nav-links" id="nav-links"><li><a href="/">首頁</a></li><li><a href="/#tours">行程介紹</a></li><li class="nav-item has-submenu"><a href="/neihai-preorder.html">預購行程 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/neihai-preorder.html">內海行程</a></li><li><a href="/preorder/festival">追風音樂節</a></li></ul></li><li class="nav-item has-submenu"><a href="/blog">旅遊大小事 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/tides">潮汐查詢系統</a></li><li><a href="/blog">旅遊文章分享</a></li><li><a href="/reviews">旅客評價</a></li></ul></li><li class="nav-item has-submenu"><a href="/#about">關於我們 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/#contact">聯絡資訊</a></li></ul></li></ul></div></nav>'''
     footer = '''<footer class="footer"><div class="container"><div class="footer-bottom"><p>© 2026 潮旅國際旅行社 All Rights Reserved.｜<a href="/" style="color:inherit">官網</a>｜<a href="/blog" style="color:inherit">部落格</a>｜<a href="/reviews" style="color:inherit">旅客評價</a></p></div></div></footer>
 <script>(function(){var t=document.getElementById('nav-toggle'),l=document.getElementById('nav-links');if(t)t.addEventListener('click',function(){l.classList.toggle('open')});})();</script>'''
     return ('<!DOCTYPE html><html lang="zh-TW"><head>'
@@ -1457,6 +1804,9 @@ def dynamic_sitemap():
         cur.execute("SELECT slug, COALESCE(updated_at,published_at,created_at) AS m FROM posts WHERE is_published=TRUE")
         for r in cur.fetchall():
             urls.append((f'{SITE}/blog/{r["slug"]}', '0.6', 'monthly', str(r['m'])[:10]))
+        cur.execute("SELECT slug FROM preorder_products WHERE is_active=TRUE")
+        for r in cur.fetchall():
+            urls.append((f'{SITE}/preorder/{r["slug"]}', '0.8', 'weekly'))
         cur.close(); conn.close()
     except Exception:
         pass

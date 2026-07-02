@@ -3,39 +3,39 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>小城故事・內海巡禮預購訂位｜潮旅國際旅行社</title>
-  <meta name="description" content="小城故事・內海巡禮預購訂位表。每日 09:00、11:00 出航，6 人成行，最多 13 人。可由消費者或合作業者填寫訂位資料。" />
-  <link rel="stylesheet" href="style.css" />
+  <title>行程預購訂位｜潮旅國際旅行社</title>
+  <meta name="description" content="潮旅國際旅行社行程預購訂位表。選擇出發日期、填寫旅客資料即可完成預購，專人將與您確認行程細節。" />
+  <link rel="stylesheet" href="/style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <style>
     body{background:#f4fbff;color:#17324d}
-    .preorder-hero{padding:120px 20px 48px;background:linear-gradient(135deg,#0b5e9e,#14b8c9);color:#fff}
+    .preorder-hero{padding:120px 20px 48px;background:linear-gradient(135deg,#6a3fa0,#c2568f);color:#fff}
     .preorder-wrap{max-width:1120px;margin:0 auto}
-    .preorder-hero h1{font-size:clamp(2rem,5vw,3.6rem);line-height:1.1;margin-bottom:16px}
+    .preorder-hero h1{font-size:clamp(1.7rem,4.5vw,3rem);line-height:1.15;margin-bottom:16px}
     .preorder-hero p{font-size:1.08rem;max-width:760px;opacity:.94}
     .preorder-badges{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
     .preorder-badge{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:8px 14px;font-weight:800}
     .preorder-main{max-width:1120px;margin:-28px auto 64px;padding:0 20px;display:grid;grid-template-columns:1.05fr .95fr;gap:24px}
     .panel{background:#fff;border-radius:20px;box-shadow:0 18px 50px rgba(17,55,86,.12);padding:24px}
-    .panel h2{font-size:1.35rem;margin-bottom:8px;color:#0d4f83}
+    .panel h2{font-size:1.35rem;margin-bottom:8px;color:#5b3591}
     .panel small,.muted{color:#63788d}
     .month-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:18px 0}
-    .month-row input,.field input,.field textarea{width:100%;border:1px solid #d8e6ef;border-radius:12px;padding:12px 14px;font-size:1rem}
+    .month-row input,.field input,.field textarea{width:100%;border:1px solid #e0d8ef;border-radius:12px;padding:12px 14px;font-size:1rem}
     .sailing-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;max-height:640px;overflow:auto;padding-right:4px}
-    .sailing-card{border:1px solid #d9e9f2;border-radius:16px;padding:14px;background:#fbfeff;text-align:left;cursor:pointer;transition:.18s}
-    .sailing-card:hover,.sailing-card.selected{border-color:#0b8cc4;box-shadow:0 8px 22px rgba(16,126,177,.16);transform:translateY(-2px)}
+    .sailing-card{border:1px solid #e3d9f2;border-radius:16px;padding:14px;background:#fdfbff;text-align:left;cursor:pointer;transition:.18s}
+    .sailing-card:hover,.sailing-card.selected{border-color:#8c56c4;box-shadow:0 8px 22px rgba(122,66,177,.16);transform:translateY(-2px)}
     .sailing-card.full,.sailing-card.closed{opacity:.55;cursor:not-allowed}
-    .sailing-date{font-weight:900;color:#143957}
-    .sailing-time{font-size:1.35rem;font-weight:900;color:#0b74a5;margin:6px 0}
+    .sailing-date{font-weight:900;color:#3c2360}
+    .sailing-time{font-size:1.1rem;font-weight:900;color:#7a42b1;margin:6px 0}
     .status{display:inline-block;border-radius:999px;padding:4px 9px;font-size:.78rem;font-weight:800}
     .status.forming{background:#fff7e6;color:#b7791f}
     .status.guaranteed{background:#e8fff4;color:#07834f}
     .status.full,.status.closed{background:#ffecec;color:#c53030}
     .field{margin:14px 0}
     .field label{display:block;font-weight:900;margin-bottom:6px;color:#17324d}
-    .selected-box{background:#edf9ff;border:1px solid #bee3f8;border-radius:16px;padding:14px;margin:14px 0;font-weight:800}
-    .passenger-card{border:1px solid #e2edf5;border-radius:16px;padding:16px;margin-top:12px;background:#fcfeff}
-    .passenger-card h3{font-size:1rem;margin-bottom:10px;color:#0d4f83}
+    .selected-box{background:#f6efff;border:1px solid #dcc8f5;border-radius:16px;padding:14px;margin:14px 0;font-weight:800}
+    .passenger-card{border:1px solid #e9e2f5;border-radius:16px;padding:16px;margin-top:12px;background:#fefcff}
+    .passenger-card h3{font-size:1rem;margin-bottom:10px;color:#5b3591}
     .passenger-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
     .privacy{font-size:.88rem;line-height:1.7;background:#fff8e8;border-left:4px solid #f6ad55;border-radius:12px;padding:12px 14px;margin:14px 0;color:#5f4217}
     .result{display:none;border-radius:16px;padding:18px;margin-top:18px}
@@ -53,31 +53,26 @@
   <section class="preorder-hero">
     <div class="preorder-wrap">
       <a class="back-link" href="/"><i class="fas fa-arrow-left"></i> 回潮旅首頁</a>
-      <h1>小城故事・內海巡禮預購訂位</h1>
-      <p>每日提供 09:00、11:00 兩個出航時間。每班最多 13 人，累計 6 人報名即達發船門檻。消費者與合作業者都可使用本表單預購訂位。</p>
-      <div class="preorder-badges">
-        <span class="preorder-badge">6 人成行</span>
-        <span class="preorder-badge">最多 13 人</span>
-        <span class="preorder-badge">航程約 90 分鐘</span>
-        <span class="preorder-badge">亞果碼頭出發</span>
-      </div>
+      <h1 id="product-title">行程預購訂位</h1>
+      <p id="product-desc">載入行程資訊中…</p>
+      <div class="preorder-badges" id="product-badges"></div>
     </div>
   </section>
 
   <main class="preorder-main">
     <section class="panel">
-      <h2><i class="fas fa-calendar-days"></i> 選擇月份與船班</h2>
-      <p class="muted">請先選月份，再點選日期與時間。名額會依目前預購人數即時顯示。</p>
+      <h2><i class="fas fa-calendar-days"></i> 選擇出發日期</h2>
+      <p class="muted" id="slot-hint">請先選月份，再點選出發日期。狀態會依目前預購人數即時顯示。</p>
       <div class="month-row">
         <input type="month" id="month-input" />
-        <button class="btn btn-primary" id="load-month"><i class="fas fa-sync"></i> 載入船班</button>
+        <button class="btn btn-primary" id="load-month"><i class="fas fa-sync"></i> 載入場次</button>
       </div>
       <div id="sailing-grid" class="sailing-grid"></div>
     </section>
 
     <section class="panel">
       <h2><i class="fas fa-clipboard-list"></i> 預購訂單資料</h2>
-      <div id="selected-sailing" class="selected-box">請先從左側選擇出航日期與時間</div>
+      <div id="selected-sailing" class="selected-box">請先從左側選擇出發日期</div>
       <form id="preorder-form">
         <div class="field">
           <label for="agency-name">業者名稱或代號（選填）</label>
@@ -90,15 +85,15 @@
         <div class="privacy">
           <strong>個人資料蒐集與利用告知事項</strong><br>
           潮旅國際旅行社（交觀乙字第1864號）依《個人資料保護法》告知：本表單蒐集之姓名、身分證字號、出生年月日與聯絡電話，
-          僅供本次「小城故事・內海巡禮」預購訂位、旅客保險投保、出航名冊製作，以及行程聯繫與身分核對之用。
-          利用期間至本次行程結束及相關法令規定之保存期限屆滿為止；利用對象為潮旅國際旅行社及配合之船務、保險單位，利用地區為澎湖及前述必要範圍。
+          僅供本次「<span class="privacy-product-name">預購行程</span>」預購訂位、旅客保險投保、名冊製作，以及行程聯繫與身分核對之用。
+          利用期間至本次行程結束及相關法令規定之保存期限屆滿為止；利用對象為潮旅國際旅行社及配合之交通、住宿、保險單位，利用地區為澎湖及前述必要範圍。
           您得依法向潮旅（電話 06-9271288／LINE @phbay2018）請求查詢、閱覽、複製、補充或更正、停止蒐集處理利用及刪除您的個人資料。
           若不提供上述資料，將無法完成預購訂位與投保。
         </div>
         <div id="passenger-list"></div>
         <div class="field">
           <label for="notes">備註（選填）</label>
-          <textarea id="notes" rows="3" placeholder="例：11:00 船班需加購午餐、同行者特殊需求等"></textarea>
+          <textarea id="notes" rows="3" placeholder="例：住宿需求、同行者特殊需求、希望聯繫時段等"></textarea>
         </div>
         <label class="consent-row" style="display:flex;gap:8px;align-items:flex-start;margin:14px 0;font-size:.92rem;line-height:1.6;color:#3a4a5a">
           <input type="checkbox" id="consent" style="margin-top:3px;width:auto" />
@@ -111,29 +106,53 @@
   </main>
 
   <script>
+    const SLUG = location.pathname.split('/').filter(Boolean).pop();
     const grid = document.getElementById('sailing-grid');
     const monthInput = document.getElementById('month-input');
     const selectedBox = document.getElementById('selected-sailing');
     const passengerCount = document.getElementById('passenger-count');
     const passengerList = document.getElementById('passenger-list');
     const resultBox = document.getElementById('result');
-    let selectedSailing = null;
+    let product = null;
+    let selectedSlot = null;
 
-    function ymToday(){
-      const d = new Date();
-      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    }
     function esc(s){ return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
-    function weekday(dateStr){
-      return ['日','一','二','三','四','五','六'][new Date(`${dateStr}T00:00:00`).getDay()];
-    }
+    function weekday(dateStr){ return ['日','一','二','三','四','五','六'][new Date(`${dateStr}T00:00:00`).getDay()]; }
+    function ym(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
     function statusClass(s){ return ['forming','guaranteed','full','closed'].includes(s) ? s : 'forming'; }
+    function slotLabel(s){
+      let t = `${s.date}（${weekday(s.date)}）`;
+      if (s.time) t += ` ${s.time}`;
+      if (s.return_date) t += ` 出發 → ${s.return_date}（${weekday(s.return_date)}）返`;
+      return t;
+    }
+
+    function renderProduct(){
+      document.title = `${product.name} 預購訂位｜潮旅國際旅行社`;
+      document.getElementById('product-title').textContent = `${product.name} 預購訂位`;
+      document.getElementById('product-desc').textContent = product.description || '';
+      document.querySelectorAll('.privacy-product-name').forEach(el => el.textContent = product.name);
+      document.getElementById('product-badges').innerHTML =
+        product.badges.map(b => `<span class="preorder-badge">${esc(b)}</span>`).join('');
+      passengerCount.max = product.max_party;
+      // 月份選擇範圍：今天起，至行程開放結束月
+      const today = new Date();
+      const startYm = product.date_start ? product.date_start.slice(0,7) : ym(today);
+      monthInput.min = startYm > ym(today) ? startYm : ym(today);
+      if (product.date_end) monthInput.max = product.date_end.slice(0,7);
+      monthInput.value = monthInput.min;
+      if (product.slot_type === 'times') {
+        document.getElementById('slot-hint').textContent = '請先選月份，再點選日期與時間。狀態會依目前預購人數即時顯示。';
+      }
+    }
+
     function renderPassengers(){
-      const n = Math.max(1, Math.min(13, parseInt(passengerCount.value || '1', 10)));
+      const maxN = product ? product.max_party : 13;
+      const n = Math.max(1, Math.min(maxN, parseInt(passengerCount.value || '1', 10)));
       passengerCount.value = n;
       passengerList.innerHTML = Array.from({length:n}, (_, i) => `
         <div class="passenger-card">
-          <h3>第 ${i+1} 位乘客</h3>
+          <h3>第 ${i+1} 位旅客</h3>
           <div class="passenger-grid">
             <div class="field"><label>姓名 *</label><input name="p_name_${i}" required /></div>
             <div class="field"><label>身分證字號 *</label><input name="p_id_${i}" required autocomplete="off" /></div>
@@ -142,40 +161,43 @@
           </div>
         </div>`).join('');
     }
-    async function loadSailings(){
+
+    async function loadSlots(){
       grid.innerHTML = '載入中…';
-      selectedSailing = null;
-      selectedBox.textContent = '請先從左側選擇出航日期與時間';
-      const res = await fetch(`/api/neihai/sailings?month=${encodeURIComponent(monthInput.value)}`);
+      selectedSlot = null;
+      selectedBox.textContent = '請先從左側選擇出發日期';
+      const res = await fetch(`/api/preorder/${encodeURIComponent(SLUG)}/slots?month=${encodeURIComponent(monthInput.value)}`);
       const json = await res.json();
       if (!json.ok) { grid.innerHTML = esc(json.error || '載入失敗'); return; }
-      if (!json.sailings.length) { grid.innerHTML = '<p class="muted">本月已無可預購的船班，請改選其他月份。</p>'; return; }
-      grid.innerHTML = json.sailings.map(s => `
+      if (!json.slots.length) { grid.innerHTML = '<p class="muted">本月沒有可預購的出發日，請改選其他月份。</p>'; return; }
+      grid.innerHTML = json.slots.map(s => `
         <button type="button" class="sailing-card ${esc(s.status)}" data-date="${esc(s.date)}" data-time="${esc(s.time)}" ${['full','closed'].includes(s.status) ? 'disabled' : ''}>
           <div class="sailing-date">${esc(s.date)}（${weekday(s.date)}）</div>
-          <div class="sailing-time">${esc(s.time)}</div>
+          ${s.time ? `<div class="sailing-time">${esc(s.time)}</div>` : ''}
+          ${s.return_date ? `<div class="sailing-time">→ ${esc(s.return_date)}（${weekday(s.return_date)}）返</div>` : ''}
           <span class="status ${statusClass(s.status)}">${esc(s.status_label)}</span>
-          <div class="muted" style="margin-top:8px">已訂 ${s.booked}/${s.capacity} 位｜剩 ${s.remaining} 位</div>
+          <div class="muted" style="margin-top:8px">已報 ${s.booked} 人${s.remaining != null ? `｜剩 ${s.remaining} 位` : ''}</div>
         </button>`).join('');
       grid.querySelectorAll('.sailing-card').forEach(btn => {
         btn.addEventListener('click', () => {
           grid.querySelectorAll('.sailing-card').forEach(b => b.classList.remove('selected'));
           btn.classList.add('selected');
-          selectedSailing = json.sailings.find(s => s.date === btn.dataset.date && s.time === btn.dataset.time);
-          selectedBox.innerHTML = `<strong>${esc(selectedSailing.date)}（${weekday(selectedSailing.date)}）${esc(selectedSailing.time)}</strong><br>${esc(selectedSailing.status_label)}｜剩餘 ${selectedSailing.remaining} 位`;
+          selectedSlot = json.slots.find(s => s.date === btn.dataset.date && s.time === btn.dataset.time);
+          selectedBox.innerHTML = `<strong>${esc(slotLabel(selectedSlot))}</strong><br>${esc(selectedSlot.status_label)}${selectedSlot.remaining != null ? `｜剩餘 ${selectedSlot.remaining} 位` : ''}`;
           resultBox.className = 'result';
           resultBox.innerHTML = '';
         });
       });
     }
-    document.getElementById('load-month').addEventListener('click', loadSailings);
+
+    document.getElementById('load-month').addEventListener('click', loadSlots);
     passengerCount.addEventListener('input', renderPassengers);
     document.getElementById('preorder-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       resultBox.className = 'result';
-      if (!selectedSailing) {
+      if (!selectedSlot) {
         resultBox.className = 'result err';
-        resultBox.textContent = '請先選擇出航日期與時間。';
+        resultBox.textContent = '請先選擇出發日期。';
         return;
       }
       if (!document.getElementById('consent').checked) {
@@ -184,9 +206,9 @@
         return;
       }
       const n = parseInt(passengerCount.value, 10);
-      if (n > selectedSailing.remaining) {
+      if (selectedSlot.remaining != null && n > selectedSlot.remaining) {
         resultBox.className = 'result err';
-        resultBox.textContent = `此船班目前只剩 ${selectedSailing.remaining} 位，請調整人數或改選其他船班。`;
+        resultBox.textContent = `此場次目前只剩 ${selectedSlot.remaining} 位，請調整人數或改選其他場次。`;
         return;
       }
       const fd = new FormData(e.target);
@@ -200,12 +222,12 @@
       btn.disabled = true;
       btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 送出中...';
       try {
-        const res = await fetch('/api/neihai/preorders', {
+        const res = await fetch(`/api/preorder/${encodeURIComponent(SLUG)}/orders`, {
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body: JSON.stringify({
-            sailing_date: selectedSailing.date,
-            sailing_time: selectedSailing.time,
+            departure_date: selectedSlot.date,
+            departure_time: selectedSlot.time,
             agency_name: document.getElementById('agency-name').value,
             notes: document.getElementById('notes').value,
             passengers,
@@ -214,11 +236,11 @@
         const json = await res.json();
         if (!json.ok) throw new Error(json.error || '送出失敗');
         resultBox.className = 'result ok';
-        resultBox.innerHTML = `預購已送出！<br>訂單編號：<strong>${esc(json.booking_ref)}</strong><br>${esc(json.message)}。潮旅將再與您確認最終出航資訊。`;
+        resultBox.innerHTML = `預購已送出！<br>訂單編號：<strong>${esc(json.booking_ref)}</strong><br>${esc(json.message)}。潮旅將再與您確認行程細節與付款方式。`;
         e.target.reset();
         passengerCount.value = 1;
         renderPassengers();
-        await loadSailings();
+        await loadSlots();
       } catch (err) {
         resultBox.className = 'result err';
         resultBox.textContent = err.message || '送出失敗，請稍後再試或改用 LINE 聯繫。';
@@ -227,10 +249,22 @@
         btn.innerHTML = '<i class="fas fa-paper-plane"></i> 送出預購訂單';
       }
     });
-    monthInput.value = ymToday();
-    monthInput.min = ymToday(); // 過去的月份不可選，避免誤填過期日期
-    renderPassengers();
-    loadSailings();
+
+    (async function init(){
+      const res = await fetch(`/api/preorder/${encodeURIComponent(SLUG)}`);
+      const json = await res.json();
+      if (!json.ok) {
+        document.getElementById('product-title').textContent = '找不到此預購行程';
+        document.getElementById('product-desc').textContent = json.error || '請確認網址是否正確，或聯繫潮旅（06-9271288／LINE @phbay2018）。';
+        grid.innerHTML = '';
+        document.getElementById('preorder-form').style.display = 'none';
+        return;
+      }
+      product = json.product;
+      renderProduct();
+      renderPassengers();
+      loadSlots();
+    })();
 
     // 導覽列漢堡選單（本頁未載入 script.js，自行綁定）
     (function(){var t=document.getElementById('nav-toggle'),l=document.getElementById('nav-links');if(t)t.addEventListener('click',function(){l.classList.toggle('open')});})();

@@ -213,6 +213,9 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
     <button onclick="switchTab('neihai',this)">
       <i class="fas fa-ship"></i> 內海預購
     </button>
+    <button onclick="switchTab('preorder',this)">
+      <i class="fas fa-ticket"></i> 行程預購
+    </button>
     <button onclick="switchTab('contacts',this)">
       <i class="fas fa-envelope"></i> 諮詢紀錄
     </button>
@@ -293,6 +296,24 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
       </div>
       <div id="neihai-stats" class="stats-row"></div>
       <div id="neihai-orders-list">請選擇月份後載入…</div>
+    </div>
+
+    <!-- ── 通用行程預購（音樂節等） ── -->
+    <div class="tab-content" id="tab-preorder">
+      <div class="toolbar">
+        <h2>行程預購訂單</h2>
+        <div class="toolbar-right">
+          <select id="preorder-product" class="search-input" style="width:220px">
+            <option value="">全部行程</option>
+          </select>
+          <input type="month" id="preorder-month" class="search-input" style="width:160px" />
+          <button class="btn btn-primary" onclick="loadPreorderOrders()">
+            <i class="fas fa-sync"></i> 載入月份
+          </button>
+        </div>
+      </div>
+      <div id="preorder-stats" class="stats-row"></div>
+      <div id="preorder-orders-list">請選擇月份後載入…</div>
     </div>
 
     <!-- ── 諮詢紀錄 ── -->
@@ -699,6 +720,7 @@ function switchTab(name, btn) {
   if (name === 'slots')    loadSlots();
   if (name === 'posts')    loadPosts();
   if (name === 'neihai')   loadNeihaiOrders();
+  if (name === 'preorder') loadPreorderOrders();
 }
 
 /* ══════════════════════════════════════
@@ -1122,7 +1144,76 @@ function updateNeihaiOrderStatus(id, status) {
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('neihai-month');
   if (el && !el.value) el.value = neihaiMonthDefault();
+  const pel = document.getElementById('preorder-month');
+  if (pel && !pel.value) pel.value = neihaiMonthDefault();
 });
+
+
+/* ══════════════════════════════════════
+   通用行程預購訂單（音樂節等）
+══════════════════════════════════════ */
+function loadPreorderOrders() {
+  const monthEl = document.getElementById('preorder-month');
+  if (monthEl && !monthEl.value) monthEl.value = neihaiMonthDefault();
+  const month = monthEl ? monthEl.value : neihaiMonthDefault();
+  const product = document.getElementById('preorder-product').value;
+  const list = document.getElementById('preorder-orders-list');
+  list.innerHTML = '載入中…';
+  fetch(`/api/admin/preorder/orders?month=${encodeURIComponent(month)}&product=${encodeURIComponent(product)}&key=${encodeURIComponent(ADMIN_KEY)}`)
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) { list.innerHTML = d.error || '載入失敗'; return; }
+      // 行程下拉（保留目前選擇）
+      const sel = document.getElementById('preorder-product');
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">全部行程</option>' +
+        (d.products || []).map(p => `<option value="${p.slug}" ${p.slug===cur?'selected':''}>${p.name}</option>`).join('');
+      const activeOrders = d.orders.filter(o => o.status !== 'cancelled');
+      const pax = activeOrders.reduce((sum, o) => sum + (parseInt(o.passenger_count, 10) || 0), 0);
+      const confirmed = activeOrders.filter(o => o.status === 'confirmed_departure' || o.status === 'confirmed').length;
+      document.getElementById('preorder-stats').innerHTML = `
+        <div class="stat-card"><div class="num">${d.orders.length}</div><div class="lbl">本月訂單</div></div>
+        <div class="stat-card"><div class="num">${pax}</div><div class="lbl">有效預購人數</div></div>
+        <div class="stat-card"><div class="num">${confirmed}</div><div class="lbl">已確認訂單</div></div>`;
+      if (!d.orders.length) {
+        list.innerHTML = '<p style="color:#a0aec0;text-align:center;padding:40px">本月尚無預購訂單</p>';
+        return;
+      }
+      list.innerHTML = d.orders.map(o => `
+        <div class="contact-card" style="display:block">
+          <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+            <div>
+              <strong style="font-size:1.05rem;color:var(--blue-dk)">${o.booking_ref || '未編號'}</strong>
+              <div style="color:var(--mid);font-size:.9rem">${o.product_name}｜出發 ${o.departure_date}${o.departure_time ? ' ' + o.departure_time : ''}｜${o.passenger_count} 人｜業者：${o.agency_name || '—'}</div>
+            </div>
+            <div>
+              <span style="font-weight:800;color:${orderStatusColor(o.status)}">${statusText(o.status)}</span>
+              <select onchange="updatePreorderStatus(${o.id}, this.value)" style="margin-left:8px;padding:6px;border:1px solid #e2e8f0;border-radius:6px">
+                ${['pending_departure','confirmed_departure','confirmed','cancelled'].map(s => `<option value="${s}" ${o.status===s?'selected':''}>${statusText(s)}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="contact-field"><label>主要聯絡</label><span>${o.contact_name}｜${o.contact_phone}</span></div>
+          <div class="contact-field"><label>備註</label><span>${o.notes || '—'}</span></div>
+          <table class="tour-table" style="margin-top:12px">
+            <thead><tr><th>旅客</th><th>身分證字號</th><th>出生年月日</th><th>電話</th></tr></thead>
+            <tbody>${(o.passengers || []).map(p => `<tr><td>${p.name}</td><td><span class="mask-id" style="cursor:pointer;font-family:monospace" title="點擊顯示/隱藏完整號碼" onclick="toggleMaskId(this)" data-full="${p.national_id || ''}" data-masked="${maskId(p.national_id)}">${maskId(p.national_id)}</span></td><td>${p.birth_date}</td><td>${p.phone}</td></tr>`).join('')}</tbody>
+          </table>
+        </div>`).join('');
+    })
+    .catch(() => { list.innerHTML = '載入失敗'; });
+}
+
+function updatePreorderStatus(id, status) {
+  fetch(`/api/admin/preorder/orders/${id}?key=${encodeURIComponent(ADMIN_KEY)}`, {
+    method:'PATCH',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ status, _key: ADMIN_KEY })
+  }).then(r => r.json()).then(d => {
+    if (d.ok) { showToast('狀態已更新', 'success'); loadPreorderOrders(); }
+    else showToast(d.error || '更新失敗', 'error');
+  });
+}
 
 
 /* ══════════════════════════════════════
