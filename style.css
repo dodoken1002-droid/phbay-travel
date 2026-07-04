@@ -293,6 +293,18 @@ ul { list-style: none; }
   display: block;
 }
 
+/* 16:9 滿版圖片格（1920×1080 規格：鋪滿裁邊、重點置中） */
+.slide-cover {
+  height: 100vh;
+}
+.slide-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
 /* 潮旅主視覺（原 hero 樣式） */
 .slide-hero {
   min-height: 100vh;
