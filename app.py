@@ -937,7 +937,26 @@ def get_slots():
 
 
 # ─── 小城故事・內海巡禮預購 API ─────────────────────────────
-NEIHAI_TIMES = ("09:00", "11:00")
+NEIHAI_BASE_TIMES = ("09:00", "11:00")
+NEIHAI_THIRD_TIME = "16:30"                      # 2026-07-06 起每日加開第三時段
+NEIHAI_THIRD_TIME_START = date(2026, 7, 6)
+NEIHAI_FIREWORKS_TIME = "20:30"                  # 花火專船：2026 年 7、8 月每週二
+
+
+def _neihai_times_for_date(d):
+    """回傳指定日期可預購的出航時段（依日期動態決定）。"""
+    times = list(NEIHAI_BASE_TIMES)
+    if d >= NEIHAI_THIRD_TIME_START:
+        times.append(NEIHAI_THIRD_TIME)
+    if d.year == 2026 and d.month in (7, 8) and d.weekday() == 1:  # 週二
+        times.append(NEIHAI_FIREWORKS_TIME)
+    return times
+
+
+def _neihai_time_label(t):
+    return f"{t} 花火專船" if t == NEIHAI_FIREWORKS_TIME else t
+
+
 NEIHAI_DEFAULT_CAPACITY = 13
 NEIHAI_MIN_PEOPLE = 6
 NEIHAI_VALID_STATUSES = {
@@ -1055,14 +1074,15 @@ def _parse_sailing_date(value):
         raise ValueError("出航日期格式需為 YYYY-MM-DD")
 
 
-def _normalize_neihai_time(value):
+def _normalize_neihai_time(value, sailing_date=None):
     value = (value or "").strip()
-    if value in ("9:00", "09"):
-        value = "09:00"
-    if value in ("11:00", "11"):
-        value = "11:00"
-    if value not in NEIHAI_TIMES:
-        raise ValueError("出航時間僅開放 09:00、11:00")
+    aliases = {"9:00": "09:00", "09": "09:00", "11": "11:00",
+               "16": "16:30", "1630": "16:30", "20": "20:30", "2030": "20:30"}
+    value = aliases.get(value, value)
+    allowed = (_neihai_times_for_date(sailing_date) if sailing_date
+               else list(NEIHAI_BASE_TIMES) + [NEIHAI_THIRD_TIME, NEIHAI_FIREWORKS_TIME])
+    if value not in allowed:
+        raise ValueError("此日期可預購時段：" + "、".join(allowed))
     return value
 
 
@@ -1105,7 +1125,7 @@ def _neihai_month_availability(start, end):
     now = _taiwan_now()
     d = start
     while d < end:
-        for sailing_time in NEIHAI_TIMES:
+        for sailing_time in _neihai_times_for_date(d):
             # 已過出航時間的班次不再回傳，避免旅客誤選過期日期／時段
             if _sailing_departed(d, sailing_time, now):
                 continue
@@ -1120,6 +1140,7 @@ def _neihai_month_availability(start, end):
                 "id": row.get("id"),
                 "date": str(d),
                 "time": sailing_time,
+                "time_label": _neihai_time_label(sailing_time),
                 "capacity": capacity,
                 "min_people": min_people,
                 "booked": booked,
@@ -1157,7 +1178,7 @@ def create_neihai_preorder():
     data = request.get_json(force=True, silent=True) or {}
     try:
         sailing_date = _parse_sailing_date(data.get("sailing_date"))
-        sailing_time = _normalize_neihai_time(data.get("sailing_time"))
+        sailing_time = _normalize_neihai_time(data.get("sailing_time"), sailing_date)
     except ValueError as e:
         return jsonify(ok=False, error=str(e)), 400
     if _sailing_departed(sailing_date, sailing_time):
@@ -2063,7 +2084,7 @@ def admin_delete_post(pid):
 # ── 伺服器渲染：共用外殼 ──
 def _render_blog(title, desc, canonical, body, head_extra=''):
     nav = '''<div class="top-banner"><div class="banner-static"><span>潮旅國際旅行社</span><span class="banner-sep">｜</span><span>2026 澎湖追風音樂燈光節 官方合作旅行社</span><span class="banner-sep">｜</span><span>電話：06-9271288</span></div></div>
-<nav class="navbar" id="navbar"><div class="nav-container"><a href="/" class="nav-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a><button class="nav-toggle" id="nav-toggle" aria-label="選單"><span></span><span></span><span></span></button><ul class="nav-links" id="nav-links"><li><a href="/">首頁</a></li><li><a href="/#tours">行程介紹</a></li><li class="nav-item has-submenu"><a href="/neihai-preorder.html">預購行程 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/neihai-preorder.html">內海行程</a></li><li><a href="/preorder/festival">追風音樂節</a></li></ul></li><li class="nav-item has-submenu"><a href="/blog">旅遊大小事 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/tides">潮汐查詢系統</a></li><li><a href="/blog">旅遊文章分享</a></li><li><a href="/reviews">旅客評價</a></li></ul></li><li class="nav-item has-submenu"><a href="/#about">關於我們 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/#contact">聯絡資訊</a></li></ul></li></ul></div></nav>'''
+<nav class="navbar" id="navbar"><div class="nav-container"><a href="/" class="nav-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a><button class="nav-toggle" id="nav-toggle" aria-label="選單"><span></span><span></span><span></span></button><ul class="nav-links" id="nav-links"><li><a href="/">首頁</a></li><li><a href="/#tours">行程介紹</a></li><li class="nav-item has-submenu"><a href="/neihai-preorder.html">預購行程 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/neihai-preorder.html">小城故事內海巡禮</a></li><li><a href="/preorder/festival">追風音樂節</a></li></ul></li><li class="nav-item has-submenu"><a href="/blog">旅遊大小事 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/tides">潮汐查詢系統</a></li><li><a href="/blog">旅遊文章分享</a></li><li><a href="/reviews">旅客評價</a></li></ul></li><li class="nav-item has-submenu"><a href="/#about">關於我們 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/#contact">聯絡資訊</a></li></ul></li></ul></div></nav>'''
     footer = '''<footer class="footer"><div class="container"><div class="footer-bottom"><p>© 2026 潮旅國際旅行社 All Rights Reserved.｜<a href="/" style="color:inherit">官網</a>｜<a href="/blog" style="color:inherit">部落格</a>｜<a href="/reviews" style="color:inherit">旅客評價</a></p></div></div></footer>
 <script>(function(){var t=document.getElementById('nav-toggle'),l=document.getElementById('nav-links');if(t)t.addEventListener('click',function(){l.classList.toggle('open')});})();</script>'''
     return ('<!DOCTYPE html><html lang="zh-TW"><head>'

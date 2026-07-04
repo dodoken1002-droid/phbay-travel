@@ -275,53 +275,25 @@ ul { list-style: none; }
   overflow: hidden;
 }
 
-/* 第 1 格：直式海報（粉紅底色，保持比例置中） */
-.slide-poster {
-  background: #e8197a;
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.slide-poster img {
-  max-height: 100vh;
-  max-width: 100%;
-  object-fit: contain;
-  display: block;
-}
-
-/* 第 2 格：橫式 Banner（全寬覆蓋） */
-.slide-banner {
-  background: #d61779;
-  min-height: 56vw;
-  max-height: 100vh;
-  display: flex;
-  align-items: center;
-}
-.slide-banner img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-/* 活動促銷（正方形圖：天空藍底、完整置中、不裁切） */
+/* 圖片格統一尺寸：滿版高度、圖片保持比例置中不裁切（各格自帶底色） */
+.slide-poster,
 .slide-promo {
-  background: #bfe3f7;
-  min-height: 56vw;
-  max-height: 100vh;
+  height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
 }
+.slide-poster { background: #e8197a; }
+.slide-promo  { background: #bfe3f7; }
+.slide-poster img,
 .slide-promo img {
-  max-width: 100%;
   max-height: 100vh;
+  max-width: 100%;
   object-fit: contain;
   display: block;
 }
 
-/* 第 3 格：潮旅主視覺（原 hero 樣式） */
+/* 潮旅主視覺（原 hero 樣式） */
 .slide-hero {
   min-height: 100vh;
   background: url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&q=85') center / cover no-repeat;
@@ -1514,7 +1486,6 @@ ul { list-style: none; }
   .carousel-arrow { width: 36px; height: 36px; font-size: .9rem; }
   .carousel-prev { left: 10px; }
   .carousel-next { right: 10px; }
-  .slide-banner { min-height: 50vw; }
   .d-mobile-none { display: none; }
   .hero-buttons .btn { width: 100%; max-width: 280px; justify-content: center; }
 
