@@ -15,6 +15,10 @@ import os
 import re
 import json
 import base64
+import hmac
+import hashlib
+import urllib.request
+import urllib.error
 from datetime import date, datetime, timedelta
 import smtplib
 from email.mime.text import MIMEText
@@ -175,6 +179,18 @@ def init_db():
             preorder_id  INT NOT NULL REFERENCES neihai_preorders(id) ON DELETE CASCADE,
             summary      TEXT NOT NULL,
             changed_at   TIMESTAMP DEFAULT NOW()
+        )
+    """)
+
+    # LINE 官方帳號互動用戶（webhook 記錄，用於取得 userId 與對照訂單）
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS line_users (
+            user_id        VARCHAR(64) PRIMARY KEY,
+            display_name   VARCHAR(120),
+            last_message   TEXT,
+            message_count  INT DEFAULT 0,
+            first_seen     TIMESTAMP DEFAULT NOW(),
+            last_seen      TIMESTAMP DEFAULT NOW()
         )
     """)
 
@@ -738,12 +754,69 @@ def _smtp_send(sender, password, recipient, msg):
     return False, ' ; '.join(errors)
 
 
+# ─── LINE Messaging API 通知 ─────────────────────────────────
+# 需環境變數：LINE_CHANNEL_ACCESS_TOKEN（頻道存取權杖）、LINE_CHANNEL_SECRET（webhook 驗簽）、
+# LINE_OWNER_USER_ID（接收通知的老闆 userId，向官方帳號傳「綁定通知」即可由機器人回覆取得）。
+# 走 HTTPS（api.line.me），不受 Railway SMTP 封鎖影響；全部失敗不影響訂單/表單儲存。
+
+def _line_api_call(endpoint, payload):
+    """POST 到 LINE Messaging API，回傳 (ok: bool, detail: str)。"""
+    token = os.environ.get('LINE_CHANNEL_ACCESS_TOKEN', '').strip()
+    if not token:
+        return False, 'LINE_CHANNEL_ACCESS_TOKEN 未設定'
+    req = urllib.request.Request(
+        f'https://api.line.me/v2/bot/{endpoint}',
+        data=json.dumps(payload).encode('utf-8'),
+        headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'},
+        method='POST')
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return True, f'HTTP {resp.status}'
+    except urllib.error.HTTPError as e:
+        try:
+            detail = e.read().decode('utf-8', 'replace')[:300]
+        except Exception:
+            detail = ''
+        return False, f'HTTP {e.code}：{detail}'
+    except Exception as e:
+        return False, str(e)
+
+
+def send_line_notify(text):
+    """推播文字訊息給老闆（LINE_OWNER_USER_ID）。未設定即跳過，失敗只記 log。"""
+    owner = os.environ.get('LINE_OWNER_USER_ID', '').strip()
+    if not owner or not os.environ.get('LINE_CHANNEL_ACCESS_TOKEN', '').strip():
+        print('[LINE] 未設定 LINE_CHANNEL_ACCESS_TOKEN / LINE_OWNER_USER_ID，跳過 LINE 通知')
+        return False, '未設定'
+    ok, detail = _line_api_call('message/push', {
+        'to': owner, 'messages': [{'type': 'text', 'text': text[:4900]}]})
+    print(f'[LINE] 推播{"成功" if ok else "失敗"}（{detail}）')
+    return ok, detail
+
+
+def _line_reply(reply_token, text):
+    return _line_api_call('message/reply', {
+        'replyToken': reply_token, 'messages': [{'type': 'text', 'text': text[:4900]}]})
+
+
+def _line_get_profile(user_id):
+    """查使用者顯示名稱；失敗回空字串（例如未加好友）。"""
+    token = os.environ.get('LINE_CHANNEL_ACCESS_TOKEN', '').strip()
+    if not token or not user_id:
+        return ''
+    req = urllib.request.Request(
+        f'https://api.line.me/v2/bot/profile/{user_id}',
+        headers={'Authorization': f'Bearer {token}'})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return (json.loads(resp.read().decode('utf-8')) or {}).get('displayName', '')
+    except Exception:
+        return ''
+
+
 def send_contact_email(data):
     sender    = os.environ.get('EMAIL_USER', '')
     recipient = 'dodoken1002@phbay.net'
-    if not sender or not (os.environ.get('GMAIL_SERVICE_ACCOUNT_JSON', '').strip() or os.environ.get('EMAIL_PASS', '')):
-        print('[EMAIL] 未設定寄信方式（EMAIL_USER + GMAIL_SERVICE_ACCOUNT_JSON 或 EMAIL_PASS），跳過寄信')
-        return
 
     body = f"""潮旅國際旅行社 — 新諮詢通知
 
@@ -762,28 +835,32 @@ def send_contact_email(data):
 
 請盡快與客戶聯繫。
 """
-    msg = MIMEMultipart()
-    msg['From']    = f'潮旅國際旅行社 <{sender}>'
-    msg['To']      = recipient
-    msg['Subject'] = f'【新諮詢】{data.get("name", "")} — {data.get("travel_date", "")} ~ {data.get("travel_date_end", "")}'
-    msg.attach(MIMEText(body, 'plain', 'utf-8'))
-
-    ok, detail = _deliver(sender, recipient, msg)
-    if ok:
-        print(f'[EMAIL] 通知信已寄出（{detail}）→ {recipient}')
+    if sender and (os.environ.get('GMAIL_SERVICE_ACCOUNT_JSON', '').strip() or os.environ.get('EMAIL_PASS', '')):
+        msg = MIMEMultipart()
+        msg['From']    = f'潮旅國際旅行社 <{sender}>'
+        msg['To']      = recipient
+        msg['Subject'] = f'【新諮詢】{data.get("name", "")} — {data.get("travel_date", "")} ~ {data.get("travel_date_end", "")}'
+        msg.attach(MIMEText(body, 'plain', 'utf-8'))
+        ok, detail = _deliver(sender, recipient, msg)
+        if ok:
+            print(f'[EMAIL] 通知信已寄出（{detail}）→ {recipient}')
+        else:
+            print(f'[EMAIL] 寄信失敗（不影響表單儲存）：{detail}')
     else:
-        print(f'[EMAIL] 寄信失敗（不影響表單儲存）：{detail}')
+        print('[EMAIL] 未設定寄信方式（EMAIL_USER + GMAIL_SERVICE_ACCOUNT_JSON 或 EMAIL_PASS），跳過寄信')
+
+    try:
+        send_line_notify(body)
+    except Exception as _e:
+        print(f'[LINE] 諮詢通知呼叫失敗（不影響表單儲存）：{_e}')
 
 
 def send_preorder_email(info):
-    """行程預購新訂單通知信（內海巡禮／音樂節等預購共用）。
-    沿用諮詢信的 SMTP 設定；寄信失敗不影響訂單建立。
-    為保護個資，信中不含完整身分證字號，完整資料請至後台 /admin 檢視。"""
+    """行程預購新訂單通知（內海巡禮／音樂節等預購共用）：email＋LINE 推播。
+    任一通知失敗都不影響訂單建立。
+    為保護個資，通知內容不含完整身分證字號，完整資料請至後台 /admin 檢視。"""
     sender    = os.environ.get('EMAIL_USER', '')
     recipient = os.environ.get('PREORDER_NOTIFY_EMAIL', 'dodoken1002@phbay.net')
-    if not sender or not (os.environ.get('GMAIL_SERVICE_ACCOUNT_JSON', '').strip() or os.environ.get('EMAIL_PASS', '')):
-        print('[EMAIL] 未設定寄信方式（EMAIL_USER + GMAIL_SERVICE_ACCOUNT_JSON 或 EMAIL_PASS），跳過預購通知')
-        return
 
     status_map = {'confirmed_departure': '已達成行門檻（可成行）', 'pending_departure': '待成團',
                   'confirmed': '人工確認', 'cancelled': '已取消'}
@@ -807,16 +884,24 @@ def send_preorder_email(info):
 ※ 身分證字號等完整資料請至後台 /admin 檢視。
 請盡快與客戶確認出發資訊。
 """
-    msg = MIMEMultipart()
-    msg['From']    = f'潮旅國際旅行社 <{sender}>'
-    msg['To']      = recipient
-    msg['Subject'] = f'【新預購】{product}｜{when}｜{info.get("passenger_count", "")}人｜{info.get("booking_ref", "")}'
-    msg.attach(MIMEText(body, 'plain', 'utf-8'))
-    ok, detail = _deliver(sender, recipient, msg)
-    if ok:
-        print(f'[EMAIL] 預購通知信已寄出（{detail}）→ {recipient}')
+    if sender and (os.environ.get('GMAIL_SERVICE_ACCOUNT_JSON', '').strip() or os.environ.get('EMAIL_PASS', '')):
+        msg = MIMEMultipart()
+        msg['From']    = f'潮旅國際旅行社 <{sender}>'
+        msg['To']      = recipient
+        msg['Subject'] = f'【新預購】{product}｜{when}｜{info.get("passenger_count", "")}人｜{info.get("booking_ref", "")}'
+        msg.attach(MIMEText(body, 'plain', 'utf-8'))
+        ok, detail = _deliver(sender, recipient, msg)
+        if ok:
+            print(f'[EMAIL] 預購通知信已寄出（{detail}）→ {recipient}')
+        else:
+            print(f'[EMAIL] 預購通知寄信失敗（不影響訂單）：{detail}')
     else:
-        print(f'[EMAIL] 預購通知寄信失敗（不影響訂單）：{detail}')
+        print('[EMAIL] 未設定寄信方式（EMAIL_USER + GMAIL_SERVICE_ACCOUNT_JSON 或 EMAIL_PASS），跳過預購通知')
+
+    try:
+        send_line_notify(body)
+    except Exception as _e:
+        print(f'[LINE] 預購通知呼叫失敗（不影響訂單）：{_e}')
 
 
 # ─── 梯次名額 API（公開）─────────────────────────────────────
@@ -1365,6 +1450,97 @@ def admin_email_test():
         return jsonify(ok=True, configured=True, sent_to=recipient, via=detail,
                        message=f'測試信已透過 {detail} 寄出至 {recipient}，請查收。')
     return jsonify(ok=False, configured=True, error=f'各埠皆寄信失敗：{detail}')
+
+
+# ─── LINE Messaging API：webhook 與診斷 ─────────────────────
+LINE_BIND_KEYWORDS = {'綁定通知', '綁定', '我的id', 'id', 'userid', 'myid'}
+
+
+@app.route('/api/line/webhook', methods=['POST'])
+def line_webhook():
+    """LINE 官方帳號 webhook：驗簽後記錄互動用戶；
+    傳「綁定通知」的用戶會收到自己的 userId（供設定 LINE_OWNER_USER_ID）。"""
+    secret = os.environ.get('LINE_CHANNEL_SECRET', '').strip()
+    if not secret:
+        return jsonify(ok=False, error='LINE_CHANNEL_SECRET 未設定'), 503
+    body = request.get_data()
+    signature = request.headers.get('X-Line-Signature', '')
+    expected = base64.b64encode(hmac.new(secret.encode('utf-8'), body, hashlib.sha256).digest()).decode()
+    if not hmac.compare_digest(signature, expected):
+        return jsonify(ok=False, error='簽章驗證失敗'), 403
+
+    try:
+        events = (json.loads(body.decode('utf-8')) or {}).get('events', [])
+    except Exception:
+        events = []
+    for ev in events:
+        try:
+            user_id = ((ev.get('source') or {}).get('userId') or '').strip()
+            if not user_id:
+                continue
+            etype = ev.get('type')
+            text = ''
+            if etype == 'message' and (ev.get('message') or {}).get('type') == 'text':
+                text = ((ev.get('message') or {}).get('text') or '').strip()
+            display_name = _line_get_profile(user_id)
+            conn = get_db(); cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO line_users (user_id, display_name, last_message, message_count)
+                VALUES (%s, %s, %s, 1)
+                ON CONFLICT (user_id) DO UPDATE SET
+                  display_name = COALESCE(NULLIF(EXCLUDED.display_name, ''), line_users.display_name),
+                  last_message = CASE WHEN EXCLUDED.last_message <> '' THEN EXCLUDED.last_message ELSE line_users.last_message END,
+                  message_count = line_users.message_count + 1,
+                  last_seen = NOW()
+            """, (user_id, display_name, text))
+            conn.commit(); cur.close(); conn.close()
+            if text and text.lower().replace(' ', '') in LINE_BIND_KEYWORDS and ev.get('replyToken'):
+                _line_reply(ev['replyToken'],
+                            f'您的 LINE userId 是：\n{user_id}\n\n'
+                            '（此代碼供潮旅系統設定通知使用，一般旅客不需理會）')
+        except Exception as e:
+            print(f'[LINE] webhook 事件處理失敗（略過）：{e}')
+    return 'OK', 200
+
+
+@app.route('/api/admin/line-test', methods=['GET', 'POST'])
+def admin_line_test():
+    """診斷 LINE 通知設定：檢查環境變數並實際推播一則測試訊息給老闆。"""
+    if not is_admin():
+        return jsonify(ok=False, error='未授權'), 401
+    has_token = bool(os.environ.get('LINE_CHANNEL_ACCESS_TOKEN', '').strip())
+    has_secret = bool(os.environ.get('LINE_CHANNEL_SECRET', '').strip())
+    owner = os.environ.get('LINE_OWNER_USER_ID', '').strip()
+    if not has_token or not owner:
+        return jsonify(ok=False, configured=False,
+                       has_token=has_token, has_secret=has_secret, has_owner=bool(owner),
+                       error='需設定 LINE_CHANNEL_ACCESS_TOKEN 與 LINE_OWNER_USER_ID'
+                             '（webhook 另需 LINE_CHANNEL_SECRET）。')
+    ok, detail = send_line_notify('【測試】潮旅 LINE 通知設定成功！日後新預購訂單與諮詢會即時推播到這裡。')
+    if ok:
+        return jsonify(ok=True, configured=True, has_secret=has_secret, via='line-messaging-api',
+                       message='測試訊息已推播，請查看您的 LINE。')
+    return jsonify(ok=False, configured=True, has_secret=has_secret, error=f'推播失敗：{detail}')
+
+
+@app.route('/api/admin/line-users', methods=['GET'])
+def admin_line_users():
+    """列出曾與官方帳號互動的用戶（webhook 記錄），供查 userId 與對照訂單。"""
+    if not is_admin():
+        return jsonify(ok=False, error='未授權'), 401
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT * FROM line_users ORDER BY last_seen DESC LIMIT 200")
+        users = []
+        for r in cur.fetchall():
+            r = dict(r)
+            for k in ('first_seen', 'last_seen'):
+                if r.get(k): r[k] = str(r[k])
+            users.append(r)
+        cur.close(); conn.close()
+        return jsonify(ok=True, users=users)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
 
 
 # ─── 通用預購系統（音樂節等；每個行程一筆 preorder_products）───
