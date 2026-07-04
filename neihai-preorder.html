@@ -207,12 +207,12 @@
       passengerCount.value = n;
       passengerList.innerHTML = Array.from({length:n}, (_, i) => `
         <div class="passenger-card">
-          <h3>第 ${i+1} 位乘客</h3>
+          <h3>第 ${i+1} 位乘客${i === 0 ? '（代表人）' : ''}</h3>
           <div class="passenger-grid">
             <div class="field"><label>姓名 *</label><input name="p_name_${i}" required /></div>
             <div class="field"><label>身分證字號 *</label><input name="p_id_${i}" required autocomplete="off" /></div>
             <div class="field"><label>出生年月日 *</label><input type="date" name="p_birth_${i}" required /></div>
-            <div class="field"><label>電話 *</label><input type="tel" name="p_phone_${i}" required /></div>
+            <div class="field"><label>電話${i === 0 ? ' *' : '（選填）'}</label><input type="tel" name="p_phone_${i}" ${i === 0 ? 'required' : ''} /></div>
           </div>
         </div>`).join('');
     }
@@ -288,7 +288,13 @@
         const json = await res.json();
         if (!json.ok) throw new Error(json.error || '送出失敗');
         resultBox.className = 'result ok';
-        resultBox.innerHTML = `預購已送出！<br>訂單編號：<strong>${esc(json.booking_ref)}</strong><br>${esc(json.message)}。潮旅將再與您確認最終出航資訊。`;
+        resultBox.innerHTML = `預購已送出！<br>訂單編號：<strong>${esc(json.booking_ref)}</strong><br>${esc(json.message)}。潮旅將再與您確認最終出航資訊。<br>
+          <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" rel="noopener noreferrer"
+             style="display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:#06c755;color:#fff;font-weight:800;padding:12px 22px;border-radius:30px;text-decoration:none">
+            <i class="fab fa-line" style="font-size:1.3rem"></i> 加入官方 LINE（@phbay2018），出航通知不漏接
+          </a><br>
+          <span style="font-size:.85rem;color:#5a7a94">加入後請傳訊息告知訂單編號 ${esc(json.booking_ref)}，方便我們與您聯繫。</span>`;
+        resultBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
         if (typeof fbq === 'function') fbq('track', 'Lead', { content_name: '內海巡禮預購' });
         e.target.reset();
         passengerCount.value = 1;

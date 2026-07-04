@@ -1088,8 +1088,11 @@ def create_neihai_preorder():
         national_id = (p.get("national_id") or "").strip().upper()
         phone = (p.get("phone") or "").strip()
         birth = (p.get("birth_date") or "").strip()
-        if not all([name, national_id, phone, birth]):
+        # 電話僅第 1 位（代表人）必填，其餘乘客選填
+        if not all([name, national_id, birth]):
             return jsonify(ok=False, error=f"第 {idx} 位乘客資料未填完整"), 400
+        if idx == 1 and not phone:
+            return jsonify(ok=False, error="第 1 位乘客為代表人，請填寫聯絡電話"), 400
         try:
             birth_date = datetime.strptime(birth, "%Y-%m-%d").date()
         except ValueError:
@@ -1521,9 +1524,13 @@ def api_preorder_create(slug):
             national_id = (ps.get('national_id') or '').strip().upper()
             phone = (ps.get('phone') or '').strip()
             birth = (ps.get('birth_date') or '').strip()
-            if not all([name, national_id, phone, birth]):
+            # 電話僅第 1 位（代表人）必填，其餘旅客選填
+            if not all([name, national_id, birth]):
                 cur.close(); conn.close()
                 return jsonify(ok=False, error=f'第 {idx} 位旅客資料未填完整'), 400
+            if idx == 1 and not phone:
+                cur.close(); conn.close()
+                return jsonify(ok=False, error='第 1 位旅客為代表人，請填寫聯絡電話'), 400
             try:
                 birth_date = datetime.strptime(birth, '%Y-%m-%d').date()
             except ValueError:
