@@ -1447,6 +1447,101 @@ def admin_update_neihai_preorder(order_id):
         return jsonify(ok=False, error=str(e)), 500
 
 
+IMPORT_STATUS_LABELS = {v: k for k, v in NEIHAI_STATUS_LABELS.items()}  # 中文標籤→代碼
+
+
+def _import_clean_passengers(raw_passengers):
+    """匯入用乘客清洗：姓名/身分證/生日必填，電話選填。回傳 (clean, err)。"""
+    clean = []
+    for idx, p in enumerate(raw_passengers or [], start=1):
+        name = (p.get('name') or '').strip()
+        national_id = (p.get('national_id') or '').strip().upper()
+        birth = (p.get('birth_date') or '').strip()
+        phone = (p.get('phone') or '').strip()
+        if not all([name, national_id, birth]):
+            return None, f'第 {idx} 位乘客缺姓名/身分證/生日'
+        try:
+            birth_date = datetime.strptime(birth, '%Y-%m-%d').date()
+        except ValueError:
+            return None, f'第 {idx} 位乘客生日格式需為 YYYY-MM-DD（{birth}）'
+        clean.append({'name': name, 'national_id': national_id,
+                      'birth_date': birth_date, 'phone': phone})
+    if not clean:
+        return None, '沒有乘客資料'
+    return clean, None
+
+
+@app.route('/api/admin/neihai/import', methods=['POST'])
+def admin_neihai_import():
+    """後台批次匯入內海預購訂單（CSV 格式與匯出相同，前端解析後送 JSON）。
+    - booking_ref 已存在的訂單直接略過（可安全重複匯入）
+    - 不做已出航/額滿阻擋（後台資料視為權威，超過容量僅回警告）
+    - 不寄 email / LINE 通知"""
+    if not is_admin():
+        return jsonify(ok=False, error='未授權'), 401
+    data = request.get_json(force=True, silent=True) or {}
+    orders = data.get('orders') or []
+    if not isinstance(orders, list) or not orders:
+        return jsonify(ok=False, error='沒有可匯入的訂單'), 400
+    created, skipped, errors, warnings = [], [], [], []
+    try:
+        conn = get_db(); cur = conn.cursor()
+        for i, o in enumerate(orders, start=1):
+            try:
+                sailing_date = _parse_sailing_date(o.get('sailing_date'))
+                sailing_time = _normalize_neihai_time(o.get('sailing_time'), sailing_date)
+            except ValueError as e:
+                errors.append(f'第 {i} 筆：{e}'); continue
+            ref = (o.get('booking_ref') or '').strip()
+            if ref:
+                cur.execute("SELECT id FROM neihai_preorders WHERE booking_ref=%s", (ref,))
+                if cur.fetchone():
+                    skipped.append(ref); continue
+            clean, err = _import_clean_passengers(o.get('passengers'))
+            if err:
+                errors.append(f'第 {i} 筆：{err}'); continue
+            cur.execute("""
+                INSERT INTO neihai_sailings (sailing_date, sailing_time, capacity, min_people)
+                VALUES (%s,%s,%s,%s) ON CONFLICT (sailing_date, sailing_time) DO NOTHING
+            """, (sailing_date, sailing_time, NEIHAI_DEFAULT_CAPACITY, NEIHAI_MIN_PEOPLE))
+            cur.execute("SELECT * FROM neihai_sailings WHERE sailing_date=%s AND sailing_time=%s FOR UPDATE",
+                        (sailing_date, sailing_time))
+            sailing = cur.fetchone()
+            cur.execute("""
+                SELECT COALESCE(SUM(passenger_count), 0) AS booked FROM neihai_preorders
+                WHERE sailing_id=%s AND status <> 'cancelled'
+            """, (sailing['id'],))
+            booked = int(cur.fetchone()['booked'] or 0)
+            capacity = int(sailing['capacity'] or NEIHAI_DEFAULT_CAPACITY)
+            status = IMPORT_STATUS_LABELS.get((o.get('status') or '').strip()) or (
+                'confirmed_departure' if booked + len(clean) >= int(sailing['min_people'])
+                else 'pending_departure')
+            if status != 'cancelled' and booked + len(clean) > capacity:
+                warnings.append(f'{sailing_date} {sailing_time} 匯入後共 {booked + len(clean)} 人，超過上限 {capacity}')
+            cur.execute("""
+                INSERT INTO neihai_preorders
+                  (sailing_id, agency_name, contact_name, contact_phone, passenger_count, status, notes)
+                VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id
+            """, (sailing['id'], (o.get('agency_name') or '').strip(),
+                  (o.get('contact_name') or '').strip() or clean[0]['name'],
+                  (o.get('contact_phone') or '').strip() or clean[0]['phone'],
+                  len(clean), status, (o.get('notes') or '').strip()))
+            oid = cur.fetchone()['id']
+            new_ref = ref or f"NH{sailing_date.strftime('%Y%m%d')}{sailing_time.replace(':', '')}-{int(oid):04d}"
+            cur.execute("UPDATE neihai_preorders SET booking_ref=%s WHERE id=%s", (new_ref, oid))
+            for p in clean:
+                cur.execute("""
+                    INSERT INTO neihai_passengers (preorder_id, name, national_id, birth_date, phone)
+                    VALUES (%s,%s,%s,%s,%s)
+                """, (oid, p['name'], p['national_id'], p['birth_date'], p['phone']))
+            cur.execute("INSERT INTO neihai_preorder_logs (preorder_id, summary) VALUES (%s,%s)",
+                        (oid, '後台匯入建立'))
+            created.append(new_ref)
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True, created=created, skipped=skipped, errors=errors, warnings=warnings)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
 
 @app.route('/api/admin/email-test', methods=['GET', 'POST'])
 def admin_email_test():
@@ -1856,6 +1951,77 @@ def admin_update_preorder(order_id):
         cur.execute('UPDATE preorder_orders SET status=%s, updated_at=NOW() WHERE id=%s', (status, order_id))
         conn.commit(); cur.close(); conn.close()
         return jsonify(ok=True)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.route('/api/admin/preorder/import', methods=['POST'])
+def admin_preorder_import():
+    """後台批次匯入通用行程預購訂單（CSV 與匯出同格式；行程以名稱或 slug 對應）。
+    規則同內海匯入：booking_ref 重複略過、超額僅警告、不發通知。"""
+    if not is_admin():
+        return jsonify(ok=False, error='未授權'), 401
+    data = request.get_json(force=True, silent=True) or {}
+    orders = data.get('orders') or []
+    if not isinstance(orders, list) or not orders:
+        return jsonify(ok=False, error='沒有可匯入的訂單'), 400
+    created, skipped, errors, warnings = [], [], [], []
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT * FROM preorder_products")
+        products = cur.fetchall()
+        by_key = {}
+        for p in products:
+            by_key[p['slug'].strip().lower()] = p
+            by_key[p['name'].strip()] = p
+        for i, o in enumerate(orders, start=1):
+            pkey = (o.get('product') or '').strip()
+            prod = by_key.get(pkey) or by_key.get(pkey.lower())
+            if not prod:
+                errors.append(f'第 {i} 筆：找不到行程「{pkey}」'); continue
+            try:
+                dep_date = datetime.strptime((o.get('departure_date') or '').strip(), '%Y-%m-%d').date()
+            except ValueError:
+                errors.append(f'第 {i} 筆：出發日期格式需為 YYYY-MM-DD'); continue
+            dep_time = (o.get('departure_time') or '').strip()
+            ref = (o.get('booking_ref') or '').strip()
+            if ref:
+                cur.execute("SELECT id FROM preorder_orders WHERE booking_ref=%s", (ref,))
+                if cur.fetchone():
+                    skipped.append(ref); continue
+            clean, err = _import_clean_passengers(o.get('passengers'))
+            if err:
+                errors.append(f'第 {i} 筆：{err}'); continue
+            cur.execute("""
+                SELECT COALESCE(SUM(passenger_count), 0) AS booked FROM preorder_orders
+                WHERE product_id=%s AND departure_date=%s AND departure_time=%s AND status <> 'cancelled'
+            """, (prod['id'], dep_date, dep_time))
+            booked = int(cur.fetchone()['booked'] or 0)
+            status = IMPORT_STATUS_LABELS.get((o.get('status') or '').strip()) or (
+                'confirmed_departure' if booked + len(clean) >= int(prod['min_people'] or 2)
+                else 'pending_departure')
+            if status != 'cancelled' and prod['capacity'] is not None and booked + len(clean) > int(prod['capacity']):
+                warnings.append(f"{prod['name']} {dep_date} {dep_time} 匯入後共 {booked + len(clean)} 人，超過上限 {prod['capacity']}")
+            cur.execute("""
+                INSERT INTO preorder_orders
+                  (product_id, departure_date, departure_time, agency_name,
+                   contact_name, contact_phone, passenger_count, status, notes)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
+            """, (prod['id'], dep_date, dep_time, (o.get('agency_name') or '').strip(),
+                  (o.get('contact_name') or '').strip() or clean[0]['name'],
+                  (o.get('contact_phone') or '').strip() or clean[0]['phone'],
+                  len(clean), status, (o.get('notes') or '').strip()))
+            oid = cur.fetchone()['id']
+            new_ref = ref or f"{prod['slug'][:6].upper()}{dep_date.strftime('%Y%m%d')}-{int(oid):04d}"
+            cur.execute("UPDATE preorder_orders SET booking_ref=%s WHERE id=%s", (new_ref, oid))
+            for ps in clean:
+                cur.execute("""
+                    INSERT INTO preorder_passengers (order_id, name, national_id, birth_date, phone)
+                    VALUES (%s,%s,%s,%s,%s)
+                """, (oid, ps['name'], ps['national_id'], ps['birth_date'], ps['phone']))
+            created.append(new_ref)
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True, created=created, skipped=skipped, errors=errors, warnings=warnings)
     except Exception as e:
         return jsonify(ok=False, error=str(e)), 500
 
