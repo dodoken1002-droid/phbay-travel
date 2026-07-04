@@ -313,6 +313,9 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
           <button class="btn btn-primary" onclick="loadPreorderOrders()">
             <i class="fas fa-sync"></i> 載入月份
           </button>
+          <button class="btn btn-ghost" onclick="exportPreorderCsv()">
+            <i class="fas fa-file-excel"></i> 匯出 Excel
+          </button>
         </div>
       </div>
       <div id="preorder-stats" class="stats-row"></div>
@@ -323,9 +326,14 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
     <div class="tab-content" id="tab-contacts">
       <div class="toolbar">
         <h2>諮詢紀錄</h2>
-        <button class="btn btn-primary" onclick="loadContacts()">
-          <i class="fas fa-sync"></i> 重新整理
-        </button>
+        <div class="toolbar-right">
+          <button class="btn btn-primary" onclick="loadContacts()">
+            <i class="fas fa-sync"></i> 重新整理
+          </button>
+          <button class="btn btn-ghost" onclick="exportContactsCsv()">
+            <i class="fas fa-file-excel"></i> 匯出 Excel
+          </button>
+        </div>
       </div>
       <div id="contacts-list">載入中…</div>
     </div>
@@ -1014,6 +1022,7 @@ function loadContacts() {
     .then(r => r.json())
     .then(d => {
       if (!d.ok) { document.getElementById('contacts-list').innerHTML = '載入失敗'; return; }
+      window._contacts = d.contacts || [];
       if (!d.contacts.length) {
         document.getElementById('contacts-list').innerHTML =
           '<p style="color:#a0aec0;text-align:center;padding:40px">尚無諮詢紀錄</p>';
@@ -1086,8 +1095,16 @@ function loadNeihaiOrders() {
       (d.orders || []).forEach(o => window._neihaiOrders[o.id] = o);
       const activeOrders = d.orders.filter(o => o.status !== 'cancelled');
       const pax = activeOrders.reduce((sum, o) => sum + (parseInt(o.passenger_count, 10) || 0), 0);
-      const guaranteed = d.sailings.filter(s => s.status === 'guaranteed').length;
-      const forming = d.sailings.filter(s => s.status === 'forming' && s.booked > 0).length;
+      // 由訂單依船班分組計算門檻，含已出航班次（後端 sailings 只回未過期班次）
+      const paxBySailing = {};
+      activeOrders.forEach(o => {
+        const key = `${o.sailing_date}|${o.sailing_time}`;
+        paxBySailing[key] = paxBySailing[key] || { booked: 0, min: parseInt(o.min_people, 10) || 6 };
+        paxBySailing[key].booked += parseInt(o.passenger_count, 10) || 0;
+      });
+      const sailingStats = Object.values(paxBySailing);
+      const guaranteed = sailingStats.filter(s => s.booked >= s.min).length;
+      const forming = sailingStats.filter(s => s.booked > 0 && s.booked < s.min).length;
       document.getElementById('neihai-stats').innerHTML = `
         <div class="stat-card"><div class="num">${d.orders.length}</div><div class="lbl">本月訂單</div></div>
         <div class="stat-card"><div class="num">${pax}</div><div class="lbl">有效預購人數</div></div>
@@ -1097,9 +1114,46 @@ function loadNeihaiOrders() {
         list.innerHTML = '<p style="color:#a0aec0;text-align:center;padding:40px">本月尚無預購訂單</p>';
         return;
       }
-      list.innerHTML = d.orders.map(o => `<div id="ncard-${o.id}">${renderNeihaiCard(o)}</div>`).join('');
+      list.innerHTML = renderNeihaiGroups(d.orders);
     })
     .catch(() => { list.innerHTML = '載入失敗'; });
+}
+
+/* 依船班（日期＋時段）分組並列訂單，門檻狀態由有效人數自動判定 */
+function renderNeihaiGroups(orders) {
+  const groups = {};
+  orders.forEach(o => {
+    const key = `${o.sailing_date}|${o.sailing_time}`;
+    (groups[key] = groups[key] || []).push(o);
+  });
+  return Object.keys(groups).sort().map(key => {
+    const list = groups[key];
+    const [date, time] = key.split('|');
+    const active = list.filter(o => o.status !== 'cancelled');
+    const booked = active.reduce((s, o) => s + (parseInt(o.passenger_count, 10) || 0), 0);
+    const minPeople = parseInt(list[0].min_people, 10) || 6;
+    const capacity = parseInt(list[0].capacity, 10) || 13;
+    const full = booked >= capacity;
+    const go = booked >= minPeople;
+    const badge = full
+      ? '<span style="background:#2f855a;color:#fff;padding:4px 14px;border-radius:20px;font-weight:800">已額滿</span>'
+      : go
+        ? '<span style="background:#2f855a;color:#fff;padding:4px 14px;border-radius:20px;font-weight:800">已達發船門檻</span>'
+        : `<span style="background:#dd6b20;color:#fff;padding:4px 14px;border-radius:20px;font-weight:800">待成團（還差 ${minPeople - booked} 人）</span>`;
+    return `
+      <div style="margin-bottom:28px;border:1px solid ${go ? '#9ae6b4' : '#fbd38d'};border-radius:16px;overflow:hidden">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 20px;background:${go ? '#f0fff4' : '#fffaf0'}">
+          <div>
+            <strong style="font-size:1.1rem;color:var(--blue-dk)"><i class="fas fa-ship"></i> ${date} ${time} 船班</strong>
+            <span style="color:var(--mid);margin-left:12px">有效 ${booked} 人／上限 ${capacity} 人（${minPeople} 人成團）｜${list.length} 筆訂單</span>
+          </div>
+          ${badge}
+        </div>
+        <div style="padding:12px 16px">
+          ${list.map(o => `<div id="ncard-${o.id}">${renderNeihaiCard(o)}</div>`).join('')}
+        </div>
+      </div>`;
+  }).join('');
 }
 
 function nEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
@@ -1205,14 +1259,45 @@ function exportNeihaiCsv() {
       statusText(o.status), o.agency_name||'', o.contact_name||'', o.contact_phone||'',
       p.name||'', p.national_id||'', p.birth_date||'', p.phone||'', o.notes||'', o.created_at||'']));
   });
+  const month = (document.getElementById('neihai-month')||{}).value || '';
+  downloadCsv(rows, `內海預購訂單_${month}.csv`);
+}
+
+/* 共用：rows（二維陣列）→ 下載 UTF-8 BOM CSV（Excel 可直接開） */
+function downloadCsv(rows, filename) {
   const csv = '﻿' + rows.map(r => r.map(c => `"${String(c==null?'':c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
   const a = document.createElement('a');
-  const month = (document.getElementById('neihai-month')||{}).value || '';
   a.href = URL.createObjectURL(blob);
-  a.download = `內海預購訂單_${month}.csv`;
+  a.download = filename;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(a.href);
+}
+
+function exportPreorderCsv() {
+  const orders = window._preorderOrders || [];
+  if (!orders.length) { showToast('請先載入月份，目前沒有可匯出的訂單', 'error'); return; }
+  const header = ['訂單編號','行程名稱','出發日期','出發時間','訂單狀態','業者/代號','主要聯絡姓名','主要聯絡電話','旅客姓名','身分證字號','出生年月日','旅客電話','備註','建立時間'];
+  const rows = [header];
+  orders.forEach(o => {
+    const paxList = (o.passengers && o.passengers.length) ? o.passengers : [{}];
+    paxList.forEach(p => rows.push([o.booking_ref||'', o.product_name||'', o.departure_date||'', o.departure_time||'',
+      statusText(o.status), o.agency_name||'', o.contact_name||'', o.contact_phone||'',
+      p.name||'', p.national_id||'', p.birth_date||'', p.phone||'', o.notes||'', o.created_at||'']));
+  });
+  const month = (document.getElementById('preorder-month')||{}).value || '';
+  downloadCsv(rows, `行程預購訂單_${month}.csv`);
+}
+
+function exportContactsCsv() {
+  const contacts = window._contacts || [];
+  if (!contacts.length) { showToast('目前沒有可匯出的諮詢紀錄', 'error'); return; }
+  const header = ['姓名','電話','旅遊日期','結束日期','人數','交通','出發地','預算','行程','候補','備註','送出時間'];
+  const rows = [header];
+  contacts.forEach(c => rows.push([c.name||'', c.phone||'', c.travel_date||'', c.travel_date_end||'',
+    c.people||'', c.transport||'', c.departure_city||'', c.budget||'', c.tour_interest||'',
+    c.is_waitlist ? '候補' : (c.slot_id ? '正團' : ''), c.notes||'', c.created_at||'']));
+  downloadCsv(rows, `諮詢紀錄_${new Date().toISOString().slice(0,10)}.csv`);
 }
 
 function updateNeihaiOrderStatus(id, status) {
@@ -1248,6 +1333,7 @@ function loadPreorderOrders() {
     .then(r => r.json())
     .then(d => {
       if (!d.ok) { list.innerHTML = d.error || '載入失敗'; return; }
+      window._preorderOrders = d.orders || [];
       // 行程下拉（保留目前選擇）
       const sel = document.getElementById('preorder-product');
       const cur = sel.value;
