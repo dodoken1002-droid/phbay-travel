@@ -243,7 +243,13 @@
         if (!json.ok) throw new Error(json.error || '送出失敗');
         resultBox.className = 'result ok';
         resultBox.innerHTML = `預購已送出！<br>訂單編號：<strong>${esc(json.booking_ref)}</strong><br>${esc(json.message)}。潮旅將再與您確認行程細節與付款方式。`;
-        if (typeof fbq === 'function') fbq('track', 'Lead', { content_name: (product ? product.name : '行程') + '預購' });
+        if (typeof fbq === 'function') {
+          fbq('track', 'Lead', {
+            content_name: (product ? product.name : '行程') + '預購',
+            content_category: '行程預購',
+            content_type: 'product'
+          });
+        }
         e.target.reset();
         passengerCount.value = 1;
         renderPassengers();

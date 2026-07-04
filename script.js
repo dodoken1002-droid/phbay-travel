@@ -111,6 +111,16 @@ function openModal(tourId) {
   overlay.classList.add('active');
   modal.classList.add('active');
   document.body.style.overflow = 'hidden'; // 防止背景捲動
+
+  // Meta Pixel：使用者主動開啟行程詳情才記錄內容瀏覽，不在頁面載入時觸發
+  if (typeof fbq === 'function') {
+    const modalTitle = modal.querySelector('h2, h3, .tour-title')?.textContent?.trim() || tourId;
+    fbq('track', 'ViewContent', {
+      content_name: modalTitle,
+      content_type: 'product',
+      content_category: '行程詳情'
+    });
+  }
 }
 
 function closeModal() {
@@ -212,13 +222,19 @@ function initContactForm() {
       success.style.display = 'block';
       success.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-      // GA4 轉換事件：記錄一筆諮詢成立
+      // GA4 / Meta Pixel 轉換事件：送出成功後才記錄一筆諮詢成立
       if (typeof gtag === 'function') {
         gtag('event', 'generate_lead', {
           tour_interest: data.tour_interest || '(未選)',
           transport:     data.transport || '',
           people:        data.people || '',
           is_waitlist:   !!result.is_waitlist,
+        });
+      }
+      if (typeof fbq === 'function') {
+        fbq('track', 'Lead', {
+          content_name: '諮詢表單',
+          content_category: '行程諮詢'
         });
       }
 
