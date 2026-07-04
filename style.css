@@ -1498,6 +1498,12 @@ ul { list-style: none; }
   .carousel-arrow { width: 36px; height: 36px; font-size: .9rem; }
   .carousel-prev { left: 10px; }
   .carousel-next { right: 10px; }
+  /* 16:9 滿版圖在直式螢幕改為完整顯示（不裁字），高度縮為 60vh 減少上下留白 */
+  .slide-cover { height: 60vh; }
+  .slide-cover img { object-fit: contain; }
+  .slide-poster, .slide-promo { height: 60vh; }
+  .slide-poster img, .slide-promo img { max-height: 60vh; }
+  .slide-hero { min-height: 60vh; }
   .d-mobile-none { display: none; }
   .hero-buttons .btn { width: 100%; max-width: 280px; justify-content: center; }
 
