@@ -55,6 +55,7 @@
     "@type": "TravelAgency",
     "@id": "https://www.phbay.info/#organization",
     "name": "潮旅國際旅行社",
+    "legalName": "潮旅國際旅行社",
     "alternateName": "Phbay Travel",
     "slogan": "帶你玩出不一樣的澎湖旅行",
     "description": "潮旅國際旅行社是澎湖在地深度旅遊專家，提供親子海島體驗、望安綠蠵龜生態、七美跳島、SUP 浮潛、潮間帶、夜釣小管與 2026 澎湖追風音樂燈光節主題行程。在地嚮導親自規劃，兩人即可成行。交觀乙第1864號、澎品保0188號。",
@@ -64,12 +65,20 @@
     "telephone": "+886-6-9271288",
     "email": "dodoken1002@phbay.net",
     "founder": "唐瑋汝",
+    "taxID": "60305305",
+    "identifier": [
+      { "@type": "PropertyValue", "name": "統一編號", "value": "60305305" },
+      { "@type": "PropertyValue", "name": "旅行社證號", "value": "交觀乙第1864號" },
+      { "@type": "PropertyValue", "name": "品保編號", "value": "澎品保0188號" }
+    ],
     "priceRange": "NT$4,500 - NT$15,000",
     "currenciesAccepted": "TWD",
     "address": {
       "@type": "PostalAddress",
       "addressRegion": "澎湖縣",
       "addressLocality": "馬公市",
+      "postalCode": "880008",
+      "streetAddress": "啟明里民權路13號2樓",
       "addressCountry": "TW"
     },
     "geo": {
@@ -86,6 +95,20 @@
       "澎湖浮潛", "SUP 立槳", "夜釣小管", "潮間帶體驗", "澎湖跨海大橋",
       "澎湖玄武岩", "2026 澎湖追風音樂燈光節", "親子海島旅遊", "澎湖自由行"
     ],
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "telephone": "+886-6-9271288",
+      "email": "dodoken1002@phbay.net",
+      "contactType": "customer service",
+      "areaServed": "TW",
+      "availableLanguage": ["zh-TW", "en", "ja", "ko", "zh-CN"],
+      "hoursAvailable": {
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+        "opens": "08:30",
+        "closes": "17:30"
+      }
+    },
     "openingHoursSpecification": {
       "@type": "OpeningHoursSpecification",
       "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
@@ -101,7 +124,8 @@
         { "@type": "OfferCatalog", "name": "4 天 3 夜行程" },
         { "@type": "OfferCatalog", "name": "望安綠蠵龜生態行程" },
         { "@type": "OfferCatalog", "name": "親子海島體驗行程" },
-        { "@type": "OfferCatalog", "name": "澎湖追風音樂燈光節主題行程" }
+        { "@type": "OfferCatalog", "name": "澎湖追風音樂燈光節主題行程" },
+        { "@type": "OfferCatalog", "name": "小城故事・內海巡禮預購訂位" }
       ]
     },
     "sameAs": [
@@ -142,11 +166,15 @@
       <span class="banner-sep">｜</span>
       <span>負責人：唐瑋汝</span>
       <span class="banner-sep">｜</span>
+      <span>統編：60305305</span>
+      <span class="banner-sep">｜</span>
       <span>交觀乙第1864號</span>
       <span class="banner-sep">｜</span>
       <span>澎品保0188號</span>
       <span class="banner-sep">｜</span>
       <span>電話：06-9271288</span>
+      <span class="banner-sep">｜</span>
+      <span>地址：澎湖縣馬公市民權路13號2樓</span>
       <span class="banner-sep">｜</span>
       <span>官方LINE：@phbay2018</span>
     </div>
@@ -474,7 +502,7 @@
           <!-- 證照資訊 -->
           <div class="license-info">
             <i class="fas fa-certificate"></i>
-            <span>交觀乙第1864號｜澎品保0188號</span>
+            <span>潮旅國際旅行社｜統編：60305305｜交觀乙第1864號｜澎品保0188號｜負責人：唐瑋汝｜營業地址：880008 澎湖縣馬公市啟明里民權路13號2樓｜電話：06-9271288｜服務時間：週一至週五 08:30–17:30（週六、日及國定假日休假）</span>
           </div>
         </div>
       </div>
@@ -700,7 +728,10 @@
         <div class="footer-brand">
           <h3><i class="fas fa-water"></i> 潮旅國際旅行社</h3>
           <p data-i18n="hero.subtitle">帶你玩出不一樣的澎湖旅行</p>
-          <p class="footer-license">交觀乙第1864號｜澎品保0188號</p>
+          <p class="footer-license">統編：60305305｜交觀乙第1864號｜澎品保0188號</p>
+          <p class="footer-license">負責人：唐瑋汝</p>
+          <p class="footer-license">營業地址：880008 澎湖縣馬公市啟明里民權路13號2樓</p>
+          <p class="footer-license">服務時間：週一至週五 08:30–17:30（週六、日及國定假日休假）</p>
         </div>
         <div class="footer-links">
           <h4 data-i18n="footer.quickLinks">快速連結</h4>
@@ -718,8 +749,10 @@
           <h4 data-i18n="footer.contactInfo">聯絡資訊</h4>
           <p><i class="fas fa-phone"></i> 06-9271288</p>
           <p><i class="fas fa-envelope"></i> dodoken1002@phbay.net</p>
+          <p><i class="fas fa-id-card"></i> 統編：60305305</p>
           <p><i class="fas fa-user"></i> <span data-i18n="footer.owner">負責人：唐瑋汝</span></p>
           <p><i class="fas fa-clock"></i> <span data-i18n="footer.hours">週一至週五 08:30–17:30</span></p>
+          <p><i class="fas fa-location-dot"></i> 880008 澎湖縣馬公市啟明里民權路13號2樓</p>
           <div class="footer-social">
             <a href="https://www.facebook.com/phbay2018" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
             <a href="https://www.instagram.com/phbay_2021/" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
