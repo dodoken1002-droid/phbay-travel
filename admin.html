@@ -300,8 +300,10 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
           <button class="btn btn-primary" onclick="loadNeihaiOrders()">
             <i class="fas fa-sync"></i> 載入月份
           </button>
-          <input type="date" id="neihai-export-date" class="search-input" style="width:150px"
-                 title="只匯出此日期的訂單（留空＝匯出整月）" />
+          <select id="neihai-export-date" class="search-input" style="width:170px"
+                  title="選擇要匯出的日期（預設整月）">
+            <option value="">匯出全部日期</option>
+          </select>
           <button class="btn btn-ghost" onclick="exportNeihaiCsv()">
             <i class="fas fa-file-excel"></i> 匯出 Excel
           </button>
@@ -335,8 +337,10 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
           <button class="btn btn-primary" onclick="loadPreorderOrders()">
             <i class="fas fa-sync"></i> 載入月份
           </button>
-          <input type="date" id="preorder-export-date" class="search-input" style="width:150px"
-                 title="只匯出此日期的訂單（留空＝匯出整月）" />
+          <select id="preorder-export-date" class="search-input" style="width:170px"
+                  title="選擇要匯出的日期（預設整月）">
+            <option value="">匯出全部日期</option>
+          </select>
           <button class="btn btn-ghost" onclick="exportPreorderCsv()">
             <i class="fas fa-file-excel"></i> 匯出 Excel
           </button>
@@ -1303,6 +1307,7 @@ function loadNeihaiOrders() {
         <div class="stat-card"><div class="num">${guaranteed}</div><div class="lbl">已達發船船班</div></div>
         <div class="stat-card"><div class="num">${forming}</div><div class="lbl">待成團船班</div></div>`;
       renderNeihaiSailingToggles(d.sailings || []);
+      fillExportDateOptions('neihai-export-date', d.orders, 'sailing_date');
       const archivedHint = (!showArchived && archivedCount)
         ? `<p style="color:#a0aec0;text-align:center;padding:10px;font-size:.85rem">另有 ${archivedCount} 筆已封存訂單（勾選右上「顯示已封存」可查看）</p>` : '';
       if (!d.orders.length) {
@@ -1536,7 +1541,7 @@ function exportNeihaiCsv() {
   const onlyDate = (document.getElementById('neihai-export-date') || {}).value || '';
   if (onlyDate) orders = orders.filter(o => o.sailing_date === onlyDate);
   if (!orders.length) {
-    showToast(onlyDate ? `本月訂單中沒有 ${onlyDate} 的資料（先按「載入月份」，且日期需在該月內）` : '目前沒有可匯出的訂單', 'error');
+    showToast('目前沒有可匯出的訂單，請先按「載入月份」', 'error');
     return;
   }
   const header = ['訂單編號','出航日期','時段','訂單狀態','業者/代號','主要聯絡姓名','主要聯絡電話','Email','乘客姓名','身分證字號','出生年月日','乘客電話','備註','建立時間'];
@@ -1694,6 +1699,21 @@ function importCsvFile(input, kind) {
   reader.readAsText(file, 'utf-8');
 }
 
+/* 依已載入訂單，填入匯出日期下拉（只列出實際有訂單的日期），保留目前選擇 */
+function fillExportDateOptions(selectId, orders, dateField) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const prev = sel.value;
+  const dates = [...new Set((orders || []).map(o => o[dateField]).filter(Boolean))].sort();
+  const wdArr = ['日','一','二','三','四','五','六'];
+  sel.innerHTML = '<option value="">匯出全部日期</option>' +
+    dates.map(d => {
+      const wd = wdArr[new Date(d + 'T00:00:00').getDay()];
+      return `<option value="${d}">${d}（${wd}）</option>`;
+    }).join('');
+  if (dates.includes(prev)) sel.value = prev;  // 保留原選擇（若仍存在）
+}
+
 /* 共用：rows（二維陣列）→ 下載 UTF-8 BOM CSV（Excel 可直接開） */
 function downloadCsv(rows, filename) {
   const csv = '﻿' + rows.map(r => r.map(c => `"${String(c==null?'':c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
@@ -1710,7 +1730,7 @@ function exportPreorderCsv() {
   const onlyDate = (document.getElementById('preorder-export-date') || {}).value || '';
   if (onlyDate) orders = orders.filter(o => o.departure_date === onlyDate);
   if (!orders.length) {
-    showToast(onlyDate ? `本月訂單中沒有 ${onlyDate} 的資料（先按「載入月份」，且日期需在該月內）` : '請先載入月份，目前沒有可匯出的訂單', 'error');
+    showToast('目前沒有可匯出的訂單，請先按「載入月份」', 'error');
     return;
   }
   const header = ['訂單編號','行程名稱','出發日期','出發時間','訂單狀態','業者/代號','主要聯絡姓名','主要聯絡電話','Email','旅客姓名','身分證字號','出生年月日','旅客電話','備註','建立時間'];
@@ -1786,6 +1806,7 @@ function loadPreorderOrders() {
         <div class="stat-card"><div class="num">${orders.length}</div><div class="lbl">本月訂單</div></div>
         <div class="stat-card"><div class="num">${pax}</div><div class="lbl">有效預購人數</div></div>
         <div class="stat-card"><div class="num">${confirmed}</div><div class="lbl">已確認訂單</div></div>`;
+      fillExportDateOptions('preorder-export-date', orders, 'departure_date');
       const archivedHint = (!showArchived && archivedCount)
         ? `<p style="color:#a0aec0;text-align:center;padding:10px;font-size:.85rem">另有 ${archivedCount} 筆已封存訂單（勾選右上「顯示已封存」可查看）</p>` : '';
       if (!orders.length) {
