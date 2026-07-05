@@ -300,6 +300,8 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
           <button class="btn btn-primary" onclick="loadNeihaiOrders()">
             <i class="fas fa-sync"></i> 載入月份
           </button>
+          <input type="date" id="neihai-export-date" class="search-input" style="width:150px"
+                 title="只匯出此日期的訂單（留空＝匯出整月）" />
           <button class="btn btn-ghost" onclick="exportNeihaiCsv()">
             <i class="fas fa-file-excel"></i> 匯出 Excel
           </button>
@@ -330,6 +332,8 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
           <button class="btn btn-primary" onclick="loadPreorderOrders()">
             <i class="fas fa-sync"></i> 載入月份
           </button>
+          <input type="date" id="preorder-export-date" class="search-input" style="width:150px"
+                 title="只匯出此日期的訂單（留空＝匯出整月）" />
           <button class="btn btn-ghost" onclick="exportPreorderCsv()">
             <i class="fas fa-file-excel"></i> 匯出 Excel
           </button>
@@ -1473,8 +1477,13 @@ function saveNeihaiOrder(id) {
 }
 
 function exportNeihaiCsv() {
-  const orders = Object.values(window._neihaiOrders || {});
-  if (!orders.length) { showToast('目前沒有可匯出的訂單', 'error'); return; }
+  let orders = Object.values(window._neihaiOrders || {});
+  const onlyDate = (document.getElementById('neihai-export-date') || {}).value || '';
+  if (onlyDate) orders = orders.filter(o => o.sailing_date === onlyDate);
+  if (!orders.length) {
+    showToast(onlyDate ? `本月訂單中沒有 ${onlyDate} 的資料（先按「載入月份」，且日期需在該月內）` : '目前沒有可匯出的訂單', 'error');
+    return;
+  }
   const header = ['訂單編號','出航日期','時段','訂單狀態','業者/代號','主要聯絡姓名','主要聯絡電話','Email','乘客姓名','身分證字號','出生年月日','乘客電話','備註','建立時間'];
   const rows = [header];
   orders.forEach(o => {
@@ -1484,7 +1493,7 @@ function exportNeihaiCsv() {
       p.name||'', p.national_id||'', p.birth_date||'', p.phone||'', o.notes||'', o.created_at||'']));
   });
   const month = (document.getElementById('neihai-month')||{}).value || '';
-  downloadCsv(rows, `內海預購訂單_${month}.csv`);
+  downloadCsv(rows, `內海預購訂單_${onlyDate || month}.csv`);
 }
 
 /* ── CSV 匯入（格式與匯出相同，Excel 另存 CSV 後可直接回匯）── */
@@ -1512,40 +1521,72 @@ function normDate(s) {  // 2026/7/5、2026.07.05 → 2026-07-05
   return m ? `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}` : String(s || '').trim();
 }
 
-/* 依表頭名稱取欄位索引；缺任一必要欄位回 null */
-function csvCols(header, required) {
-  const idx = {};
-  header.forEach((h, i) => { idx[String(h).trim()] = i; });
-  for (const name of required) if (!(name in idx)) return null;
-  return idx;
+/* 表頭容錯：每個欄位接受多種常見寫法（去空白/符號、不分大小寫比對） */
+const IMPORT_FIELD_ALIASES = {
+  booking_ref:    ['訂單編號','訂位代號','編號'],
+  sailing_date:   ['出航日期','出發日期','日期'],
+  sailing_time:   ['時段','出航時間','班次','時間'],
+  product:        ['行程名稱','行程','商品名稱'],
+  departure_date: ['出發日期','出航日期','日期'],
+  departure_time: ['出發時間','時段','班次','時間'],
+  status:         ['訂單狀態','狀態'],
+  agency_name:    ['業者/代號','業者代號','業者','代號'],
+  contact_name:   ['主要聯絡姓名','聯絡姓名','聯絡人','訂購人'],
+  contact_phone:  ['主要聯絡電話','聯絡電話','聯絡人電話','訂購人電話'],
+  contact_email:  ['email','e-mail','電子郵件','電子信箱','信箱'],
+  pax_name:       ['乘客姓名','旅客姓名','姓名'],
+  national_id:    ['身分證字號','身份證字號','身分證','身份證','身分證號'],
+  birth_date:     ['出生年月日','出生日期','生日'],
+  pax_phone:      ['乘客電話','旅客電話','電話','手機'],
+  notes:          ['備註','附註'],
+};
+const IMPORT_FIELD_LABELS = {
+  sailing_date:'出航日期', sailing_time:'時段', product:'行程名稱', departure_date:'出發日期',
+  pax_name:'乘客姓名', national_id:'身分證字號', birth_date:'出生年月日',
+};
+
+function normHeader(h) {
+  return String(h || '').trim().toLowerCase().replace(/[\s＊*：:（）()「」【】\-＿_]/g, '');
+}
+
+/* 表頭列 → {欄位: 索引}；比對不到的欄位不會出現在結果中 */
+function resolveCsvCols(header, fields) {
+  const hmap = {};
+  header.forEach((h, i) => { const k = normHeader(h); if (k && !(k in hmap)) hmap[k] = i; });
+  const col = {};
+  for (const f of fields) {
+    const hit = (IMPORT_FIELD_ALIASES[f] || [f]).map(normHeader).find(a => a in hmap);
+    if (hit !== undefined) col[f] = hmap[hit];
+  }
+  return col;
 }
 
 /* rows→訂單陣列：同訂單編號（或同日期+時段+聯絡人）連續列合併為一筆多乘客訂單 */
 function groupImportRows(rows, col, kind) {
   const orders = []; const byKey = {};
   rows.forEach(r => {
-    const get = name => (name in col) ? String(r[col[name]] ?? '').trim() : '';
-    const ref = get('訂單編號');
+    const get = f => (f in col) ? String(r[col[f]] ?? '').trim() : '';
+    const ref = get('booking_ref');
     const base = kind === 'neihai'
-      ? { booking_ref: ref, sailing_date: normDate(get('出航日期')), sailing_time: get('時段'),
-          status: get('訂單狀態'), agency_name: get('業者/代號'),
-          contact_name: get('主要聯絡姓名'), contact_phone: get('主要聯絡電話'),
-          contact_email: get('Email'), notes: get('備註'), passengers: [] }
-      : { booking_ref: ref, product: get('行程名稱'),
-          departure_date: normDate(get('出發日期')), departure_time: get('出發時間'),
-          status: get('訂單狀態'), agency_name: get('業者/代號'),
-          contact_name: get('主要聯絡姓名'), contact_phone: get('主要聯絡電話'),
-          contact_email: get('Email'), notes: get('備註'), passengers: [] }
+      ? { booking_ref: ref, sailing_date: normDate(get('sailing_date')), sailing_time: get('sailing_time'),
+          status: get('status'), agency_name: get('agency_name'),
+          contact_name: get('contact_name'), contact_phone: get('contact_phone'),
+          contact_email: get('contact_email'), notes: get('notes'), passengers: [] }
+      : { booking_ref: ref, product: get('product'),
+          departure_date: normDate(get('departure_date')), departure_time: get('departure_time'),
+          status: get('status'), agency_name: get('agency_name'),
+          contact_name: get('contact_name'), contact_phone: get('contact_phone'),
+          contact_email: get('contact_email'), notes: get('notes'), passengers: [] }
     ;
     const key = ref || (kind === 'neihai'
       ? `${base.sailing_date}|${base.sailing_time}|${base.contact_name}|${base.contact_phone}`
       : `${base.product}|${base.departure_date}|${base.departure_time}|${base.contact_name}|${base.contact_phone}`);
     if (!byKey[key]) { byKey[key] = base; orders.push(base); }
-    const paxName = get(kind === 'neihai' ? '乘客姓名' : '旅客姓名');
+    const paxName = get('pax_name');
     if (paxName) byKey[key].passengers.push({
-      name: paxName, national_id: get('身分證字號'),
-      birth_date: normDate(get('出生年月日')),
-      phone: get(kind === 'neihai' ? '乘客電話' : '旅客電話'),
+      name: paxName, national_id: get('national_id'),
+      birth_date: normDate(get('birth_date')),
+      phone: get('pax_phone'),
     });
   });
   return orders;
@@ -1560,10 +1601,22 @@ function importCsvFile(input, kind) {
     const rows = parseCsv(String(reader.result));
     if (rows.length < 2) { showToast('檔案沒有資料列', 'error'); return; }
     const required = kind === 'neihai'
-      ? ['出航日期','時段','乘客姓名','身分證字號','出生年月日']
-      : ['行程名稱','出發日期','旅客姓名','身分證字號','出生年月日'];
-    const col = csvCols(rows[0], required);
-    if (!col) { showToast('表頭欄位不符，請用「匯出 Excel」的檔案格式（需含：' + required.join('、') + '）', 'error'); return; }
+      ? ['sailing_date','sailing_time','pax_name','national_id','birth_date']
+      : ['product','departure_date','pax_name','national_id','birth_date'];
+    const allFields = required.concat(
+      ['booking_ref','status','agency_name','contact_name','contact_phone','contact_email','pax_phone','notes'],
+      kind === 'neihai' ? [] : ['departure_time']);
+    const col = resolveCsvCols(rows[0], allFields);
+    const missing = required.filter(f => !(f in col));
+    if (missing.length) {
+      showToast('表頭欄位不符，未匯入任何資料', 'error');
+      alert('❌ 無法匯入：缺少必要欄位\n\n' +
+        '缺少：' + missing.map(f => IMPORT_FIELD_LABELS[f] || f).join('、') + '\n' +
+        '檔案表頭：' + rows[0].map(h => String(h).trim()).filter(Boolean).join('、') + '\n\n' +
+        '表頭可用常見別名（例如「生日」＝出生年月日、「姓名」＝乘客姓名），\n' +
+        '最保險的做法：先按「匯出 Excel」拿範本再填。');
+      return;
+    }
     const orders = groupImportRows(rows.slice(1), col, kind);
     if (!orders.length) { showToast('解析後沒有可匯入的訂單', 'error'); return; }
     const pax = orders.reduce((s, o) => s + o.passengers.length, 0);
@@ -1598,8 +1651,13 @@ function downloadCsv(rows, filename) {
 }
 
 function exportPreorderCsv() {
-  const orders = window._preorderOrders || [];
-  if (!orders.length) { showToast('請先載入月份，目前沒有可匯出的訂單', 'error'); return; }
+  let orders = window._preorderOrders || [];
+  const onlyDate = (document.getElementById('preorder-export-date') || {}).value || '';
+  if (onlyDate) orders = orders.filter(o => o.departure_date === onlyDate);
+  if (!orders.length) {
+    showToast(onlyDate ? `本月訂單中沒有 ${onlyDate} 的資料（先按「載入月份」，且日期需在該月內）` : '請先載入月份，目前沒有可匯出的訂單', 'error');
+    return;
+  }
   const header = ['訂單編號','行程名稱','出發日期','出發時間','訂單狀態','業者/代號','主要聯絡姓名','主要聯絡電話','Email','旅客姓名','身分證字號','出生年月日','旅客電話','備註','建立時間'];
   const rows = [header];
   orders.forEach(o => {
@@ -1609,7 +1667,7 @@ function exportPreorderCsv() {
       p.name||'', p.national_id||'', p.birth_date||'', p.phone||'', o.notes||'', o.created_at||'']));
   });
   const month = (document.getElementById('preorder-month')||{}).value || '';
-  downloadCsv(rows, `行程預購訂單_${month}.csv`);
+  downloadCsv(rows, `行程預購訂單_${onlyDate || month}.csv`);
 }
 
 function exportContactsCsv() {
