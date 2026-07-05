@@ -23,7 +23,8 @@ from datetime import date, datetime, timedelta
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from flask import Flask, send_from_directory, request, jsonify
+from flask import Flask, send_from_directory, request, jsonify, session
+from werkzeug.security import generate_password_hash, check_password_hash
 import psycopg2
 import psycopg2.extras
 from psycopg2.extras import Json
@@ -32,6 +33,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__, static_folder='.', static_url_path='')
+# session cookie 簽章金鑰（後台帳號登入用）；優先 FLASK_SECRET_KEY，退回 ADMIN_KEY
+app.secret_key = os.environ.get('FLASK_SECRET_KEY') or os.environ.get('ADMIN_KEY') or 'phbay-dev-secret'
+app.permanent_session_lifetime = timedelta(hours=12)
 
 _db_initialized = False
 
@@ -45,13 +49,41 @@ def get_db():
     return psycopg2.connect(url, cursor_factory=psycopg2.extras.RealDictCursor)
 
 
-# ─── 管理員驗證 ────────────────────────────────────────────
-def is_admin():
+# ─── 管理員驗證（金鑰＝owner；帳號登入依角色分權）──────────────
+ADMIN_ROLES = {'owner': '管理者（全部權限）', 'orders': '訂位人員（訂單）', 'editor': '小編（文章）'}
+
+
+def _legacy_key_ok():
     key = (request.args.get('key')
            or request.headers.get('X-Admin-Key')
            or (request.get_json(force=True, silent=True) or {}).get('_key', ''))
     admin_key = os.environ.get('ADMIN_KEY', '')
-    return (not admin_key) or (key == admin_key)
+    return bool(admin_key) and key == admin_key
+
+
+def current_admin():
+    """回傳目前操作者 {id, username, name, role}；金鑰視為 owner。未登入回 None。"""
+    if _legacy_key_ok():
+        return {'id': 0, 'username': '(admin-key)', 'name': '管理金鑰', 'role': 'owner'}
+    u = session.get('au')
+    if isinstance(u, dict) and u.get('role') in ADMIN_ROLES:
+        return u
+    # 未設 ADMIN_KEY 的開發環境維持全開（與舊行為一致）
+    if not os.environ.get('ADMIN_KEY', ''):
+        return {'id': 0, 'username': '(dev)', 'name': '開發模式', 'role': 'owner'}
+    return None
+
+
+def is_admin():
+    """owner 專用檢查（金鑰或 owner 帳號）。訂單/文章端點請用 has_role()。"""
+    u = current_admin()
+    return bool(u and u['role'] == 'owner')
+
+
+def has_role(role):
+    """角色檢查：owner 永遠通過，否則需完全符合指定角色。"""
+    u = current_admin()
+    return bool(u and (u['role'] == 'owner' or u['role'] == role))
 
 
 # ─── 資料表初始化 ──────────────────────────────────────────
@@ -181,6 +213,20 @@ def init_db():
             preorder_id  INT NOT NULL REFERENCES neihai_preorders(id) ON DELETE CASCADE,
             summary      TEXT NOT NULL,
             changed_at   TIMESTAMP DEFAULT NOW()
+        )
+    """)
+
+    # 後台使用者帳號（分權限：owner/orders/editor）
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS admin_users (
+            id            SERIAL PRIMARY KEY,
+            username      VARCHAR(50) UNIQUE NOT NULL,
+            password_hash VARCHAR(300) NOT NULL,
+            display_name  VARCHAR(100),
+            role          VARCHAR(20) NOT NULL DEFAULT 'orders',
+            is_active     BOOLEAN DEFAULT TRUE,
+            created_at    TIMESTAMP DEFAULT NOW(),
+            last_login    TIMESTAMP
         )
     """)
 
@@ -1372,7 +1418,7 @@ def create_neihai_preorder():
 
 @app.route('/api/admin/neihai/preorders', methods=['GET'])
 def admin_neihai_preorders():
-    if not is_admin():
+    if not has_role('orders'):
         return jsonify(ok=False, error='未授權'), 401
     try:
         start, end = _parse_month(request.args.get("month"))
@@ -1437,7 +1483,7 @@ NEIHAI_STATUS_LABELS = {
 def admin_update_neihai_preorder(order_id):
     """更新內海預購訂單：可改狀態、聯絡/業者/備註、以及各乘客資料；
     所有實際變更會寫入 neihai_preorder_logs 留下修改紀錄。"""
-    if not is_admin():
+    if not has_role('orders'):
         return jsonify(ok=False, error='未授權'), 401
     data = request.get_json(force=True, silent=True) or {}
     try:
@@ -1551,7 +1597,7 @@ def _import_clean_passengers(raw_passengers):
 def admin_toggle_neihai_sailing():
     """後台開啟/關閉單一船班的預購（upsert neihai_sailings.is_active）。
     關閉後前台該時段顯示「已關閉」且無法送出預購；已存在的訂單不受影響。"""
-    if not is_admin():
+    if not has_role('orders'):
         return jsonify(ok=False, error='未授權'), 401
     data = request.get_json(force=True, silent=True) or {}
     try:
@@ -1580,7 +1626,7 @@ def admin_neihai_import():
     - booking_ref 已存在的訂單直接略過（可安全重複匯入）
     - 不做已出航/額滿阻擋（後台資料視為權威，超過容量僅回警告）
     - 不寄 email / LINE 通知"""
-    if not is_admin():
+    if not has_role('orders'):
         return jsonify(ok=False, error='未授權'), 401
     data = request.get_json(force=True, silent=True) or {}
     orders = data.get('orders') or []
@@ -1644,6 +1690,122 @@ def admin_neihai_import():
             created.append(new_ref)
         conn.commit(); cur.close(); conn.close()
         return jsonify(ok=True, created=created, skipped=skipped, errors=errors, warnings=warnings)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+# ─── 後台帳號登入與使用者管理 ─────────────────────────────
+@app.route('/api/admin/login', methods=['POST'])
+def admin_login():
+    data = request.get_json(force=True, silent=True) or {}
+    username = (data.get('username') or '').strip().lower()
+    password = data.get('password') or ''
+    if not username or not password:
+        return jsonify(ok=False, error='請輸入帳號與密碼'), 400
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT * FROM admin_users WHERE LOWER(username)=%s", (username,))
+        u = cur.fetchone()
+        if not u or not u['is_active'] or not check_password_hash(u['password_hash'], password):
+            cur.close(); conn.close()
+            return jsonify(ok=False, error='帳號或密碼錯誤，或帳號已停用'), 401
+        cur.execute("UPDATE admin_users SET last_login=NOW() WHERE id=%s", (u['id'],))
+        conn.commit(); cur.close(); conn.close()
+        session.permanent = True
+        session['au'] = {'id': u['id'], 'username': u['username'],
+                         'name': u['display_name'] or u['username'], 'role': u['role']}
+        return jsonify(ok=True, user=session['au'], role_label=ADMIN_ROLES.get(u['role'], u['role']))
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.route('/api/admin/logout', methods=['POST'])
+def admin_logout():
+    session.pop('au', None)
+    return jsonify(ok=True)
+
+
+@app.route('/api/admin/me', methods=['GET'])
+def admin_me():
+    u = current_admin()
+    if not u:
+        return jsonify(ok=False, error='未登入'), 401
+    return jsonify(ok=True, user=u, role_label=ADMIN_ROLES.get(u['role'], u['role']))
+
+
+@app.route('/api/admin/users', methods=['GET', 'POST'])
+def admin_users():
+    """使用者管理（僅 owner）。GET 列表；POST 建立 {username,password,display_name,role}。"""
+    if not is_admin():
+        return jsonify(ok=False, error='未授權'), 401
+    try:
+        conn = get_db(); cur = conn.cursor()
+        if request.method == 'GET':
+            cur.execute("""SELECT id, username, display_name, role, is_active, created_at, last_login
+                           FROM admin_users ORDER BY id""")
+            users = []
+            for r in cur.fetchall():
+                r = dict(r)
+                for k in ('created_at', 'last_login'):
+                    if r.get(k): r[k] = str(r[k])
+                r['role_label'] = ADMIN_ROLES.get(r['role'], r['role'])
+                users.append(r)
+            cur.close(); conn.close()
+            return jsonify(ok=True, users=users, roles=ADMIN_ROLES)
+        data = request.get_json(force=True, silent=True) or {}
+        username = (data.get('username') or '').strip().lower()
+        password = data.get('password') or ''
+        role = (data.get('role') or 'orders').strip()
+        if not re.match(r'^[a-z0-9_.-]{3,30}$', username):
+            cur.close(); conn.close()
+            return jsonify(ok=False, error='帳號需為 3–30 字英數（可含 . _ -）'), 400
+        if len(password) < 8:
+            cur.close(); conn.close()
+            return jsonify(ok=False, error='密碼至少 8 碼'), 400
+        if role not in ADMIN_ROLES:
+            cur.close(); conn.close()
+            return jsonify(ok=False, error='角色不正確'), 400
+        cur.execute("SELECT 1 FROM admin_users WHERE LOWER(username)=%s", (username,))
+        if cur.fetchone():
+            cur.close(); conn.close()
+            return jsonify(ok=False, error='帳號已存在'), 400
+        cur.execute("""INSERT INTO admin_users (username, password_hash, display_name, role)
+                       VALUES (%s,%s,%s,%s) RETURNING id""",
+                    (username, generate_password_hash(password),
+                     (data.get('display_name') or '').strip() or username, role))
+        uid = cur.fetchone()['id']
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True, id=uid)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.route('/api/admin/users/<int:uid>', methods=['PATCH'])
+def admin_update_user(uid):
+    """更新使用者（僅 owner）：role / is_active / display_name / password（重設）。"""
+    if not is_admin():
+        return jsonify(ok=False, error='未授權'), 401
+    data = request.get_json(force=True, silent=True) or {}
+    sets, params = [], []
+    if 'role' in data:
+        if data['role'] not in ADMIN_ROLES:
+            return jsonify(ok=False, error='角色不正確'), 400
+        sets.append('role=%s'); params.append(data['role'])
+    if 'is_active' in data:
+        sets.append('is_active=%s'); params.append(bool(data['is_active']))
+    if 'display_name' in data:
+        sets.append('display_name=%s'); params.append((data['display_name'] or '').strip())
+    if data.get('password'):
+        if len(data['password']) < 8:
+            return jsonify(ok=False, error='密碼至少 8 碼'), 400
+        sets.append('password_hash=%s'); params.append(generate_password_hash(data['password']))
+    if not sets:
+        return jsonify(ok=False, error='沒有可更新的欄位'), 400
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute(f"UPDATE admin_users SET {', '.join(sets)} WHERE id=%s", tuple(params) + (uid,))
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True)
     except Exception as e:
         return jsonify(ok=False, error=str(e)), 500
 
@@ -2017,7 +2179,7 @@ def api_preorder_create(slug):
 
 @app.route('/api/admin/preorder/orders', methods=['GET'])
 def admin_preorder_orders():
-    if not is_admin():
+    if not has_role('orders'):
         return jsonify(ok=False, error='未授權'), 401
     try:
         start, end = _parse_month(request.args.get('month'))
@@ -2061,7 +2223,7 @@ def admin_preorder_orders():
 
 @app.route('/api/admin/preorder/orders/<int:order_id>', methods=['PATCH'])
 def admin_update_preorder(order_id):
-    if not is_admin():
+    if not has_role('orders'):
         return jsonify(ok=False, error='未授權'), 401
     data = request.get_json(force=True, silent=True) or {}
     status = (data.get('status') or '').strip()
@@ -2080,7 +2242,7 @@ def admin_update_preorder(order_id):
 def admin_preorder_import():
     """後台批次匯入通用行程預購訂單（CSV 與匯出同格式；行程以名稱或 slug 對應）。
     規則同內海匯入：booking_ref 重複略過、超額僅警告、不發通知。"""
-    if not is_admin():
+    if not has_role('orders'):
         return jsonify(ok=False, error='未授權'), 401
     data = request.get_json(force=True, silent=True) or {}
     orders = data.get('orders') or []
@@ -2421,7 +2583,7 @@ def get_post(slug):
 # ── 管理員 CRUD ──
 @app.route('/api/admin/posts', methods=['GET'])
 def admin_get_posts():
-    if not is_admin(): return jsonify(ok=False, error='未授權'), 401
+    if not has_role('editor'): return jsonify(ok=False, error='未授權'), 401
     try:
         conn = get_db(); cur = conn.cursor()
         cur.execute("SELECT * FROM posts ORDER BY COALESCE(published_at, created_at) DESC")
@@ -2433,7 +2595,7 @@ def admin_get_posts():
 
 @app.route('/api/admin/posts', methods=['POST'])
 def admin_create_post():
-    if not is_admin(): return jsonify(ok=False, error='未授權'), 401
+    if not has_role('editor'): return jsonify(ok=False, error='未授權'), 401
     d = request.get_json(force=True, silent=True) or {}
     try:
         pub = bool(d.get('is_published'))
@@ -2450,7 +2612,7 @@ def admin_create_post():
 
 @app.route('/api/admin/posts/<int:pid>', methods=['PUT'])
 def admin_update_post(pid):
-    if not is_admin(): return jsonify(ok=False, error='未授權'), 401
+    if not has_role('editor'): return jsonify(ok=False, error='未授權'), 401
     d = request.get_json(force=True, silent=True) or {}
     try:
         conn = get_db(); cur = conn.cursor()
@@ -2473,7 +2635,7 @@ def admin_update_post(pid):
 
 @app.route('/api/admin/posts/<int:pid>', methods=['DELETE'])
 def admin_delete_post(pid):
-    if not is_admin(): return jsonify(ok=False, error='未授權'), 401
+    if not has_role('editor'): return jsonify(ok=False, error='未授權'), 401
     try:
         conn = get_db(); cur = conn.cursor()
         cur.execute("DELETE FROM posts WHERE id=%s", (pid,))

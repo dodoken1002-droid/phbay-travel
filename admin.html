@@ -175,12 +175,19 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
   <div class="login-box">
     <div style="font-size:2.5rem;margin-bottom:12px">🌊</div>
     <h2>潮旅國際旅行社</h2>
-    <p>管理後台 — 請輸入管理員密鑰</p>
-    <input class="login-input" type="password" id="login-key" placeholder="輸入 ADMIN_KEY" />
+    <p>管理後台 — 請登入</p>
+    <input class="login-input" type="text" id="login-user" placeholder="帳號" autocomplete="username" />
+    <input class="login-input" type="password" id="login-pass" placeholder="密碼" autocomplete="current-password" />
     <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px"
       onclick="doLogin()"><i class="fas fa-sign-in-alt"></i> 登入</button>
+    <details style="margin-top:14px;text-align:left">
+      <summary style="cursor:pointer;color:#8aa4b8;font-size:.82rem">使用管理金鑰登入（管理者）</summary>
+      <input class="login-input" type="password" id="login-key" placeholder="輸入 ADMIN_KEY" style="margin-top:8px" />
+      <button class="btn btn-ghost" style="width:100%;justify-content:center;padding:10px"
+        onclick="doKeyLogin()"><i class="fas fa-key"></i> 金鑰登入</button>
+    </details>
     <p id="login-err" style="color:#e53e3e;font-size:.82rem;margin-top:8px;display:none">
-      密鑰錯誤，請重試</p>
+      登入失敗，請重試</p>
   </div>
 </div>
 
@@ -191,6 +198,7 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
   <header class="admin-header">
     <h1><i class="fas fa-water"></i> <span>潮旅國際旅行社</span> 管理後台</h1>
     <div class="header-actions">
+      <span id="me-badge" style="color:#8aa4b8;font-size:.85rem;margin-right:6px"></span>
       <a href="/" target="_blank" class="btn btn-ghost btn-sm">
         <i class="fas fa-external-link-alt"></i> 前往網站
       </a>
@@ -201,23 +209,26 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
   </header>
 
   <nav class="tab-nav">
-    <button class="active" onclick="switchTab('tours',this)">
+    <button id="tabbtn-tours" class="active" onclick="switchTab('tours',this)">
       <i class="fas fa-map-marked-alt"></i> 行程管理
     </button>
-    <button onclick="switchTab('slots',this)">
+    <button id="tabbtn-slots" onclick="switchTab('slots',this)">
       <i class="fas fa-calendar-check"></i> 梯次名額
     </button>
-    <button onclick="switchTab('posts',this)">
+    <button id="tabbtn-posts" onclick="switchTab('posts',this)">
       <i class="fas fa-pen-nib"></i> 部落格
     </button>
-    <button onclick="switchTab('neihai',this)">
+    <button id="tabbtn-neihai" onclick="switchTab('neihai',this)">
       <i class="fas fa-ship"></i> 內海預購
     </button>
-    <button onclick="switchTab('preorder',this)">
+    <button id="tabbtn-preorder" onclick="switchTab('preorder',this)">
       <i class="fas fa-ticket"></i> 行程預購
     </button>
-    <button onclick="switchTab('contacts',this)">
+    <button id="tabbtn-contacts" onclick="switchTab('contacts',this)">
       <i class="fas fa-envelope"></i> 諮詢紀錄
+    </button>
+    <button id="tabbtn-users" onclick="switchTab('users',this)">
+      <i class="fas fa-users-gear"></i> 使用者管理
     </button>
   </nav>
 
@@ -347,6 +358,35 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
         </div>
       </div>
       <div id="contacts-list">載入中…</div>
+    </div>
+
+    <!-- ── 使用者管理（僅 owner）── -->
+    <div class="tab-content" id="tab-users">
+      <div class="toolbar">
+        <h2>後台使用者</h2>
+        <button class="btn btn-primary" onclick="toggleUserForm()">
+          <i class="fas fa-user-plus"></i> 新增使用者
+        </button>
+      </div>
+      <div id="user-form" class="contact-card" style="display:none;margin-bottom:18px">
+        <div class="contact-field"><label>帳號</label><input id="nu-username" placeholder="3–30 字英數，例：amy01" style="width:100%"/></div>
+        <div class="contact-field"><label>顯示名稱</label><input id="nu-name" placeholder="例：小美（訂位組）" style="width:100%"/></div>
+        <div class="contact-field"><label>密碼</label><input id="nu-pass" type="text" placeholder="至少 8 碼" style="width:100%"/></div>
+        <div class="contact-field"><label>角色</label>
+          <select id="nu-role" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:8px">
+            <option value="orders">訂位人員（僅訂單分頁）</option>
+            <option value="editor">小編（僅部落格分頁）</option>
+            <option value="owner">管理者（全部權限）</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="createUser()" style="margin-top:10px">
+          <i class="fas fa-save"></i> 建立帳號
+        </button>
+      </div>
+      <div id="users-list">載入中…</div>
+      <p style="color:#8aa4b8;font-size:.82rem;margin-top:14px">
+        ※ 帳號登入有效 12 小時。停用帳號立即失效；密碼可由管理者在此重設。管理金鑰（ADMIN_KEY）永遠等同管理者權限。
+      </p>
     </div>
   </div>
 </div>
@@ -694,41 +734,167 @@ function buildI18nPayload(){
 /* ══════════════════════════════════════
    登入 / 登出
 ══════════════════════════════════════ */
+let ME = null;  // 目前登入者 {name, role, ...}
+
+/* 角色 → 可見分頁（owner 全開） */
+const ROLE_TABS = {
+  owner:  ['tours','slots','posts','neihai','preorder','contacts','users'],
+  orders: ['neihai','preorder'],
+  editor: ['posts'],
+};
+function loginFail(msg) {
+  const el = document.getElementById('login-err');
+  el.textContent = msg || '登入失敗，請重試';
+  el.style.display = 'block';
+}
+
 function doLogin() {
+  const username = document.getElementById('login-user').value.trim();
+  const password = document.getElementById('login-pass').value;
+  if (!username || !password) return;
+  fetch('/api/admin/login', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ username, password }),
+  }).then(r => r.json()).then(d => {
+    if (d.ok) { ME = d.user; ADMIN_KEY = ''; showAdmin(); }
+    else loginFail(d.error);
+  }).catch(() => loginFail());
+}
+
+function doKeyLogin() {
   const key = document.getElementById('login-key').value.trim();
   if (!key) return;
-  // 先用 /api/admin/tours?key=xxx 驗證
-  fetch(`/api/admin/tours?key=${encodeURIComponent(key)}`)
+  fetch(`/api/admin/me?key=${encodeURIComponent(key)}`)
     .then(r => r.json())
     .then(d => {
       if (d.ok) {
-        ADMIN_KEY = key;
+        ME = d.user; ADMIN_KEY = key;
         sessionStorage.setItem('admin_key', key);
         showAdmin();
-      } else {
-        document.getElementById('login-err').style.display = 'block';
-      }
+      } else loginFail('金鑰錯誤');
     })
-    .catch(() => { document.getElementById('login-err').style.display = 'block'; });
+    .catch(() => loginFail());
 }
+
 function doLogout() {
   sessionStorage.removeItem('admin_key');
-  location.reload();
+  fetch('/api/admin/logout', { method: 'POST' }).finally(() => location.reload());
 }
+
 function showAdmin() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('admin-app').style.display = 'block';
-  loadTours();
+  const role = (ME && ME.role) || 'owner';
+  const allowed = ROLE_TABS[role] || ROLE_TABS.owner;
+  const roleLabel = { owner:'管理者', orders:'訂位人員', editor:'小編' }[role] || role;
+  document.getElementById('me-badge').textContent = `${(ME && ME.name) || ''}（${roleLabel}）`;
+  // 只顯示有權限的分頁，並切到第一個
+  ['tours','slots','posts','neihai','preorder','contacts','users'].forEach(t => {
+    const btn = document.getElementById('tabbtn-' + t);
+    if (btn) btn.style.display = allowed.includes(t) ? '' : 'none';
+  });
+  const first = allowed[0];
+  switchTab(first, document.getElementById('tabbtn-' + first));
 }
-// 頁面載入：嘗試從 sessionStorage 恢復登入
+
+// 頁面載入：先問 session（cookie），再退回 sessionStorage 金鑰
 (function() {
-  const k = sessionStorage.getItem('admin_key');
-  if (k) { ADMIN_KEY = k; showAdmin(); }
+  fetch('/api/admin/me')
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) { ME = d.user; ADMIN_KEY = ''; showAdmin(); return; }
+      const k = sessionStorage.getItem('admin_key');
+      if (!k) return;
+      fetch(`/api/admin/me?key=${encodeURIComponent(k)}`)
+        .then(r => r.json())
+        .then(d2 => { if (d2.ok) { ME = d2.user; ADMIN_KEY = k; showAdmin(); } });
+    })
+    .catch(() => {});
 })();
 // Enter 鍵登入
-document.getElementById('login-key').addEventListener('keydown', e => {
+document.getElementById('login-pass').addEventListener('keydown', e => {
   if (e.key === 'Enter') doLogin();
 });
+document.getElementById('login-key').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doKeyLogin();
+});
+
+/* ══════════════════════════════════════
+   使用者管理（僅 owner）
+══════════════════════════════════════ */
+function toggleUserForm() {
+  const f = document.getElementById('user-form');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+function loadUsers() {
+  const list = document.getElementById('users-list');
+  list.innerHTML = '載入中…';
+  fetch(`/api/admin/users?key=${encodeURIComponent(ADMIN_KEY)}`)
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) { list.innerHTML = d.error || '載入失敗'; return; }
+      if (!d.users.length) {
+        list.innerHTML = '<p style="color:#a0aec0;text-align:center;padding:40px">尚無帳號，請按「新增使用者」建立</p>';
+        return;
+      }
+      list.innerHTML = `<table class="tour-table"><thead>
+        <tr><th>帳號</th><th>顯示名稱</th><th>角色</th><th>狀態</th><th>最後登入</th><th>操作</th></tr></thead><tbody>` +
+        d.users.map(u => `
+          <tr style="${u.is_active ? '' : 'opacity:.5'}">
+            <td style="font-family:monospace">${nEsc(u.username)}</td>
+            <td>${nEsc(u.display_name)}</td>
+            <td>
+              <select onchange="patchUser(${u.id},{role:this.value})" style="padding:6px;border:1px solid #e2e8f0;border-radius:6px">
+                ${['orders','editor','owner'].map(r => `<option value="${r}" ${u.role===r?'selected':''}>${{orders:'訂位人員',editor:'小編',owner:'管理者'}[r]}</option>`).join('')}
+              </select>
+            </td>
+            <td style="font-weight:800;color:${u.is_active ? '#2f855a' : '#c53030'}">${u.is_active ? '啟用' : '停用'}</td>
+            <td style="font-size:.82rem;color:var(--mid)">${u.last_login ? nEsc(String(u.last_login).slice(0,16)) : '—'}</td>
+            <td>
+              <button class="btn btn-ghost" style="padding:6px 10px" onclick="patchUser(${u.id},{is_active:${u.is_active ? 'false' : 'true'}})">${u.is_active ? '停用' : '啟用'}</button>
+              <button class="btn btn-ghost" style="padding:6px 10px" onclick="resetUserPass(${u.id},'${nEsc(u.username)}')">重設密碼</button>
+            </td>
+          </tr>`).join('') + '</tbody></table>';
+    })
+    .catch(() => { list.innerHTML = '載入失敗'; });
+}
+
+function createUser() {
+  const body = {
+    username: document.getElementById('nu-username').value.trim(),
+    display_name: document.getElementById('nu-name').value.trim(),
+    password: document.getElementById('nu-pass').value,
+    role: document.getElementById('nu-role').value,
+    _key: ADMIN_KEY,
+  };
+  fetch(`/api/admin/users?key=${encodeURIComponent(ADMIN_KEY)}`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+  }).then(r => r.json()).then(d => {
+    if (d.ok) {
+      showToast('帳號已建立', 'success');
+      ['nu-username','nu-name','nu-pass'].forEach(id => document.getElementById(id).value = '');
+      toggleUserForm(); loadUsers();
+    } else showToast(d.error || '建立失敗', 'error');
+  }).catch(() => showToast('建立失敗', 'error'));
+}
+
+function patchUser(id, patch) {
+  patch._key = ADMIN_KEY;
+  fetch(`/api/admin/users/${id}?key=${encodeURIComponent(ADMIN_KEY)}`, {
+    method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(patch),
+  }).then(r => r.json()).then(d => {
+    if (d.ok) { showToast('已更新', 'success'); loadUsers(); }
+    else showToast(d.error || '更新失敗', 'error');
+  }).catch(() => showToast('更新失敗', 'error'));
+}
+
+function resetUserPass(id, username) {
+  const p = prompt(`為「${username}」設定新密碼（至少 8 碼）：`);
+  if (!p) return;
+  if (p.length < 8) { showToast('密碼至少 8 碼', 'error'); return; }
+  patchUser(id, { password: p });
+}
 
 /* ══════════════════════════════════════
    Tab 切換
@@ -743,6 +909,8 @@ function switchTab(name, btn) {
   if (name === 'posts')    loadPosts();
   if (name === 'neihai')   loadNeihaiOrders();
   if (name === 'preorder') loadPreorderOrders();
+  if (name === 'users')    loadUsers();
+  if (name === 'tours')    loadTours();
 }
 
 /* ══════════════════════════════════════
