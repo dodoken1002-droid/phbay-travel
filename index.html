@@ -222,7 +222,7 @@
             <li><a href="#contact" data-i18n="nav.contactInfo">聯絡資訊</a></li>
           </ul>
         </li>
-        <!-- <li><a href="#quiz" data-i18n="nav.quiz">行程測驗</a></li> 暫時隱藏 -->
+        <li><a href="#quiz" data-i18n="nav.quiz">行程診斷</a></li>
         <li class="lang-switch">
           <button class="lang-btn" id="lang-btn" aria-label="Language">🌐 <span id="lang-current">中文</span> <i class="fas fa-chevron-down" style="font-size:.7em"></i></button>
           <ul class="lang-menu" id="lang-menu">
@@ -270,8 +270,8 @@
         <div class="carousel-slide slide-poster">
           <img src="/images/festival-poster.png" alt="2026 澎湖追風音樂燈光節" />
           <div class="slide-overlay">
-            <a href="#contact" class="btn btn-primary slide-cta" data-i18n="slide.cta">
-              <i class="fas fa-comment-dots"></i> 詢問搭配行程
+            <a href="/preorder/festival" class="btn btn-primary slide-cta">
+              <i class="fas fa-music"></i> 查看音樂節預購
             </a>
           </div>
         </div>
@@ -289,6 +289,9 @@
               </a>
               <a href="#contact" class="btn btn-outline" data-i18n="hero.btnContact">
                 <i class="fas fa-comment-dots"></i> 立即諮詢
+              </a>
+              <a href="#quiz" class="btn btn-outline">
+                <i class="fas fa-wand-magic-sparkles"></i> 30 秒行程診斷
               </a>
             </div>
           </div>
@@ -349,6 +352,30 @@
         <div class="partner-text">
           <h2 data-i18n="partner.title">2026 澎湖追風音樂燈光節 官方合作旅行社</h2>
           <p data-i18n="partner.subtitle">潮旅國際與易遊網、雄獅、可樂、東南、星晴、佳期、kkday、長汎並列官方授權名單</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════
+       30 秒行程診斷曝光入口
+  ════════════════════════════════════════════════ -->
+  <section class="diagnosis-entry" id="trip-diagnosis-entry">
+    <div class="container">
+      <div class="diagnosis-card">
+        <div class="diagnosis-copy">
+          <span class="diagnosis-kicker">30 秒找到你的澎湖玩法</span>
+          <h2>不知道澎湖怎麼排？先測你的旅行類型</h2>
+          <p>回答 4 題，系統會推薦適合的澎湖行程，結果可分享給旅伴，也能直接傳 LINE 讓潮旅專人協助安排。</p>
+          <div class="diagnosis-points">
+            <span><i class="fas fa-check"></i> 親子 / 情侶 / 朋友都能測</span>
+            <span><i class="fas fa-check"></i> 連到內海巡禮、音樂節與套裝行程</span>
+            <span><i class="fas fa-check"></i> 分享結果幫網站自然擴散</span>
+          </div>
+        </div>
+        <div class="diagnosis-actions">
+          <a href="#quiz" class="btn btn-primary"><i class="fas fa-wand-magic-sparkles"></i> 開始行程診斷</a>
+          <a href="/preorder/festival" class="btn btn-outline"><i class="fas fa-music"></i> 看音樂節預購</a>
         </div>
       </div>
     </div>
@@ -505,8 +532,9 @@
   <section class="quiz-section" id="quiz">
     <div class="container">
       <div class="section-header">
+        <span class="section-kicker">澎湖行程診斷</span>
         <h2 data-i18n="quiz.title">找到你的專屬澎湖行程</h2>
-        <p data-i18n="quiz.subtitle">4 個問題・30 秒・幫你找出最適合的旅遊方案</p>
+        <p data-i18n="quiz.subtitle">4 個問題・30 秒・測完可分享結果，也能直接 LINE 諮詢</p>
       </div>
       <div class="quiz-wrap" id="quiz-wrap">
         <!-- 由 script.js initQuiz() 動態產生 -->

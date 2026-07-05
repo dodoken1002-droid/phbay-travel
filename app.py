@@ -2148,10 +2148,123 @@ def admin_preorder_import():
         return jsonify(ok=False, error=str(e)), 500
 
 
+def _preorder_seo_data(slug, product=None):
+    """通用預購頁的伺服器端 SEO；避免 /preorder/<slug> 只呈現通用標題。"""
+    product = product or {}
+    name = product.get('name') or ('2026 澎湖追風音樂燈光節主題行程' if slug == 'festival' else '潮旅行程預購')
+    desc = product.get('description') or '選擇出發日期、填寫旅客資料即可完成預購，潮旅國際旅行社將由專人與您確認行程細節。'
+    canonical = f'{SITE}/preorder/{slug}'
+    image = f'{SITE}/images/festival-poster.png'
+    if slug == 'festival':
+        title = '2026 澎湖追風音樂燈光節主題行程預購｜三天兩夜套裝｜潮旅國際旅行社'
+        desc = '2026 澎湖追風音樂燈光節主題行程預購，三天兩夜套裝安排，兩人成行，搭配觀音亭園區燈光展演與澎湖在地玩法，由潮旅國際旅行社專人確認。'
+        keywords = ['澎湖追風音樂燈光節', '澎湖音樂節行程', '澎湖三天兩夜', '澎湖音樂節套裝', '潮旅國際旅行社']
+    else:
+        title = f'{name}預購訂位｜潮旅國際旅行社'
+        keywords = ['澎湖行程預購', name, '潮旅國際旅行社']
+    graph = [
+        {
+            '@context': 'https://schema.org',
+            '@type': 'TouristTrip',
+            '@id': f'{canonical}#trip',
+            'name': name,
+            'description': desc,
+            'url': canonical,
+            'image': image,
+            'touristType': ['親子旅客', '情侶旅客', '朋友團體', '澎湖自由行旅客'],
+            'provider': {
+                '@type': 'TravelAgency',
+                'name': '潮旅國際旅行社',
+                'url': SITE,
+                'telephone': '+886-6-9271288',
+                'identifier': [
+                    {'@type': 'PropertyValue', 'name': '統一編號', 'value': '60305305'},
+                    {'@type': 'PropertyValue', 'name': '旅行社證號', 'value': '交觀乙第1864號'}
+                ]
+            },
+            'offers': {
+                '@type': 'Offer',
+                'url': canonical,
+                'priceCurrency': 'TWD',
+                'availability': 'https://schema.org/InStock'
+            },
+            'keywords': ', '.join(keywords)
+        },
+        _breadcrumb_ld([('首頁', f'{SITE}/'), ('預購行程', canonical), (name, canonical)])
+    ]
+    if slug == 'festival':
+        graph.append({
+            '@context': 'https://schema.org',
+            '@type': 'Event',
+            '@id': f'{canonical}#event',
+            'name': '2026 澎湖追風音樂燈光節',
+            'description': '2026 澎湖追風音樂燈光節主題行程，搭配澎湖三天兩夜旅遊安排與專人預購服務。',
+            'startDate': '2026-09-12',
+            'endDate': '2026-10-11',
+            'eventAttendanceMode': 'https://schema.org/OfflineEventAttendanceMode',
+            'eventStatus': 'https://schema.org/EventScheduled',
+            'image': image,
+            'url': canonical,
+            'location': {
+                '@type': 'Place',
+                'name': '澎湖觀音亭園區',
+                'address': {
+                    '@type': 'PostalAddress',
+                    'addressRegion': '澎湖縣',
+                    'addressLocality': '馬公市',
+                    'addressCountry': 'TW'
+                }
+            },
+            'organizer': {'@type': 'TravelAgency', 'name': '潮旅國際旅行社', 'url': SITE}
+        })
+    return {'title': title, 'description': desc, 'canonical': canonical, 'image': image, 'graph': graph}
+
+
+def _render_preorder_template(slug, product=None):
+    html_doc = open(os.path.join(app.root_path, 'preorder.html'), encoding='utf-8-sig').read()
+    seo = _preorder_seo_data(slug, product)
+    safe_title = _html.escape(seo['title'])
+    safe_desc = _html.escape(seo['description'])
+    safe_canonical = _html.escape(seo['canonical'])
+    safe_image = _html.escape(seo['image'])
+    head_extra = (
+        f'<meta name="description" content="{safe_desc}" />\n'
+        f'  <link rel="canonical" href="{safe_canonical}" />\n'
+        f'  <meta property="og:type" content="website" />\n'
+        f'  <meta property="og:site_name" content="潮旅國際旅行社" />\n'
+        f'  <meta property="og:title" content="{safe_title}" />\n'
+        f'  <meta property="og:description" content="{safe_desc}" />\n'
+        f'  <meta property="og:url" content="{safe_canonical}" />\n'
+        f'  <meta property="og:image" content="{safe_image}" />\n'
+        f'  <meta property="og:locale" content="zh_TW" />\n'
+        f'  <meta name="twitter:card" content="summary_large_image" />\n'
+        f'  <meta name="twitter:title" content="{safe_title}" />\n'
+        f'  <meta name="twitter:description" content="{safe_desc}" />\n'
+        f'  <meta name="twitter:image" content="{safe_image}" />\n'
+        f'  <script type="application/ld+json">{json.dumps(seo["graph"], ensure_ascii=False)}</script>'
+    )
+    html_doc = re.sub(r'<title>.*?</title>', f'<title>{safe_title}</title>', html_doc, count=1, flags=re.S | re.I)
+    html_doc = re.sub(
+        r'<meta name="description" content=".*?"\s*/>',
+        head_extra,
+        html_doc,
+        count=1,
+        flags=re.S | re.I
+    )
+    return html_doc
+
+
 @app.route('/preorder/<slug>')
 def preorder_page(slug):
-    # 通用預購頁：同一模板，前端依 slug 讀取行程設定
-    return send_from_directory('.', 'preorder.html')
+    # 通用預購頁：同一模板，前端依 slug 讀取行程設定；後端先補 SEO/社群預覽/結構化資料。
+    product = None
+    try:
+        conn = get_db(); cur = conn.cursor()
+        product = _get_product(slug, cur)
+        cur.close(); conn.close()
+    except Exception as e:
+        print(f'[SEO] 預購頁商品讀取失敗，改用 fallback：{e}')
+    return _render_preorder_template(slug, product)
 
 
 # ─── 梯次名額 CRUD（管理員）────────────────────────────────────
