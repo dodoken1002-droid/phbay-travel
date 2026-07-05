@@ -162,6 +162,8 @@ def init_db():
             updated_at      TIMESTAMP DEFAULT NOW()
         )
     """)
+    # 訂位確認信用：代表人 Email（選填）
+    cur.execute("ALTER TABLE neihai_preorders ADD COLUMN IF NOT EXISTS contact_email VARCHAR(200)")
     cur.execute("""
         CREATE TABLE IF NOT EXISTS neihai_passengers (
             id              SERIAL PRIMARY KEY,
@@ -232,6 +234,7 @@ def init_db():
             updated_at      TIMESTAMP DEFAULT NOW()
         )
     """)
+    cur.execute("ALTER TABLE preorder_orders ADD COLUMN IF NOT EXISTS contact_email VARCHAR(200)")
     cur.execute("""
         CREATE TABLE IF NOT EXISTS preorder_passengers (
             id              SERIAL PRIMARY KEY,
@@ -904,6 +907,61 @@ def send_preorder_email(info):
         print(f'[LINE] 預購通知呼叫失敗（不影響訂單）：{_e}')
 
 
+EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+
+
+def send_customer_confirmation_email(info):
+    """寄「訂位確認信」給客人（代表人 Email，選填有填才寄）。
+    內容為客人視角：訂單編號、行程、班次、人數、成團狀態與聯絡方式；
+    不含身分證等個資。寄信失敗不影響訂單。"""
+    recipient = (info.get('contact_email') or '').strip()
+    sender = os.environ.get('EMAIL_USER', '')
+    if not recipient or not EMAIL_RE.match(recipient):
+        return
+    if not sender or not (os.environ.get('GMAIL_SERVICE_ACCOUNT_JSON', '').strip() or os.environ.get('EMAIL_PASS', '')):
+        print('[EMAIL] 未設定寄信方式，跳過客人確認信')
+        return
+
+    when = f"{info.get('date', '')} {info.get('time', '')}".strip()
+    product = info.get('product', '預購行程')
+    if info.get('status') == 'confirmed_departure':
+        status_line = '本班次已達成行門檻，確定出發！我們將於出發前與您聯繫確認細節。'
+    else:
+        status_line = '本班次尚在湊團中（6 人成行），成團後我們會第一時間通知您；若最終未成團，將協助您改期或全額退還已付款項。'
+    body = f"""{info.get('contact_name', '')} 您好：
+
+感謝您預購「{product}」，以下是您的訂位資訊，請留存核對：
+
+──────────────────────
+訂位代號：{info.get('booking_ref', '')}
+行　　程：{product}
+出發班次：{when}
+預購人數：{info.get('passenger_count', '')} 人
+業者/代號：{info.get('agency_name') or '—'}
+備　　註：{info.get('notes') or '—'}
+──────────────────────
+
+{status_line}
+
+【重要】請加入潮旅官方 LINE（ID：@phbay2018，https://line.me/R/ti/p/@phbay2018），
+並傳送您的訂位代號 {info.get('booking_ref', '')}，方便我們即時通知出發資訊與天候異動。
+
+如資料有誤或需修改，請透過 LINE 或電話 06-9271288 與我們聯繫（週一至週五 08:30–17:30）。
+
+潮旅國際旅行社
+交觀乙第1864號｜澎品保0188號
+澎湖縣馬公市民權路13號2樓
+官網：https://www.phbay.info
+"""
+    msg = MIMEMultipart()
+    msg['From'] = f'潮旅國際旅行社 <{sender}>'
+    msg['To'] = recipient
+    msg['Subject'] = f'【訂位確認】{product}｜{when}｜訂位代號 {info.get("booking_ref", "")}'
+    msg.attach(MIMEText(body, 'plain', 'utf-8'))
+    ok, detail = _deliver(sender, recipient, msg)
+    print(f'[EMAIL] 客人確認信{"已寄出" if ok else "寄送失敗（不影響訂單）"}（{detail}）→ {recipient}')
+
+
 # ─── 梯次名額 API（公開）─────────────────────────────────────
 @app.route('/api/slots', methods=['GET'])
 def get_slots():
@@ -1212,6 +1270,9 @@ def create_neihai_preorder():
 
     contact_name = clean_passengers[0]["name"]
     contact_phone = (data.get("contact_phone") or clean_passengers[0]["phone"]).strip()
+    contact_email = (data.get("contact_email") or "").strip()
+    if contact_email and not EMAIL_RE.match(contact_email):
+        return jsonify(ok=False, error="Email 格式不正確，請確認後再送出（或留空）"), 400
     agency_name = (data.get("agency_name") or "").strip()
     notes = (data.get("notes") or "").strip()
 
@@ -1248,10 +1309,12 @@ def create_neihai_preorder():
         status = "confirmed_departure" if booked + passenger_count >= int(sailing["min_people"]) else "pending_departure"
         cur.execute("""
             INSERT INTO neihai_preorders
-              (sailing_id, agency_name, contact_name, contact_phone, passenger_count, status, notes)
-            VALUES (%s,%s,%s,%s,%s,%s,%s)
+              (sailing_id, agency_name, contact_name, contact_phone, contact_email,
+               passenger_count, status, notes)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
             RETURNING id, created_at
-        """, (sailing["id"], agency_name, contact_name, contact_phone, passenger_count, status, notes))
+        """, (sailing["id"], agency_name, contact_name, contact_phone, contact_email,
+              passenger_count, status, notes))
         order = cur.fetchone()
         booking_ref = f"NH{sailing_date.strftime('%Y%m%d')}{sailing_time.replace(':', '')}-{int(order['id']):04d}"
         cur.execute("UPDATE neihai_preorders SET booking_ref=%s WHERE id=%s", (booking_ref, order["id"]))
@@ -1275,6 +1338,18 @@ def create_neihai_preorder():
             })
         except Exception as _e:
             print(f'[EMAIL] 內海預購通知呼叫失敗（不影響訂單）：{_e}')
+
+        try:
+            send_customer_confirmation_email({
+                'product': '小城故事・內海巡禮',
+                'booking_ref': booking_ref,
+                'date': str(sailing_date), 'time': sailing_time,
+                'passenger_count': passenger_count, 'status': status,
+                'agency_name': agency_name, 'contact_name': contact_name,
+                'contact_email': contact_email, 'notes': notes,
+            })
+        except Exception as _e:
+            print(f'[EMAIL] 內海客人確認信呼叫失敗（不影響訂單）：{_e}')
 
         code, label, remaining, needed = _sailing_status(booked + passenger_count, capacity, sailing["min_people"], True)
         return jsonify(
@@ -1388,7 +1463,8 @@ def admin_update_neihai_preorder(order_id):
                 set_parts.append("status=%s"); params.append(new_status)
 
         for field, label in (("agency_name", "業者"), ("contact_name", "主要聯絡姓名"),
-                             ("contact_phone", "聯絡電話"), ("notes", "備註")):
+                             ("contact_phone", "聯絡電話"), ("contact_email", "Email"),
+                             ("notes", "備註")):
             if field in data:
                 new_val = (data.get(field) or "").strip()
                 old_val = order.get(field) or ""
@@ -1547,11 +1623,13 @@ def admin_neihai_import():
                 warnings.append(f'{sailing_date} {sailing_time} 匯入後共 {booked + len(clean)} 人，超過上限 {capacity}')
             cur.execute("""
                 INSERT INTO neihai_preorders
-                  (sailing_id, agency_name, contact_name, contact_phone, passenger_count, status, notes)
-                VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id
+                  (sailing_id, agency_name, contact_name, contact_phone, contact_email,
+                   passenger_count, status, notes)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
             """, (sailing['id'], (o.get('agency_name') or '').strip(),
                   (o.get('contact_name') or '').strip() or clean[0]['name'],
                   (o.get('contact_phone') or '').strip() or clean[0]['phone'],
+                  (o.get('contact_email') or '').strip(),
                   len(clean), status, (o.get('notes') or '').strip()))
             oid = cur.fetchone()['id']
             new_ref = ref or f"NH{sailing_date.strftime('%Y%m%d')}{sailing_time.replace(':', '')}-{int(oid):04d}"
@@ -1860,6 +1938,10 @@ def api_preorder_create(slug):
 
         contact_name = clean[0]['name']
         contact_phone = (data.get('contact_phone') or clean[0]['phone']).strip()
+        contact_email = (data.get('contact_email') or '').strip()
+        if contact_email and not EMAIL_RE.match(contact_email):
+            cur.close(); conn.close()
+            return jsonify(ok=False, error='Email 格式不正確，請確認後再送出（或留空）'), 400
         agency_name = (data.get('agency_name') or '').strip()
         notes = (data.get('notes') or '').strip()
 
@@ -1879,11 +1961,11 @@ def api_preorder_create(slug):
         cur.execute("""
             INSERT INTO preorder_orders
               (product_id, departure_date, departure_time, agency_name,
-               contact_name, contact_phone, passenger_count, status, notes)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+               contact_name, contact_phone, contact_email, passenger_count, status, notes)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             RETURNING id, created_at
         """, (p['id'], dep_date, dep_time, agency_name, contact_name,
-              contact_phone, len(clean), status, notes))
+              contact_phone, contact_email, len(clean), status, notes))
         order = cur.fetchone()
         booking_ref = f"{slug[:6].upper()}{dep_date.strftime('%Y%m%d')}-{int(order['id']):04d}"
         cur.execute('UPDATE preorder_orders SET booking_ref=%s WHERE id=%s', (booking_ref, order['id']))
@@ -1906,6 +1988,18 @@ def api_preorder_create(slug):
             })
         except Exception as _e:
             print(f'[EMAIL] 預購通知呼叫失敗（不影響訂單）：{_e}')
+
+        try:
+            send_customer_confirmation_email({
+                'product': p.get('name') or slug,
+                'booking_ref': booking_ref,
+                'date': str(dep_date), 'time': dep_time,
+                'passenger_count': len(clean), 'status': status,
+                'agency_name': agency_name, 'contact_name': contact_name,
+                'contact_email': contact_email, 'notes': notes,
+            })
+        except Exception as _e:
+            print(f'[EMAIL] 客人確認信呼叫失敗（不影響訂單）：{_e}')
 
         code, label, remaining = _preorder_slot_status(booked + len(clean), p['capacity'], p['min_people'])
         return jsonify(
@@ -2032,11 +2126,12 @@ def admin_preorder_import():
             cur.execute("""
                 INSERT INTO preorder_orders
                   (product_id, departure_date, departure_time, agency_name,
-                   contact_name, contact_phone, passenger_count, status, notes)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
+                   contact_name, contact_phone, contact_email, passenger_count, status, notes)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
             """, (prod['id'], dep_date, dep_time, (o.get('agency_name') or '').strip(),
                   (o.get('contact_name') or '').strip() or clean[0]['name'],
                   (o.get('contact_phone') or '').strip() or clean[0]['phone'],
+                  (o.get('contact_email') or '').strip(),
                   len(clean), status, (o.get('notes') or '').strip()))
             oid = cur.fetchone()['id']
             new_ref = ref or f"{prod['slug'][:6].upper()}{dep_date.strftime('%Y%m%d')}-{int(oid):04d}"

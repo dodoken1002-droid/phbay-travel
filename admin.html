@@ -1234,7 +1234,7 @@ function renderNeihaiCard(o) {
           <button class="btn" onclick="editNeihaiOrder(${o.id})" style="margin-left:6px;padding:6px 10px"><i class="fas fa-pen"></i> 編輯</button>
         </div>
       </div>
-      <div class="contact-field"><label>主要聯絡</label><span>${nEsc(o.contact_name)}｜${nEsc(o.contact_phone)}</span></div>
+      <div class="contact-field"><label>主要聯絡</label><span>${nEsc(o.contact_name)}｜${nEsc(o.contact_phone)}${o.contact_email ? '｜' + nEsc(o.contact_email) : ''}</span></div>
       <div class="contact-field"><label>備註</label><span>${nEsc(o.notes) || '—'}</span></div>
       <table class="tour-table" style="margin-top:12px">
         <thead><tr><th>乘客</th><th>身分證字號</th><th>出生年月日</th><th>電話</th></tr></thead>
@@ -1264,6 +1264,7 @@ function renderNeihaiEditForm(o) {
       <div class="contact-field"><label>業者/代號</label><input id="ne-agency-${o.id}" value="${nEsc(o.agency_name)}" style="width:100%"/></div>
       <div class="contact-field"><label>主要聯絡姓名</label><input id="ne-cname-${o.id}" value="${nEsc(o.contact_name)}" style="width:100%"/></div>
       <div class="contact-field"><label>聯絡電話</label><input id="ne-cphone-${o.id}" value="${nEsc(o.contact_phone)}" style="width:100%"/></div>
+      <div class="contact-field"><label>Email</label><input id="ne-cemail-${o.id}" value="${nEsc(o.contact_email)}" style="width:100%"/></div>
       <div class="contact-field"><label>備註</label><textarea id="ne-notes-${o.id}" rows="2" style="width:100%">${nEsc(o.notes)}</textarea></div>
       <table class="tour-table" style="margin-top:12px" id="ne-pax-${o.id}">
         <thead><tr><th>乘客姓名</th><th>身分證字號</th><th>出生年月日</th><th>電話</th></tr></thead>
@@ -1292,7 +1293,7 @@ function saveNeihaiOrder(id) {
   }, []);
   const body = {
     agency_name: g('agency').value, contact_name: g('cname').value,
-    contact_phone: g('cphone').value, notes: g('notes').value,
+    contact_phone: g('cphone').value, contact_email: g('cemail').value, notes: g('notes').value,
     passengers, _key: ADMIN_KEY,
   };
   fetch(`/api/admin/neihai/preorders/${id}?key=${encodeURIComponent(ADMIN_KEY)}`, {
@@ -1306,12 +1307,12 @@ function saveNeihaiOrder(id) {
 function exportNeihaiCsv() {
   const orders = Object.values(window._neihaiOrders || {});
   if (!orders.length) { showToast('目前沒有可匯出的訂單', 'error'); return; }
-  const header = ['訂單編號','出航日期','時段','訂單狀態','業者/代號','主要聯絡姓名','主要聯絡電話','乘客姓名','身分證字號','出生年月日','乘客電話','備註','建立時間'];
+  const header = ['訂單編號','出航日期','時段','訂單狀態','業者/代號','主要聯絡姓名','主要聯絡電話','Email','乘客姓名','身分證字號','出生年月日','乘客電話','備註','建立時間'];
   const rows = [header];
   orders.forEach(o => {
     const paxList = (o.passengers && o.passengers.length) ? o.passengers : [{}];
     paxList.forEach(p => rows.push([o.booking_ref||'', o.sailing_date||'', o.sailing_time||'',
-      statusText(o.status), o.agency_name||'', o.contact_name||'', o.contact_phone||'',
+      statusText(o.status), o.agency_name||'', o.contact_name||'', o.contact_phone||'', o.contact_email||'',
       p.name||'', p.national_id||'', p.birth_date||'', p.phone||'', o.notes||'', o.created_at||'']));
   });
   const month = (document.getElementById('neihai-month')||{}).value || '';
@@ -1361,12 +1362,12 @@ function groupImportRows(rows, col, kind) {
       ? { booking_ref: ref, sailing_date: normDate(get('出航日期')), sailing_time: get('時段'),
           status: get('訂單狀態'), agency_name: get('業者/代號'),
           contact_name: get('主要聯絡姓名'), contact_phone: get('主要聯絡電話'),
-          notes: get('備註'), passengers: [] }
+          contact_email: get('Email'), notes: get('備註'), passengers: [] }
       : { booking_ref: ref, product: get('行程名稱'),
           departure_date: normDate(get('出發日期')), departure_time: get('出發時間'),
           status: get('訂單狀態'), agency_name: get('業者/代號'),
           contact_name: get('主要聯絡姓名'), contact_phone: get('主要聯絡電話'),
-          notes: get('備註'), passengers: [] }
+          contact_email: get('Email'), notes: get('備註'), passengers: [] }
     ;
     const key = ref || (kind === 'neihai'
       ? `${base.sailing_date}|${base.sailing_time}|${base.contact_name}|${base.contact_phone}`
@@ -1431,12 +1432,12 @@ function downloadCsv(rows, filename) {
 function exportPreorderCsv() {
   const orders = window._preorderOrders || [];
   if (!orders.length) { showToast('請先載入月份，目前沒有可匯出的訂單', 'error'); return; }
-  const header = ['訂單編號','行程名稱','出發日期','出發時間','訂單狀態','業者/代號','主要聯絡姓名','主要聯絡電話','旅客姓名','身分證字號','出生年月日','旅客電話','備註','建立時間'];
+  const header = ['訂單編號','行程名稱','出發日期','出發時間','訂單狀態','業者/代號','主要聯絡姓名','主要聯絡電話','Email','旅客姓名','身分證字號','出生年月日','旅客電話','備註','建立時間'];
   const rows = [header];
   orders.forEach(o => {
     const paxList = (o.passengers && o.passengers.length) ? o.passengers : [{}];
     paxList.forEach(p => rows.push([o.booking_ref||'', o.product_name||'', o.departure_date||'', o.departure_time||'',
-      statusText(o.status), o.agency_name||'', o.contact_name||'', o.contact_phone||'',
+      statusText(o.status), o.agency_name||'', o.contact_name||'', o.contact_phone||'', o.contact_email||'',
       p.name||'', p.national_id||'', p.birth_date||'', p.phone||'', o.notes||'', o.created_at||'']));
   });
   const month = (document.getElementById('preorder-month')||{}).value || '';
@@ -1518,7 +1519,7 @@ function loadPreorderOrders() {
               </select>
             </div>
           </div>
-          <div class="contact-field"><label>主要聯絡</label><span>${o.contact_name}｜${o.contact_phone}</span></div>
+          <div class="contact-field"><label>主要聯絡</label><span>${o.contact_name}｜${o.contact_phone}${o.contact_email ? '｜' + o.contact_email : ''}</span></div>
           <div class="contact-field"><label>備註</label><span>${o.notes || '—'}</span></div>
           <table class="tour-table" style="margin-top:12px">
             <thead><tr><th>旅客</th><th>身分證字號</th><th>出生年月日</th><th>電話</th></tr></thead>

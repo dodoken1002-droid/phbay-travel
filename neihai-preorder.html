@@ -158,6 +158,10 @@
           <input id="agency-name" name="agency_name" placeholder="例：PHBAY-A01 / 某某旅行社" />
         </div>
         <div class="field">
+          <label for="contact-email">聯絡 Email（選填，填寫後將寄送訂位確認信）</label>
+          <input id="contact-email" name="contact_email" type="email" placeholder="例：name@example.com" />
+        </div>
+        <div class="field">
           <label for="passenger-count">預購人數</label>
           <input id="passenger-count" type="number" min="1" max="13" value="1" />
         </div>
@@ -299,6 +303,7 @@
             sailing_date: selectedSailing.date,
             sailing_time: selectedSailing.time,
             agency_name: document.getElementById('agency-name').value,
+            contact_email: document.getElementById('contact-email').value.trim(),
             notes: document.getElementById('notes').value,
             passengers,
           })
