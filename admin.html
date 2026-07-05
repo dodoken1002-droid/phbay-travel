@@ -313,6 +313,9 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
           <a class="btn btn-ghost" href="/neihai-preorder.html" target="_blank">
             <i class="fas fa-up-right-from-square"></i> 開啟預購頁
           </a>
+          <label style="display:inline-flex;align-items:center;gap:5px;font-size:.85rem;color:var(--mid);cursor:pointer">
+            <input type="checkbox" id="neihai-show-archived" onchange="loadNeihaiOrders()" style="width:auto"/> 顯示已封存
+          </label>
         </div>
       </div>
       <div id="neihai-stats" class="stats-row"></div>
@@ -342,6 +345,9 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
           </button>
           <input type="file" id="preorder-import-file" accept=".csv" style="display:none"
                  onchange="importCsvFile(this, 'preorder')" />
+          <label style="display:inline-flex;align-items:center;gap:5px;font-size:.85rem;color:var(--mid);cursor:pointer">
+            <input type="checkbox" id="preorder-show-archived" onchange="loadPreorderOrders()" style="width:auto"/> 顯示已封存
+          </label>
         </div>
       </div>
       <div id="preorder-stats" class="stats-row"></div>
@@ -1276,6 +1282,9 @@ function loadNeihaiOrders() {
       if (!d.ok) { list.innerHTML = d.error || '載入失敗'; return; }
       window._neihaiOrders = {};
       (d.orders || []).forEach(o => window._neihaiOrders[o.id] = o);
+      const showArchived = document.getElementById('neihai-show-archived').checked;
+      const archivedCount = (d.orders || []).filter(o => o.archived).length;
+      d.orders = (d.orders || []).filter(o => showArchived ? true : !o.archived);
       const activeOrders = d.orders.filter(o => o.status !== 'cancelled');
       const pax = activeOrders.reduce((sum, o) => sum + (parseInt(o.passenger_count, 10) || 0), 0);
       // 由訂單依船班分組計算門檻，含已出航班次（後端 sailings 只回未過期班次）
@@ -1294,11 +1303,13 @@ function loadNeihaiOrders() {
         <div class="stat-card"><div class="num">${guaranteed}</div><div class="lbl">已達發船船班</div></div>
         <div class="stat-card"><div class="num">${forming}</div><div class="lbl">待成團船班</div></div>`;
       renderNeihaiSailingToggles(d.sailings || []);
+      const archivedHint = (!showArchived && archivedCount)
+        ? `<p style="color:#a0aec0;text-align:center;padding:10px;font-size:.85rem">另有 ${archivedCount} 筆已封存訂單（勾選右上「顯示已封存」可查看）</p>` : '';
       if (!d.orders.length) {
-        list.innerHTML = '<p style="color:#a0aec0;text-align:center;padding:40px">本月尚無預購訂單</p>';
+        list.innerHTML = archivedHint || '<p style="color:#a0aec0;text-align:center;padding:40px">本月尚無預購訂單</p>';
         return;
       }
-      list.innerHTML = renderNeihaiGroups(d.orders);
+      list.innerHTML = renderNeihaiGroups(d.orders) + archivedHint;
     })
     .catch(() => { list.innerHTML = '載入失敗'; });
 }
@@ -1346,40 +1357,50 @@ function toggleNeihaiSailing(date, time, nextActive) {
   }).catch(() => showToast('切換失敗', 'error'));
 }
 
-/* 依船班（日期＋時段）分組並列訂單，門檻狀態由有效人數自動判定 */
+/* 兩層樹狀：外層＝日期（可收合），內層＝各時段船班；門檻由有效人數自動判定 */
 function renderNeihaiGroups(orders) {
-  const groups = {};
-  orders.forEach(o => {
-    const key = `${o.sailing_date}|${o.sailing_time}`;
-    (groups[key] = groups[key] || []).push(o);
-  });
-  return Object.keys(groups).sort().map(key => {
-    const list = groups[key];
-    const [date, time] = key.split('|');
-    const active = list.filter(o => o.status !== 'cancelled');
-    const booked = active.reduce((s, o) => s + (parseInt(o.passenger_count, 10) || 0), 0);
-    const minPeople = parseInt(list[0].min_people, 10) || 6;
-    const capacity = parseInt(list[0].capacity, 10) || 13;
-    const full = booked >= capacity;
-    const go = booked >= minPeople;
-    const badge = full
-      ? '<span style="background:#2f855a;color:#fff;padding:4px 14px;border-radius:20px;font-weight:800">已額滿</span>'
-      : go
-        ? '<span style="background:#2f855a;color:#fff;padding:4px 14px;border-radius:20px;font-weight:800">已達發船門檻</span>'
-        : `<span style="background:#dd6b20;color:#fff;padding:4px 14px;border-radius:20px;font-weight:800">待成團（還差 ${minPeople - booked} 人）</span>`;
-    return `
-      <div style="margin-bottom:28px;border:1px solid ${go ? '#9ae6b4' : '#fbd38d'};border-radius:16px;overflow:hidden">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 20px;background:${go ? '#f0fff4' : '#fffaf0'}">
-          <div>
-            <strong style="font-size:1.1rem;color:var(--blue-dk)"><i class="fas fa-ship"></i> ${date} ${time} 船班</strong>
-            <span style="color:var(--mid);margin-left:12px">有效 ${booked} 人／上限 ${capacity} 人（${minPeople} 人成團）｜${list.length} 筆訂單</span>
+  const byDate = {};
+  orders.forEach(o => { (byDate[o.sailing_date] = byDate[o.sailing_date] || []).push(o); });
+  return Object.keys(byDate).sort().map(date => {
+    const dayOrders = byDate[date];
+    const wd = ['日','一','二','三','四','五','六'][new Date(date + 'T00:00:00').getDay()];
+    // 依時段分組
+    const byTime = {};
+    dayOrders.forEach(o => { (byTime[o.sailing_time] = byTime[o.sailing_time] || []).push(o); });
+    const dayPax = dayOrders.filter(o => o.status !== 'cancelled')
+      .reduce((s, o) => s + (parseInt(o.passenger_count, 10) || 0), 0);
+    const timeBlocks = Object.keys(byTime).sort().map(time => {
+      const list = byTime[time];
+      const active = list.filter(o => o.status !== 'cancelled');
+      const booked = active.reduce((s, o) => s + (parseInt(o.passenger_count, 10) || 0), 0);
+      const minPeople = parseInt(list[0].min_people, 10) || 6;
+      const capacity = parseInt(list[0].capacity, 10) || 13;
+      const full = booked >= capacity, go = booked >= minPeople;
+      const badge = full
+        ? '<span style="background:#2f855a;color:#fff;padding:3px 12px;border-radius:20px;font-weight:800;font-size:.82rem">已額滿</span>'
+        : go
+          ? '<span style="background:#2f855a;color:#fff;padding:3px 12px;border-radius:20px;font-weight:800;font-size:.82rem">已達發船門檻</span>'
+          : `<span style="background:#dd6b20;color:#fff;padding:3px 12px;border-radius:20px;font-weight:800;font-size:.82rem">待成團（差 ${minPeople - booked} 人）</span>`;
+      return `
+        <div style="margin:10px 12px 16px;border:1px solid ${go ? '#9ae6b4' : '#fbd38d'};border-radius:12px;overflow:hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 16px;background:${go ? '#f0fff4' : '#fffaf0'}">
+            <div><strong style="color:var(--blue-dk)"><i class="fas fa-ship"></i> ${time} 船班</strong>
+              <span style="color:var(--mid);margin-left:10px;font-size:.88rem">有效 ${booked} 人／上限 ${capacity}（${minPeople} 人成團）｜${list.length} 筆</span></div>
+            ${badge}
           </div>
-          ${badge}
-        </div>
-        <div style="padding:12px 16px">
-          ${list.map(o => `<div id="ncard-${o.id}">${renderNeihaiCard(o)}</div>`).join('')}
-        </div>
-      </div>`;
+          <div style="padding:10px 14px">
+            ${list.map(o => `<div id="ncard-${o.id}">${renderNeihaiCard(o)}</div>`).join('')}
+          </div>
+        </div>`;
+    }).join('');
+    return `
+      <details open style="margin-bottom:16px;border:1px solid #d9e6f2;border-radius:14px;overflow:hidden">
+        <summary style="cursor:pointer;padding:14px 20px;background:#eef6fc;font-weight:800;color:var(--blue-dk);font-size:1.05rem;list-style:none;display:flex;justify-content:space-between;align-items:center">
+          <span><i class="fas fa-calendar-day"></i> ${date}（${wd}）</span>
+          <span style="color:var(--mid);font-weight:600;font-size:.9rem">${dayOrders.length} 筆訂單｜有效 ${dayPax} 人 ▾</span>
+        </summary>
+        <div style="padding:4px 0 8px">${timeBlocks}</div>
+      </details>`;
   }).join('');
 }
 
@@ -1391,11 +1412,13 @@ function renderNeihaiCard(o) {
   const historyHtml = logs
     ? `<details style="margin-top:10px"><summary style="cursor:pointer;color:var(--blue-main);font-size:.88rem">修改紀錄（${o.logs.length}）</summary><div style="margin-top:6px">${logs}</div></details>`
     : '';
+  const archivedTag = o.archived
+    ? '<span style="background:#718096;color:#fff;padding:2px 10px;border-radius:20px;font-weight:800;font-size:.78rem;margin-left:8px">已封存</span>' : '';
   return `
-    <div class="contact-card" style="display:block">
+    <div class="contact-card" style="display:block${o.archived ? ';opacity:.62' : ''}">
       <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px">
         <div>
-          <strong style="font-size:1.05rem;color:var(--blue-dk)">${nEsc(o.booking_ref) || '未編號'}</strong>
+          <strong style="font-size:1.05rem;color:var(--blue-dk)">${nEsc(o.booking_ref) || '未編號'}</strong>${archivedTag}
           <div style="color:var(--mid);font-size:.9rem">${o.sailing_date} ${o.sailing_time}｜${o.passenger_count} 人｜業者：${nEsc(o.agency_name) || '—'}</div>
         </div>
         <div>
@@ -1404,6 +1427,8 @@ function renderNeihaiCard(o) {
             ${['pending_departure','confirmed_departure','confirmed','cancelled'].map(s => `<option value="${s}" ${o.status===s?'selected':''}>${statusText(s)}</option>`).join('')}
           </select>
           <button class="btn" onclick="editNeihaiOrder(${o.id})" style="margin-left:6px;padding:6px 10px"><i class="fas fa-pen"></i> 編輯</button>
+          <button class="btn" onclick="archiveNeihaiOrder(${o.id}, ${o.archived ? 'false' : 'true'})" style="margin-left:4px;padding:6px 10px" title="${o.archived ? '取消封存' : '封存（行程結束後隱藏）'}"><i class="fas fa-box-archive"></i> ${o.archived ? '取消封存' : '封存'}</button>
+          <button class="btn" onclick="deleteNeihaiOrder(${o.id}, '${nEsc(o.booking_ref)}')" style="margin-left:4px;padding:6px 10px;color:#c53030" title="刪除訂單"><i class="fas fa-trash"></i></button>
         </div>
       </div>
       <div class="contact-field"><label>主要聯絡</label><span>${nEsc(o.contact_name)}｜${nEsc(o.contact_phone)}${o.contact_email ? '｜' + nEsc(o.contact_email) : ''}</span></div>
@@ -1431,6 +1456,14 @@ function renderNeihaiEditForm(o) {
         <div>
           <button class="btn btn-primary" onclick="saveNeihaiOrder(${o.id})" style="padding:6px 12px"><i class="fas fa-save"></i> 儲存</button>
           <button class="btn" onclick="cancelEditNeihai(${o.id})" style="padding:6px 12px">取消</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div class="contact-field" style="flex:1;min-width:150px"><label>出航日期</label><input type="date" id="ne-sdate-${o.id}" value="${nEsc(o.sailing_date)}" style="width:100%"/></div>
+        <div class="contact-field" style="flex:1;min-width:150px"><label>時段</label>
+          <select id="ne-stime-${o.id}" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:8px">
+            ${['09:00','11:00','16:30','20:30'].map(t => `<option value="${t}" ${o.sailing_time===t?'selected':''}>${t}${t==='20:30'?' 花火專船':''}</option>`).join('')}
+          </select>
         </div>
       </div>
       <div class="contact-field"><label>業者/代號</label><input id="ne-agency-${o.id}" value="${nEsc(o.agency_name)}" style="width:100%"/></div>
@@ -1464,6 +1497,7 @@ function saveNeihaiOrder(id) {
     return acc;
   }, []);
   const body = {
+    sailing_date: g('sdate').value, sailing_time: g('stime').value,
     agency_name: g('agency').value, contact_name: g('cname').value,
     contact_phone: g('cphone').value, contact_email: g('cemail').value, notes: g('notes').value,
     passengers, _key: ADMIN_KEY,
@@ -1474,6 +1508,27 @@ function saveNeihaiOrder(id) {
     if (d.ok) { showToast(d.changed ? '已儲存並記錄修改' : '無變更', 'success'); loadNeihaiOrders(); }
     else showToast(d.error || '儲存失敗', 'error');
   }).catch(() => showToast('儲存失敗', 'error'));
+}
+
+function archiveNeihaiOrder(id, archived) {
+  fetch(`/api/admin/neihai/preorders/${id}?key=${encodeURIComponent(ADMIN_KEY)}`, {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ archived, _key: ADMIN_KEY })
+  }).then(r => r.json()).then(d => {
+    if (d.ok) { showToast(archived ? '已封存' : '已取消封存', 'success'); loadNeihaiOrders(); }
+    else showToast(d.error || '操作失敗', 'error');
+  }).catch(() => showToast('操作失敗', 'error'));
+}
+
+function deleteNeihaiOrder(id, ref) {
+  if (!confirm(`確定刪除訂單 ${ref || ''}？\n此動作無法復原，訂單與乘客資料將永久刪除。\n（若只是行程結束想收起來，建議改用「封存」）`)) return;
+  fetch(`/api/admin/neihai/preorders/${id}?key=${encodeURIComponent(ADMIN_KEY)}`, {
+    method:'DELETE', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ _key: ADMIN_KEY })
+  }).then(r => r.json()).then(d => {
+    if (d.ok) { showToast('訂單已刪除', 'success'); loadNeihaiOrders(); }
+    else showToast(d.error || '刪除失敗', 'error');
+  }).catch(() => showToast('刪除失敗', 'error'));
 }
 
 function exportNeihaiCsv() {
@@ -1651,7 +1706,7 @@ function downloadCsv(rows, filename) {
 }
 
 function exportPreorderCsv() {
-  let orders = window._preorderOrders || [];
+  let orders = Object.values(window._preorderOrders || {});
   const onlyDate = (document.getElementById('preorder-export-date') || {}).value || '';
   if (onlyDate) orders = orders.filter(o => o.departure_date === onlyDate);
   if (!orders.length) {
@@ -1714,46 +1769,168 @@ function loadPreorderOrders() {
     .then(r => r.json())
     .then(d => {
       if (!d.ok) { list.innerHTML = d.error || '載入失敗'; return; }
-      window._preorderOrders = d.orders || [];
+      window._preorderOrders = {};
+      (d.orders || []).forEach(o => window._preorderOrders[o.id] = o);
       // 行程下拉（保留目前選擇）
       const sel = document.getElementById('preorder-product');
       const cur = sel.value;
       sel.innerHTML = '<option value="">全部行程</option>' +
         (d.products || []).map(p => `<option value="${p.slug}" ${p.slug===cur?'selected':''}>${p.name}</option>`).join('');
-      const activeOrders = d.orders.filter(o => o.status !== 'cancelled');
+      const showArchived = document.getElementById('preorder-show-archived').checked;
+      const archivedCount = (d.orders || []).filter(o => o.archived).length;
+      const orders = (d.orders || []).filter(o => showArchived ? true : !o.archived);
+      const activeOrders = orders.filter(o => o.status !== 'cancelled');
       const pax = activeOrders.reduce((sum, o) => sum + (parseInt(o.passenger_count, 10) || 0), 0);
       const confirmed = activeOrders.filter(o => o.status === 'confirmed_departure' || o.status === 'confirmed').length;
       document.getElementById('preorder-stats').innerHTML = `
-        <div class="stat-card"><div class="num">${d.orders.length}</div><div class="lbl">本月訂單</div></div>
+        <div class="stat-card"><div class="num">${orders.length}</div><div class="lbl">本月訂單</div></div>
         <div class="stat-card"><div class="num">${pax}</div><div class="lbl">有效預購人數</div></div>
         <div class="stat-card"><div class="num">${confirmed}</div><div class="lbl">已確認訂單</div></div>`;
-      if (!d.orders.length) {
-        list.innerHTML = '<p style="color:#a0aec0;text-align:center;padding:40px">本月尚無預購訂單</p>';
+      const archivedHint = (!showArchived && archivedCount)
+        ? `<p style="color:#a0aec0;text-align:center;padding:10px;font-size:.85rem">另有 ${archivedCount} 筆已封存訂單（勾選右上「顯示已封存」可查看）</p>` : '';
+      if (!orders.length) {
+        list.innerHTML = archivedHint || '<p style="color:#a0aec0;text-align:center;padding:40px">本月尚無預購訂單</p>';
         return;
       }
-      list.innerHTML = d.orders.map(o => `
-        <div class="contact-card" style="display:block">
-          <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px">
-            <div>
-              <strong style="font-size:1.05rem;color:var(--blue-dk)">${o.booking_ref || '未編號'}</strong>
-              <div style="color:var(--mid);font-size:.9rem">${o.product_name}｜出發 ${o.departure_date}${o.departure_time ? ' ' + o.departure_time : ''}｜${o.passenger_count} 人｜業者：${o.agency_name || '—'}</div>
-            </div>
-            <div>
-              <span style="font-weight:800;color:${orderStatusColor(o.status)}">${statusText(o.status)}</span>
-              <select onchange="updatePreorderStatus(${o.id}, this.value)" style="margin-left:8px;padding:6px;border:1px solid #e2e8f0;border-radius:6px">
-                ${['pending_departure','confirmed_departure','confirmed','cancelled'].map(s => `<option value="${s}" ${o.status===s?'selected':''}>${statusText(s)}</option>`).join('')}
-              </select>
-            </div>
-          </div>
-          <div class="contact-field"><label>主要聯絡</label><span>${o.contact_name}｜${o.contact_phone}${o.contact_email ? '｜' + o.contact_email : ''}</span></div>
-          <div class="contact-field"><label>備註</label><span>${o.notes || '—'}</span></div>
-          <table class="tour-table" style="margin-top:12px">
-            <thead><tr><th>旅客</th><th>身分證字號</th><th>出生年月日</th><th>電話</th></tr></thead>
-            <tbody>${(o.passengers || []).map(p => `<tr><td>${p.name}</td><td style="font-family:monospace">${p.national_id || ''}</td><td>${p.birth_date}</td><td>${p.phone}</td></tr>`).join('')}</tbody>
-          </table>
-        </div>`).join('');
+      list.innerHTML = renderPreorderGroups(orders) + archivedHint;
     })
     .catch(() => { list.innerHTML = '載入失敗'; });
+}
+
+/* 兩層樹狀：外層＝出發日期（可收合），內層＝各行程訂單 */
+function renderPreorderGroups(orders) {
+  const byDate = {};
+  orders.forEach(o => { (byDate[o.departure_date] = byDate[o.departure_date] || []).push(o); });
+  return Object.keys(byDate).sort().map(date => {
+    const dayOrders = byDate[date];
+    const wd = ['日','一','二','三','四','五','六'][new Date(date + 'T00:00:00').getDay()];
+    const dayPax = dayOrders.filter(o => o.status !== 'cancelled')
+      .reduce((s, o) => s + (parseInt(o.passenger_count, 10) || 0), 0);
+    return `
+      <details open style="margin-bottom:16px;border:1px solid #d9e6f2;border-radius:14px;overflow:hidden">
+        <summary style="cursor:pointer;padding:14px 20px;background:#eef6fc;font-weight:800;color:var(--blue-dk);font-size:1.05rem;list-style:none;display:flex;justify-content:space-between;align-items:center">
+          <span><i class="fas fa-calendar-day"></i> ${date}（${wd}）</span>
+          <span style="color:var(--mid);font-weight:600;font-size:.9rem">${dayOrders.length} 筆訂單｜有效 ${dayPax} 人 ▾</span>
+        </summary>
+        <div style="padding:10px 14px">
+          ${dayOrders.map(o => `<div id="pcard-${o.id}">${renderPreorderCard(o)}</div>`).join('')}
+        </div>
+      </details>`;
+  }).join('');
+}
+
+function renderPreorderCard(o) {
+  const archivedTag = o.archived
+    ? '<span style="background:#718096;color:#fff;padding:2px 10px;border-radius:20px;font-weight:800;font-size:.78rem;margin-left:8px">已封存</span>' : '';
+  return `
+    <div class="contact-card" style="display:block${o.archived ? ';opacity:.62' : ''}">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+        <div>
+          <strong style="font-size:1.05rem;color:var(--blue-dk)">${nEsc(o.booking_ref) || '未編號'}</strong>${archivedTag}
+          <div style="color:var(--mid);font-size:.9rem">${nEsc(o.product_name)}｜出發 ${o.departure_date}${o.departure_time ? ' ' + o.departure_time : ''}｜${o.passenger_count} 人｜業者：${nEsc(o.agency_name) || '—'}</div>
+        </div>
+        <div>
+          <span style="font-weight:800;color:${orderStatusColor(o.status)}">${statusText(o.status)}</span>
+          <select onchange="updatePreorderStatus(${o.id}, this.value)" style="margin-left:8px;padding:6px;border:1px solid #e2e8f0;border-radius:6px">
+            ${['pending_departure','confirmed_departure','confirmed','cancelled'].map(s => `<option value="${s}" ${o.status===s?'selected':''}>${statusText(s)}</option>`).join('')}
+          </select>
+          <button class="btn" onclick="editPreorderOrder(${o.id})" style="margin-left:6px;padding:6px 10px"><i class="fas fa-pen"></i> 編輯</button>
+          <button class="btn" onclick="archivePreorderOrder(${o.id}, ${o.archived ? 'false' : 'true'})" style="margin-left:4px;padding:6px 10px" title="${o.archived ? '取消封存' : '封存（行程結束後隱藏）'}"><i class="fas fa-box-archive"></i> ${o.archived ? '取消封存' : '封存'}</button>
+          <button class="btn" onclick="deletePreorderOrder(${o.id}, '${nEsc(o.booking_ref)}')" style="margin-left:4px;padding:6px 10px;color:#c53030" title="刪除訂單"><i class="fas fa-trash"></i></button>
+        </div>
+      </div>
+      <div class="contact-field"><label>主要聯絡</label><span>${nEsc(o.contact_name)}｜${nEsc(o.contact_phone)}${o.contact_email ? '｜' + nEsc(o.contact_email) : ''}</span></div>
+      <div class="contact-field"><label>備註</label><span>${nEsc(o.notes) || '—'}</span></div>
+      <table class="tour-table" style="margin-top:12px">
+        <thead><tr><th>旅客</th><th>身分證字號</th><th>出生年月日</th><th>電話</th></tr></thead>
+        <tbody>${(o.passengers || []).map(p => `<tr><td>${nEsc(p.name)}</td><td style="font-family:monospace">${nEsc(p.national_id)}</td><td>${nEsc(p.birth_date)}</td><td>${nEsc(p.phone)}</td></tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+}
+
+function renderPreorderEditForm(o) {
+  const pax = (o.passengers || []).map(p => `
+    <tr>
+      <td><input value="${nEsc(p.name)}" data-pid="${p.id}" data-f="name" style="width:100%"/></td>
+      <td><input value="${nEsc(p.national_id)}" data-pid="${p.id}" data-f="national_id" style="width:100%;font-family:monospace"/></td>
+      <td><input type="date" value="${nEsc(p.birth_date)}" data-pid="${p.id}" data-f="birth_date" style="width:100%"/></td>
+      <td><input value="${nEsc(p.phone)}" data-pid="${p.id}" data-f="phone" style="width:100%"/></td>
+    </tr>`).join('');
+  return `
+    <div class="contact-card" style="display:block;border:2px solid var(--blue-main)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <strong style="color:var(--blue-dk)">編輯訂單 ${nEsc(o.booking_ref)}（${nEsc(o.product_name)}）</strong>
+        <div>
+          <button class="btn btn-primary" onclick="savePreorderOrder(${o.id})" style="padding:6px 12px"><i class="fas fa-save"></i> 儲存</button>
+          <button class="btn" onclick="cancelEditPreorder(${o.id})" style="padding:6px 12px">取消</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div class="contact-field" style="flex:1;min-width:150px"><label>出發日期</label><input type="date" id="pe-ddate-${o.id}" value="${nEsc(o.departure_date)}" style="width:100%"/></div>
+        <div class="contact-field" style="flex:1;min-width:150px"><label>出發時間</label><input id="pe-dtime-${o.id}" value="${nEsc(o.departure_time)}" placeholder="例：09:00（可留空）" style="width:100%"/></div>
+      </div>
+      <div class="contact-field"><label>業者/代號</label><input id="pe-agency-${o.id}" value="${nEsc(o.agency_name)}" style="width:100%"/></div>
+      <div class="contact-field"><label>主要聯絡姓名</label><input id="pe-cname-${o.id}" value="${nEsc(o.contact_name)}" style="width:100%"/></div>
+      <div class="contact-field"><label>聯絡電話</label><input id="pe-cphone-${o.id}" value="${nEsc(o.contact_phone)}" style="width:100%"/></div>
+      <div class="contact-field"><label>Email</label><input id="pe-cemail-${o.id}" value="${nEsc(o.contact_email)}" style="width:100%"/></div>
+      <div class="contact-field"><label>備註</label><textarea id="pe-notes-${o.id}" rows="2" style="width:100%">${nEsc(o.notes)}</textarea></div>
+      <table class="tour-table" style="margin-top:12px" id="pe-pax-${o.id}">
+        <thead><tr><th>旅客姓名</th><th>身分證字號</th><th>出生年月日</th><th>電話</th></tr></thead>
+        <tbody>${pax}</tbody>
+      </table>
+    </div>`;
+}
+
+function editPreorderOrder(id) {
+  const o = (window._preorderOrders || {})[id];
+  if (o) document.getElementById('pcard-' + id).innerHTML = renderPreorderEditForm(o);
+}
+function cancelEditPreorder(id) {
+  const o = (window._preorderOrders || {})[id];
+  if (o) document.getElementById('pcard-' + id).innerHTML = renderPreorderCard(o);
+}
+function savePreorderOrder(id) {
+  const g = sfx => document.getElementById('pe-' + sfx + '-' + id);
+  const passengers = [...document.querySelectorAll(`#pe-pax-${id} input`)].reduce((acc, inp) => {
+    const pid = parseInt(inp.dataset.pid, 10);
+    let row = acc.find(r => r.id === pid);
+    if (!row) { row = { id: pid }; acc.push(row); }
+    row[inp.dataset.f] = inp.value;
+    return acc;
+  }, []);
+  const body = {
+    departure_date: g('ddate').value, departure_time: g('dtime').value,
+    agency_name: g('agency').value, contact_name: g('cname').value,
+    contact_phone: g('cphone').value, contact_email: g('cemail').value, notes: g('notes').value,
+    passengers, _key: ADMIN_KEY,
+  };
+  fetch(`/api/admin/preorder/orders/${id}?key=${encodeURIComponent(ADMIN_KEY)}`, {
+    method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+  }).then(r => r.json()).then(d => {
+    if (d.ok) { showToast('已儲存', 'success'); loadPreorderOrders(); }
+    else showToast(d.error || '儲存失敗', 'error');
+  }).catch(() => showToast('儲存失敗', 'error'));
+}
+
+function archivePreorderOrder(id, archived) {
+  fetch(`/api/admin/preorder/orders/${id}?key=${encodeURIComponent(ADMIN_KEY)}`, {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ archived, _key: ADMIN_KEY })
+  }).then(r => r.json()).then(d => {
+    if (d.ok) { showToast(archived ? '已封存' : '已取消封存', 'success'); loadPreorderOrders(); }
+    else showToast(d.error || '操作失敗', 'error');
+  }).catch(() => showToast('操作失敗', 'error'));
+}
+
+function deletePreorderOrder(id, ref) {
+  if (!confirm(`確定刪除訂單 ${ref || ''}？\n此動作無法復原，訂單與旅客資料將永久刪除。\n（若只是行程結束想收起來，建議改用「封存」）`)) return;
+  fetch(`/api/admin/preorder/orders/${id}?key=${encodeURIComponent(ADMIN_KEY)}`, {
+    method:'DELETE', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ _key: ADMIN_KEY })
+  }).then(r => r.json()).then(d => {
+    if (d.ok) { showToast('訂單已刪除', 'success'); loadPreorderOrders(); }
+    else showToast(d.error || '刪除失敗', 'error');
+  }).catch(() => showToast('刪除失敗', 'error'));
 }
 
 function updatePreorderStatus(id, status) {

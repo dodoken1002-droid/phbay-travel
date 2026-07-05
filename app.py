@@ -196,6 +196,8 @@ def init_db():
     """)
     # 訂位確認信用：代表人 Email（選填）
     cur.execute("ALTER TABLE neihai_preorders ADD COLUMN IF NOT EXISTS contact_email VARCHAR(200)")
+    # 行程結束後可封存（後台預設隱藏）
+    cur.execute("ALTER TABLE neihai_preorders ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE")
     cur.execute("""
         CREATE TABLE IF NOT EXISTS neihai_passengers (
             id              SERIAL PRIMARY KEY,
@@ -281,6 +283,7 @@ def init_db():
         )
     """)
     cur.execute("ALTER TABLE preorder_orders ADD COLUMN IF NOT EXISTS contact_email VARCHAR(200)")
+    cur.execute("ALTER TABLE preorder_orders ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE")
     cur.execute("""
         CREATE TABLE IF NOT EXISTS preorder_passengers (
             id              SERIAL PRIMARY KEY,
@@ -1521,6 +1524,34 @@ def admin_update_neihai_preorder(order_id):
                     changes.append(f"{label}：{old_val or '（空）'} → {new_val or '（空）'}")
                     set_parts.append(f"{field}=%s"); params.append(new_val)
 
+        if "archived" in data:
+            new_arch = bool(data.get("archived"))
+            if new_arch != bool(order.get("archived")):
+                changes.append("封存訂單" if new_arch else "取消封存")
+                set_parts.append("archived=%s"); params.append(new_arch)
+
+        # 改出航日期/時段：搬移到另一個船班（必要時自動建立船班列）
+        if data.get("sailing_date") or data.get("sailing_time"):
+            cur.execute("SELECT sailing_date, sailing_time FROM neihai_sailings WHERE id=%s",
+                        (order["sailing_id"],))
+            cur_sail = cur.fetchone()
+            old_d, old_t = str(cur_sail["sailing_date"]), cur_sail["sailing_time"]
+            try:
+                new_d = _parse_sailing_date(data.get("sailing_date") or old_d)
+                new_t = _normalize_neihai_time(data.get("sailing_time") or old_t, new_d)
+            except ValueError as e:
+                cur.close(); conn.close()
+                return jsonify(ok=False, error=str(e)), 400
+            if (str(new_d), new_t) != (old_d, old_t):
+                cur.execute("""
+                    INSERT INTO neihai_sailings (sailing_date, sailing_time, capacity, min_people)
+                    VALUES (%s,%s,%s,%s) ON CONFLICT (sailing_date, sailing_time) DO NOTHING
+                """, (new_d, new_t, NEIHAI_DEFAULT_CAPACITY, NEIHAI_MIN_PEOPLE))
+                cur.execute("SELECT id FROM neihai_sailings WHERE sailing_date=%s AND sailing_time=%s",
+                            (new_d, new_t))
+                changes.append(f"班次：{old_d} {old_t} → {new_d} {new_t}")
+                set_parts.append("sailing_id=%s"); params.append(cur.fetchone()["id"])
+
         if set_parts:
             set_parts.append("updated_at=NOW()")
             cur.execute(f"UPDATE neihai_preorders SET {', '.join(set_parts)} WHERE id=%s",
@@ -1565,6 +1596,25 @@ def admin_update_neihai_preorder(order_id):
         conn.commit(); cur.close(); conn.close()
         return jsonify(ok=True, changed=len(changes),
                        summary=("；".join(changes) if changes else "無變更"))
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.route('/api/admin/neihai/preorders/<int:order_id>', methods=['DELETE'])
+def admin_delete_neihai_preorder(order_id):
+    """刪除內海預購訂單（乘客與修改紀錄隨 CASCADE 一併刪除）。"""
+    if not has_role('orders'):
+        return jsonify(ok=False, error='未授權'), 401
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT booking_ref FROM neihai_preorders WHERE id=%s", (order_id,))
+        row = cur.fetchone()
+        if not row:
+            cur.close(); conn.close()
+            return jsonify(ok=False, error='找不到訂單'), 404
+        cur.execute("DELETE FROM neihai_preorders WHERE id=%s", (order_id,))
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True, booking_ref=row['booking_ref'])
     except Exception as e:
         return jsonify(ok=False, error=str(e)), 500
 
@@ -2223,17 +2273,102 @@ def admin_preorder_orders():
 
 @app.route('/api/admin/preorder/orders/<int:order_id>', methods=['PATCH'])
 def admin_update_preorder(order_id):
+    """更新通用預購訂單：狀態、封存、聯絡/業者/備註、出發日期時間、乘客資料。"""
     if not has_role('orders'):
         return jsonify(ok=False, error='未授權'), 401
     data = request.get_json(force=True, silent=True) or {}
-    status = (data.get('status') or '').strip()
-    if status not in PREORDER_VALID_STATUSES:
-        return jsonify(ok=False, error='狀態不正確'), 400
     try:
         conn = get_db(); cur = conn.cursor()
-        cur.execute('UPDATE preorder_orders SET status=%s, updated_at=NOW() WHERE id=%s', (status, order_id))
+        cur.execute("SELECT * FROM preorder_orders WHERE id=%s", (order_id,))
+        order = cur.fetchone()
+        if not order:
+            cur.close(); conn.close()
+            return jsonify(ok=False, error='找不到訂單'), 404
+        set_parts, params = [], []
+
+        if 'status' in data:
+            status = (data.get('status') or '').strip()
+            if status not in PREORDER_VALID_STATUSES:
+                cur.close(); conn.close()
+                return jsonify(ok=False, error='狀態不正確'), 400
+            set_parts.append('status=%s'); params.append(status)
+
+        if 'archived' in data:
+            set_parts.append('archived=%s'); params.append(bool(data.get('archived')))
+
+        for field in ('agency_name', 'contact_name', 'contact_phone', 'contact_email', 'notes'):
+            if field in data:
+                v = (data.get(field) or '').strip()
+                if field in ('contact_name', 'contact_phone') and not v:
+                    cur.close(); conn.close()
+                    return jsonify(ok=False, error='聯絡姓名與電話不可空白'), 400
+                set_parts.append(f'{field}=%s'); params.append(v)
+
+        if data.get('departure_date'):
+            try:
+                dep = datetime.strptime(str(data['departure_date']).strip(), '%Y-%m-%d').date()
+            except ValueError:
+                cur.close(); conn.close()
+                return jsonify(ok=False, error='出發日期格式需為 YYYY-MM-DD'), 400
+            set_parts.append('departure_date=%s'); params.append(dep)
+        if 'departure_time' in data:
+            set_parts.append('departure_time=%s'); params.append((data.get('departure_time') or '').strip())
+
+        if set_parts:
+            set_parts.append('updated_at=NOW()')
+            cur.execute(f"UPDATE preorder_orders SET {', '.join(set_parts)} WHERE id=%s",
+                        tuple(params) + (order_id,))
+
+        passengers = data.get('passengers')
+        if isinstance(passengers, list):
+            cur.execute("SELECT * FROM preorder_passengers WHERE order_id=%s", (order_id,))
+            existing = {r['id']: dict(r) for r in cur.fetchall()}
+            for i, p in enumerate(passengers, 1):
+                cur_p = existing.get(p.get('id'))
+                if not cur_p:
+                    continue
+                pset, pparams = [], []
+                for f in ('name', 'national_id', 'birth_date', 'phone'):
+                    if f not in p:
+                        continue
+                    v = str(p.get(f) or '').strip()
+                    if f == 'national_id':
+                        v = v.upper()
+                    if f == 'birth_date':
+                        try:
+                            v = str(datetime.strptime(v, '%Y-%m-%d').date())
+                        except ValueError:
+                            cur.close(); conn.close()
+                            return jsonify(ok=False, error=f'第 {i} 位旅客生日格式需為 YYYY-MM-DD'), 400
+                    elif f in ('name', 'national_id') and not v:
+                        cur.close(); conn.close()
+                        return jsonify(ok=False, error=f'第 {i} 位旅客姓名/身分證不可空白'), 400
+                    pset.append(f'{f}=%s'); pparams.append(v)
+                if pset:
+                    cur.execute(f"UPDATE preorder_passengers SET {', '.join(pset)} WHERE id=%s",
+                                tuple(pparams) + (cur_p['id'],))
+
         conn.commit(); cur.close(); conn.close()
         return jsonify(ok=True)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.route('/api/admin/preorder/orders/<int:order_id>', methods=['DELETE'])
+def admin_delete_preorder(order_id):
+    """刪除通用預購訂單（旅客隨 CASCADE 一併刪除）。"""
+    if not has_role('orders'):
+        return jsonify(ok=False, error='未授權'), 401
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT booking_ref FROM preorder_orders WHERE id=%s", (order_id,))
+        row = cur.fetchone()
+        if not row:
+            cur.close(); conn.close()
+            return jsonify(ok=False, error='找不到訂單'), 404
+        cur.execute("DELETE FROM preorder_orders WHERE id=%s", (order_id,))
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True, booking_ref=row['booking_ref'])
     except Exception as e:
         return jsonify(ok=False, error=str(e)), 500
 
