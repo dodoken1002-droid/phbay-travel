@@ -2594,7 +2594,9 @@ def blog_post(slug):
             f'{cover}<div class="blog-body">{p.get("content") or ""}</div>'
             f'<div class="blog-cta"><h3 style="color:var(--blue-dark);margin-bottom:10px">想規劃澎湖行程？</h3>'
             f'<a href="/#contact" class="btn btn-primary"><i class="fas fa-comment-dots"></i> 線上諮詢</a> '
-            f'<a href="/#tours" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-map-marked-alt"></i> 看推薦行程</a>'
+            f'<a href="/neihai-preorder.html" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-ship"></i> 內海巡禮預購</a> '
+            f'<a href="/preorder/festival" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-music"></i> 音樂節行程預購</a> '
+            f'<a href="/#quiz" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-compass"></i> 30 秒測你的澎湖玩法</a>'
             f'</div></article>')
     return _render_blog(f'{p["title"]} - 潮旅國際旅行社部落格', desc, canonical, body, head_extra)
 

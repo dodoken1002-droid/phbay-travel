@@ -794,7 +794,9 @@ function renderQuizResult(forcedKey, fromShare = false) {
   const wrap = document.getElementById('quiz-wrap');
   const shareUrl = `${window.location.origin}${window.location.pathname}?quiz=${encodeURIComponent(best)}#quiz`;
   const primaryHref = r.tour.url || '#contact';
-  const primaryAction = r.tour.url ? '' : ` onclick="prefillTour('${r.tour.interest}')"`;
+  const primaryAction = r.tour.url
+    ? ` onclick="trackQuizCta('${best}','preorder')"`
+    : ` onclick="prefillTour('${r.tour.interest}');trackQuizCta('${best}','contact')"`;
   if (typeof gtag === 'function') {
     gtag('event', 'quiz_result', { result_type: r.type, content_name: r.tour.name });
   }
@@ -826,11 +828,14 @@ function renderQuizResult(forcedKey, fromShare = false) {
         <a href="${primaryHref}" class="btn btn-primary"${primaryAction}>
           <i class="fas fa-route"></i> ${r.tour.url ? '查看推薦預購' : '立即諮詢這個行程'}
         </a>
-        <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" rel="noopener noreferrer" class="btn btn-outline" onclick="prefillTour('${r.tour.interest}')">
+        <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" rel="noopener noreferrer" class="btn btn-outline" onclick="prefillTour('${r.tour.interest}');trackQuizCta('${best}','line')">
           <i class="fab fa-line"></i> LINE 詢問安排
         </a>
         <button class="quiz-retry" onclick="shareQuizResult('${best}')">
           <i class="fas fa-share-nodes"></i> 分享結果
+        </button>
+        <button class="quiz-retry" onclick="downloadQuizCard('${best}')">
+          <i class="fas fa-image"></i> 儲存結果圖卡
         </button>
         <button class="quiz-retry" onclick="resetQuizShareUrl()">
           <i class="fas fa-redo"></i> 重新測驗
@@ -880,6 +885,100 @@ function prefillTour(interest) {
   if (sel && interest) sel.value = interest;
 }
 window.prefillTour = prefillTour;
+
+/* 診斷結果 CTA 點擊追蹤：知道哪種結果最會導 LINE / 預購 */
+function trackQuizCta(key, channel) {
+  const r = QUIZ_RESULTS[key];
+  if (!r) return;
+  if (typeof gtag === 'function') {
+    gtag('event', 'quiz_cta_click', { result_type: r.type, channel });
+  }
+  if (channel === 'line' && typeof fbq === 'function') {
+    fbq('track', 'Lead', { content_name: `行程診斷LINE：${r.type}`, content_category: '澎湖行程診斷' });
+  }
+}
+window.trackQuizCta = trackQuizCta;
+
+/* 診斷結果圖卡：Canvas 產生 1080×1350 分享圖（Logo＋官網＋LINE＋CTA） */
+async function downloadQuizCard(key) {
+  const r = QUIZ_RESULTS[key];
+  if (!r) return;
+  const W = 1080, H = 1350;
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+
+  // 背景漸層（海洋藍）
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#0b5e9e'); bg.addColorStop(1, '#14b8c9');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  // 行程圖（上半部，等比裁滿），失敗就略過
+  try {
+    const img = await new Promise((res, rej) => {
+      const im = new Image();
+      im.onload = () => res(im); im.onerror = rej;
+      im.src = r.tour.img;
+    });
+    const areaH = 620, scale = Math.max(W / img.width, areaH / img.height);
+    const dw = img.width * scale, dh = img.height * scale;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, W, areaH); ctx.clip();
+    ctx.drawImage(img, (W - dw) / 2, (areaH - dh) / 2, dw, dh);
+    ctx.restore();
+    const fade = ctx.createLinearGradient(0, areaH - 160, 0, areaH);
+    fade.addColorStop(0, 'rgba(11,94,158,0)'); fade.addColorStop(1, 'rgba(11,94,158,1)');
+    ctx.fillStyle = fade; ctx.fillRect(0, areaH - 160, W, 160);
+  } catch (_) {}
+
+  const centerText = (txt, y, font, color) => {
+    ctx.font = font; ctx.fillStyle = color; ctx.textAlign = 'center';
+    ctx.fillText(txt, W / 2, y);
+  };
+  const wrapText = (txt, y, font, color, maxW, lineH) => {
+    ctx.font = font; ctx.fillStyle = color; ctx.textAlign = 'center';
+    let line = '';
+    for (const ch of txt) {
+      if (ctx.measureText(line + ch).width > maxW) { ctx.fillText(line, W / 2, y); y += lineH; line = ch; }
+      else line += ch;
+    }
+    if (line) ctx.fillText(line, W / 2, y);
+    return y + lineH;
+  };
+
+  centerText('潮旅澎湖行程診斷', 700, '600 34px "Noto Sans TC", sans-serif', 'rgba(255,255,255,.85)');
+  centerText('我的旅遊類型', 756, '400 28px "Noto Sans TC", sans-serif', 'rgba(255,255,255,.7)');
+  centerText(r.type, 830, '900 62px "Noto Sans TC", sans-serif', '#ffe066');
+  let y = wrapText(r.desc, 910, '400 30px "Noto Sans TC", sans-serif', 'rgba(255,255,255,.92)', 880, 46);
+
+  // 推薦行程框
+  const boxY = Math.max(y + 10, 1080);
+  ctx.fillStyle = 'rgba(255,255,255,.14)';
+  const bw = 900, bx = (W - bw) / 2;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(bx, boxY, bw, 110, 20); else ctx.rect(bx, boxY, bw, 110);
+  ctx.fill();
+  centerText('✦ 推薦行程', boxY + 42, '700 26px "Noto Sans TC", sans-serif', '#ffe066');
+  centerText(r.tour.name, boxY + 86, '800 34px "Noto Sans TC", sans-serif', '#ffffff');
+
+  // 底部品牌列
+  ctx.fillStyle = 'rgba(6,42,71,.92)'; ctx.fillRect(0, H - 120, W, 120);
+  centerText('潮旅國際旅行社｜phbay.info｜LINE @phbay2018', H - 72, '700 30px "Noto Sans TC", sans-serif', '#ffffff');
+  centerText('測你的澎湖玩法 → www.phbay.info', H - 30, '400 26px "Noto Sans TC", sans-serif', 'rgba(255,255,255,.75)');
+
+  if (typeof gtag === 'function') gtag('event', 'share', { method: 'quiz_card_image', content_type: '澎湖行程診斷', item_id: key });
+  const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
+  const file = new File([blob], `潮旅行程診斷_${key}.png`, { type: 'image/png' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: `${r.type}｜潮旅澎湖行程診斷` }); return; } catch (_) {}
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = file.name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+window.downloadQuizCard = downloadQuizCard;
 
 /* ═══════════════════════════════════════════════
    首頁輪播
