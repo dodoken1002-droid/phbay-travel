@@ -1471,6 +1471,33 @@ def _import_clean_passengers(raw_passengers):
     return clean, None
 
 
+@app.route('/api/admin/neihai/sailings', methods=['PATCH'])
+def admin_toggle_neihai_sailing():
+    """後台開啟/關閉單一船班的預購（upsert neihai_sailings.is_active）。
+    關閉後前台該時段顯示「已關閉」且無法送出預購；已存在的訂單不受影響。"""
+    if not is_admin():
+        return jsonify(ok=False, error='未授權'), 401
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        sailing_date = _parse_sailing_date(data.get('sailing_date'))
+        sailing_time = _normalize_neihai_time(data.get('sailing_time'), sailing_date)
+    except ValueError as e:
+        return jsonify(ok=False, error=str(e)), 400
+    is_active = bool(data.get('is_active'))
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO neihai_sailings (sailing_date, sailing_time, capacity, min_people, is_active)
+            VALUES (%s,%s,%s,%s,%s)
+            ON CONFLICT (sailing_date, sailing_time) DO UPDATE SET is_active = EXCLUDED.is_active
+        """, (sailing_date, sailing_time, NEIHAI_DEFAULT_CAPACITY, NEIHAI_MIN_PEOPLE, is_active))
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True, sailing_date=str(sailing_date), sailing_time=sailing_time,
+                       is_active=is_active)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
 @app.route('/api/admin/neihai/import', methods=['POST'])
 def admin_neihai_import():
     """後台批次匯入內海預購訂單（CSV 格式與匯出相同，前端解析後送 JSON）。

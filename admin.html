@@ -303,6 +303,7 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
         </div>
       </div>
       <div id="neihai-stats" class="stats-row"></div>
+      <div id="neihai-sailing-toggles"></div>
       <div id="neihai-orders-list">請選擇月份後載入…</div>
     </div>
 
@@ -1120,6 +1121,7 @@ function loadNeihaiOrders() {
         <div class="stat-card"><div class="num">${pax}</div><div class="lbl">有效預購人數</div></div>
         <div class="stat-card"><div class="num">${guaranteed}</div><div class="lbl">已達發船船班</div></div>
         <div class="stat-card"><div class="num">${forming}</div><div class="lbl">待成團船班</div></div>`;
+      renderNeihaiSailingToggles(d.sailings || []);
       if (!d.orders.length) {
         list.innerHTML = '<p style="color:#a0aec0;text-align:center;padding:40px">本月尚無預購訂單</p>';
         return;
@@ -1127,6 +1129,49 @@ function loadNeihaiOrders() {
       list.innerHTML = renderNeihaiGroups(d.orders);
     })
     .catch(() => { list.innerHTML = '載入失敗'; });
+}
+
+/* ── 船班預購開關（點擊切換該時段開放/關閉）── */
+function renderNeihaiSailingToggles(sailings) {
+  const box = document.getElementById('neihai-sailing-toggles');
+  if (!sailings.length) { box.innerHTML = ''; return; }
+  const byDate = {};
+  sailings.forEach(s => { (byDate[s.date] = byDate[s.date] || []).push(s); });
+  const rows = Object.keys(byDate).sort().map(date => {
+    const chips = byDate[date].map(s => {
+      const on = s.is_active;
+      const fw = s.time === '20:30';
+      return `<button onclick="toggleNeihaiSailing('${s.date}','${s.time}',${on ? 'false' : 'true'})"
+        title="${on ? '點擊關閉此時段預購' : '點擊開放此時段預購'}"
+        style="border:1px solid ${on ? '#9ae6b4' : '#e2e8f0'};border-radius:20px;padding:5px 12px;cursor:pointer;
+               font-weight:800;font-size:.85rem;
+               background:${on ? '#f0fff4' : '#edf2f7'};color:${on ? '#276749' : '#a0aec0'};
+               ${on ? '' : 'text-decoration:line-through;'}">
+        ${s.time}${fw ? '🎆' : ''}｜${s.booked}人 ${on ? '' : '（已關閉）'}
+      </button>`;
+    }).join(' ');
+    const wd = ['日','一','二','三','四','五','六'][new Date(date + 'T00:00:00').getDay()];
+    return `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:4px 0">
+      <span style="min-width:110px;font-weight:800;color:var(--blue-dk)">${date}（${wd}）</span>${chips}</div>`;
+  }).join('');
+  box.innerHTML = `
+    <details style="background:#fff;border:1px solid #e6edf3;border-radius:14px;padding:14px 18px;margin-bottom:18px">
+      <summary style="cursor:pointer;font-weight:800;color:var(--blue-main)">
+        <i class="fas fa-toggle-on"></i> 船班預購開關（點時段即可開啟／關閉，綠＝開放中）
+      </summary>
+      <div style="margin-top:10px;max-height:420px;overflow:auto">${rows}</div>
+    </details>`;
+}
+
+function toggleNeihaiSailing(date, time, nextActive) {
+  if (!nextActive && !confirm(`確定關閉 ${date} ${time} 的預購？\n（已存在的訂單不受影響，前台將顯示「已關閉」且無法再訂）`)) return;
+  fetch(`/api/admin/neihai/sailings?key=${encodeURIComponent(ADMIN_KEY)}`, {
+    method: 'PATCH', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ sailing_date: date, sailing_time: time, is_active: nextActive, _key: ADMIN_KEY }),
+  }).then(r => r.json()).then(d => {
+    if (d.ok) { showToast(`${date} ${time} 已${nextActive ? '開放' : '關閉'}預購`, 'success'); loadNeihaiOrders(); }
+    else showToast(d.error || '切換失敗', 'error');
+  }).catch(() => showToast('切換失敗', 'error'));
 }
 
 /* 依船班（日期＋時段）分組並列訂單，門檻狀態由有效人數自動判定 */

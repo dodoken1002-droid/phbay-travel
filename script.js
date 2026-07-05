@@ -189,6 +189,15 @@ function initContactForm() {
       return;
     }
 
+    const contractBox = document.getElementById('contract-consent');
+    if (contractBox && !contractBox.checked) {
+      showFormError('請先閱讀並勾選同意《國內旅遊定型化契約》再送出。');
+      return;
+    }
+    delete data.contract_consent; // 僅前端確認用，不送後端
+
+
+
     // slot_id 轉為數字或移除
     if (data.slot_id) data.slot_id = parseInt(data.slot_id);
     else delete data.slot_id;

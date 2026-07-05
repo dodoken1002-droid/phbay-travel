@@ -675,6 +675,14 @@
               <label for="notes"><i class="fas fa-sticky-note"></i> <span data-i18n="form.notes">備註 / 特殊需求</span></label>
               <textarea id="notes" name="notes" rows="4" placeholder="例：有嬰兒車、素食需求、慶生安排等..." data-i18n-ph="form.notesPh"></textarea>
             </div>
+            <!-- 旅遊定型化契約確認 -->
+            <label style="display:flex;gap:8px;align-items:flex-start;margin:14px 0;font-size:.92rem;line-height:1.6;color:#3a4a5a">
+              <input type="checkbox" id="contract-consent" name="contract_consent" style="margin-top:3px;width:auto" />
+              <span>我已閱讀並同意
+                <a href="https://admin.taiwan.net.tw/BusinessInfo/Regulation?a=109&id=193" target="_blank" rel="noopener noreferrer"
+                   style="color:var(--blue-main);font-weight:800;text-decoration:underline">《國內旅遊定型化契約》</a>
+                之規定（交通部觀光署公告範本，點擊開新視窗閱覽）。</span>
+            </label>
             <button type="submit" class="btn btn-submit" data-i18n="form.submit">
               <i class="fas fa-paper-plane"></i> 送出諮詢
             </button>

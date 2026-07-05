@@ -111,6 +111,13 @@
           <input type="checkbox" id="consent" style="margin-top:3px;width:auto" />
           <span>我已閱讀並同意上述「個人資料蒐集與利用告知事項」，並確認所填資料正確無誤。</span>
         </label>
+        <label class="consent-row" style="display:flex;gap:8px;align-items:flex-start;margin:14px 0;font-size:.92rem;line-height:1.6;color:#3a4a5a">
+          <input type="checkbox" id="contract-consent" style="margin-top:3px;width:auto" />
+          <span>我已閱讀並同意
+            <a href="https://admin.taiwan.net.tw/BusinessInfo/Regulation?a=109&id=193" target="_blank" rel="noopener noreferrer"
+               style="color:#7a42b1;font-weight:800;text-decoration:underline">《國內旅遊定型化契約》</a>
+            之規定（交通部觀光署公告範本，點擊開新視窗閱覽）。</span>
+        </label>
         <button class="btn btn-submit btn-wide" type="submit"><i class="fas fa-paper-plane"></i> 送出預購訂單</button>
       </form>
       <div id="result" class="result"></div>
@@ -215,6 +222,11 @@
       if (!document.getElementById('consent').checked) {
         resultBox.className = 'result err';
         resultBox.textContent = '請先勾選同意「個人資料蒐集與利用告知事項」再送出。';
+        return;
+      }
+      if (!document.getElementById('contract-consent').checked) {
+        resultBox.className = 'result err';
+        resultBox.textContent = '請先閱讀並勾選同意《國內旅遊定型化契約》再送出。';
         return;
       }
       const n = parseInt(passengerCount.value, 10);
