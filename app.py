@@ -1183,9 +1183,14 @@ def _parse_sailing_date(value):
 
 def _normalize_neihai_time(value, sailing_date=None):
     value = (value or "").strip()
-    aliases = {"9:00": "09:00", "09": "09:00", "11": "11:00",
-               "16": "16:30", "1630": "16:30", "20": "20:30", "2030": "20:30"}
-    value = aliases.get(value, value)
+    # 先抽出 HH:MM（容許「20:30 花火專船」「20:30🎆」等帶字尾寫法）
+    mt = re.search(r'(\d{1,2}):(\d{2})', value)
+    if mt:
+        value = f"{int(mt.group(1)):02d}:{mt.group(2)}"
+    else:
+        aliases = {"9:00": "09:00", "9": "09:00", "09": "09:00", "11": "11:00",
+                   "16": "16:30", "1630": "16:30", "20": "20:30", "2030": "20:30"}
+        value = aliases.get(value, value)
     allowed = (_neihai_times_for_date(sailing_date) if sailing_date
                else list(NEIHAI_BASE_TIMES) + [NEIHAI_THIRD_TIME, NEIHAI_FIREWORKS_TIME])
     if value not in allowed:

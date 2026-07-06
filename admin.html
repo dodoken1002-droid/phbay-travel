@@ -1576,9 +1576,16 @@ function parseCsv(text) {
   return rows.filter(r => r.some(c => String(c).trim() !== ''));
 }
 
-function normDate(s) {  // 2026/7/5、2026.07.05 → 2026-07-05
-  const m = String(s || '').trim().match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
-  return m ? `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}` : String(s || '').trim();
+/* 日期正規化 → YYYY-MM-DD。支援西元與民國年、多種分隔：
+   2026/7/5、2026-07-05、民國115年7月6日、115.7.6、115/07/06 皆可 */
+function normDate(s) {
+  s = String(s || '').trim();
+  if (!s) return '';
+  const m = s.replace(/民國|民国/g, '').match(/(\d{1,4})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})/);
+  if (!m) return s;
+  let y = parseInt(m[1], 10);
+  if (y < 1000) y += 1911;   // 3 碼以內視為民國年（115 → 2026）
+  return `${y}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
 }
 
 /* 表頭容錯：每個欄位接受多種常見寫法（去空白/符號、不分大小寫比對） */
@@ -1621,29 +1628,38 @@ function resolveCsvCols(header, fields) {
   return col;
 }
 
-/* rows→訂單陣列：同訂單編號（或同日期+時段+聯絡人）連續列合併為一筆多乘客訂單 */
+/* rows→訂單陣列。同一單支援兩種填法：
+   (1) 每列都重複訂單資訊；或 (2) 只在第一列填訂單資訊，之後幾列只填乘客欄
+   → 沒有訂單層級資訊（編號/日期/聯絡人）的乘客列，自動歸到上一筆訂單。 */
 function groupImportRows(rows, col, kind) {
   const orders = []; const byKey = {};
+  let current = null;
   rows.forEach(r => {
     const get = f => (f in col) ? String(r[col[f]] ?? '').trim() : '';
     const ref = get('booking_ref');
-    const base = kind === 'neihai'
-      ? { booking_ref: ref, sailing_date: normDate(get('sailing_date')), sailing_time: get('sailing_time'),
-          status: get('status'), agency_name: get('agency_name'),
-          contact_name: get('contact_name'), contact_phone: get('contact_phone'),
-          contact_email: get('contact_email'), notes: get('notes'), passengers: [] }
-      : { booking_ref: ref, product: get('product'),
-          departure_date: normDate(get('departure_date')), departure_time: get('departure_time'),
-          status: get('status'), agency_name: get('agency_name'),
-          contact_name: get('contact_name'), contact_phone: get('contact_phone'),
-          contact_email: get('contact_email'), notes: get('notes'), passengers: [] }
-    ;
-    const key = ref || (kind === 'neihai'
-      ? `${base.sailing_date}|${base.sailing_time}|${base.contact_name}|${base.contact_phone}`
-      : `${base.product}|${base.departure_date}|${base.departure_time}|${base.contact_name}|${base.contact_phone}`);
-    if (!byKey[key]) { byKey[key] = base; orders.push(base); }
+    const dateRaw = kind === 'neihai' ? get('sailing_date') : get('departure_date');
+    const contact = get('contact_name');
+    const hasOrderInfo = !!(ref || dateRaw || contact);   // 這列有沒有訂單層級資訊
+    if (hasOrderInfo) {
+      const base = kind === 'neihai'
+        ? { booking_ref: ref, sailing_date: normDate(get('sailing_date')), sailing_time: get('sailing_time'),
+            status: get('status'), agency_name: get('agency_name'),
+            contact_name: contact, contact_phone: get('contact_phone'),
+            contact_email: get('contact_email'), notes: get('notes'), passengers: [] }
+        : { booking_ref: ref, product: get('product'),
+            departure_date: normDate(get('departure_date')), departure_time: get('departure_time'),
+            status: get('status'), agency_name: get('agency_name'),
+            contact_name: contact, contact_phone: get('contact_phone'),
+            contact_email: get('contact_email'), notes: get('notes'), passengers: [] }
+      ;
+      const key = ref || (kind === 'neihai'
+        ? `${base.sailing_date}|${base.sailing_time}|${base.contact_name}|${base.contact_phone}`
+        : `${base.product}|${base.departure_date}|${base.departure_time}|${base.contact_name}|${base.contact_phone}`);
+      if (!byKey[key]) { byKey[key] = base; orders.push(base); }
+      current = byKey[key];
+    }
     const paxName = get('pax_name');
-    if (paxName) byKey[key].passengers.push({
+    if (paxName && current) current.passengers.push({
       name: paxName, national_id: get('national_id'),
       birth_date: normDate(get('birth_date')),
       phone: get('pax_phone'),
