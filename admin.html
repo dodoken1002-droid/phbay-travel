@@ -1576,16 +1576,44 @@ function parseCsv(text) {
   return rows.filter(r => r.some(c => String(c).trim() !== ''));
 }
 
-/* 日期正規化 → YYYY-MM-DD。支援西元與民國年、多種分隔：
-   2026/7/5、2026-07-05、民國115年7月6日、115.7.6、115/07/06 皆可 */
+/* 全形→半形（含全形數字、冒號、斜線、破折號、全形空白） */
+function toHalf(s) {
+  return String(s || '')
+    .replace(/[！-～]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/　/g, ' ');
+}
+
+/* 日期正規化 → YYYY-MM-DD。支援西元／民國年、多種分隔，以及純數字：
+   2026/7/5、2026-07-05、民國115年7月6日、115.7.6、
+   20260706（西元8碼）、1150706（民國7碼）、560301（民國6碼）皆可 */
 function normDate(s) {
-  s = String(s || '').trim();
+  s = toHalf(String(s || '').trim()).replace(/民國|民国/g, '');
   if (!s) return '';
-  const m = s.replace(/民國|民国/g, '').match(/(\d{1,4})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})/);
-  if (!m) return s;
+  let m = s.match(/(\d{1,4})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})/);
+  if (!m) {
+    const d = s.replace(/\D/g, '');   // 純數字（無分隔）
+    if (d.length === 8)      m = [0, d.slice(0,4), d.slice(4,6), d.slice(6,8)];  // 西元 YYYYMMDD
+    else if (d.length === 7) m = [0, d.slice(0,3), d.slice(3,5), d.slice(5,7)];  // 民國 YYYMMDD（115）
+    else if (d.length === 6) m = [0, d.slice(0,2), d.slice(2,4), d.slice(4,6)];  // 民國 YYMMDD（56）
+    else return s;
+  }
   let y = parseInt(m[1], 10);
-  if (y < 1000) y += 1911;   // 3 碼以內視為民國年（115 → 2026）
-  return `${y}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+  if (y < 1000) y += 1911;   // 3 碼以內視為民國年（115 → 2026、56 → 1967）
+  const mo = parseInt(m[2], 10), da = parseInt(m[3], 10);
+  if (!(mo >= 1 && mo <= 12 && da >= 1 && da <= 31)) return s;
+  return `${y}-${String(mo).padStart(2,'0')}-${String(da).padStart(2,'0')}`;
+}
+
+/* 時段正規化 → HH:MM。容許全形冒號、9:00、0900、「20:30 花火專船」等 */
+function normTime(s) {
+  s = toHalf(String(s || '').trim());
+  const m = s.match(/(\d{1,2}):(\d{2})/);
+  if (m) return `${String(parseInt(m[1],10)).padStart(2,'0')}:${m[2]}`;
+  const d = s.replace(/\D/g, '');
+  const alias = { '9':'09:00','09':'09:00','900':'09:00','0900':'09:00',
+                  '11':'11:00','1100':'11:00','16':'16:30','1630':'16:30',
+                  '20':'20:30','2030':'20:30' };
+  return alias[d] || s;
 }
 
 /* 表頭容錯：每個欄位接受多種常見寫法（去空白/符號、不分大小寫比對） */
@@ -1642,12 +1670,12 @@ function groupImportRows(rows, col, kind) {
     const hasOrderInfo = !!(ref || dateRaw || contact);   // 這列有沒有訂單層級資訊
     if (hasOrderInfo) {
       const base = kind === 'neihai'
-        ? { booking_ref: ref, sailing_date: normDate(get('sailing_date')), sailing_time: get('sailing_time'),
+        ? { booking_ref: ref, sailing_date: normDate(get('sailing_date')), sailing_time: normTime(get('sailing_time')),
             status: get('status'), agency_name: get('agency_name'),
             contact_name: contact, contact_phone: get('contact_phone'),
             contact_email: get('contact_email'), notes: get('notes'), passengers: [] }
         : { booking_ref: ref, product: get('product'),
-            departure_date: normDate(get('departure_date')), departure_time: get('departure_time'),
+            departure_date: normDate(get('departure_date')), departure_time: toHalf(get('departure_time')),
             status: get('status'), agency_name: get('agency_name'),
             contact_name: contact, contact_phone: get('contact_phone'),
             contact_email: get('contact_email'), notes: get('notes'), passengers: [] }
