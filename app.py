@@ -3053,6 +3053,44 @@ def submit_contact():
         return jsonify(ok=False, error='伺服器錯誤，請稍後再試'), 500
 
 
+@app.route('/api/quiz-lead', methods=['POST'])
+def submit_quiz_lead():
+    """行程診斷「領取行程建議表」名單：僅需姓名＋聯絡方式，
+    寫入 contacts 表（tour_interest＝診斷結果），並寄通知信給店家。"""
+    data = request.get_json(force=True, silent=True) or {}
+    name = (data.get('name') or '').strip()
+    phone = (data.get('phone') or '').strip()
+    if not name or not phone:
+        return jsonify(ok=False, error='請填寫姓名與聯絡電話／LINE'), 400
+    month = (data.get('month') or '').strip()
+    result_type = (data.get('result_type') or '').strip()
+    result_name = (data.get('result_name') or '').strip()
+    people = (data.get('people') or '').strip()
+    notes = f"【行程診斷名單】結果：{result_type or '—'}｜想玩：{result_name or '—'}" \
+            f"｜預計月份：{month or '未填'}｜人數：{people or '未填'}"
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO contacts (name, phone, tour_interest, notes)
+            VALUES (%s,%s,%s,%s) RETURNING id, created_at
+        """, (name, phone, result_name or result_type, notes))
+        row = cur.fetchone()
+        conn.commit(); cur.close(); conn.close()
+        try:
+            send_contact_email({
+                'name': name, 'phone': phone, 'travel_date': f'{month or "未定"}（診斷名單）',
+                'travel_date_end': '', 'people': people or '—', 'budget': '—',
+                'transport': '—', 'departure_city': '—',
+                'tour_interest': result_name or result_type, 'slot_label': '（行程診斷領取建議表）',
+                'is_waitlist': False, 'notes': notes,
+            })
+        except Exception as _e:
+            print(f'[EMAIL] 診斷名單通知呼叫失敗（不影響）：{_e}')
+        return jsonify(ok=True, id=row['id'])
+    except Exception:
+        return jsonify(ok=False, error='伺服器錯誤，請稍後再試'), 500
+
+
 @app.route('/api/contacts', methods=['GET'])
 def list_contacts():
     if not is_admin():

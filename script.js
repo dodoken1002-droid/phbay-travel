@@ -659,82 +659,83 @@ function renderTourModal(tour) {
 ════════════════════════════════════════════════ */
 const QUIZ_QUESTIONS = [
   {
-    icon: '🧳',
-    q: '這次旅遊，你和誰一起來澎湖？',
+    icon: '📅',
+    q: '你預計幾月來澎湖？',
     options: [
-      { icon:'💑', text:'情侶 / 好朋友', sub:'兩人同行說走就走',   scores:{ festival:2, neihai:2, turtle:1, classic:1 } },
-      { icon:'👨‍👩‍👧‍👦', text:'親子 / 全家出遊', sub:'帶著孩子一起探索',  scores:{ family:3, neihai:2 } },
-      { icon:'🎒', text:'一個人',         sub:'自由自在的獨旅',   scores:{ eco:3, sup:2 } },
-      { icon:'🎉', text:'一群朋友 / 揪團', sub:'人多更熱鬧',      scores:{ festival:4, classic:2, neihai:1 } },
+      { icon:'🌸', text:'3–5 月（春）',  sub:'大潮季、秘境現身',      scores:{ tides:3, neihai:1 } },
+      { icon:'☀️', text:'6–8 月（夏）',  sub:'跳島旺季、暑假出遊',    scores:{ island:3, family:2, neihai:1 } },
+      { icon:'🎆', text:'9–10 月（秋）', sub:'追風音樂燈光節登場',    scores:{ festival:4, neihai:1 } },
+      { icon:'🧭', text:'冬季 / 還沒決定', sub:'看推薦再決定',          scores:{ neihai:2, tides:1, family:1 } },
+    ]
+  },
+  {
+    icon: '🧳',
+    q: '這趟你和誰一起來？',
+    options: [
+      { icon:'👨‍👩‍👧‍👦', text:'親子 / 全家出遊', sub:'帶著孩子一起探索',   scores:{ family:4, neihai:1 } },
+      { icon:'💑', text:'情侶 兩人',        sub:'浪漫慢步調',        scores:{ neihai:2, tides:2, festival:1 } },
+      { icon:'🎉', text:'一群朋友',          sub:'人多更熱鬧',        scores:{ festival:3, island:3 } },
+      { icon:'🏢', text:'公司員旅 / 揪團',   sub:'一起放鬆團體行',    scores:{ festival:2, island:2, family:1 } },
     ]
   },
   {
     icon: '🌊',
-    q: '最想在澎湖體驗哪一件事？',
+    q: '最想要的澎湖體驗是？',
     options: [
-      { icon:'🤿', text:'浮潛、SUP 水上活動',   sub:'直接跳進海裡玩',        scores:{ sup:3, neihai:2 } },
-      { icon:'🐢', text:'海龜保育 × 生態探索', sub:'深入自然、有意義的旅行', scores:{ turtle:4, eco:3 } },
-      { icon:'🏡', text:'古厝文化 × 在地美食', sub:'慢遊、感受澎湖生活',     scores:{ neihai:4, classic:2 } },
-      { icon:'🌅', text:'音樂節、夜間活動',       sub:'晚上也想玩得精彩',         scores:{ festival:4, classic:1, family:1 } },
-    ]
-  },
-  {
-    icon: '📅',
-    q: '這次打算在澎湖待幾天？',
-    options: [
-      { icon:'⚡', text:'2 天 1 夜',  sub:'週末快閃，說走就走',  scores:{ neihai:3, sup:2 } },
-      { icon:'☀️', text:'3 天 2 夜',  sub:'剛剛好，不趕又充實', scores:{ festival:3, classic:2, family:2 } },
-      { icon:'🌊', text:'4 天 3 夜',  sub:'深度慢遊，玩個夠',   scores:{ turtle:4, eco:3 } },
-      { icon:'🤔', text:'還沒決定',   sub:'看推薦再決定',        scores:{ classic:1, turtle:1, family:1, festival:1, neihai:1 } },
+      { icon:'🤿', text:'海上活動', sub:'浮潛、SUP、跳島',     scores:{ island:4 } },
+      { icon:'📸', text:'拍照打卡', sub:'秘境美景收進相機',    scores:{ tides:3, neihai:2 } },
+      { icon:'🍢', text:'在地美食', sub:'古厝老街、海味小吃',  scores:{ neihai:3, tides:1 } },
+      { icon:'🍃', text:'慢旅行',   sub:'放空、看海、聽故事',  scores:{ neihai:3, tides:2 } },
+      { icon:'🎶', text:'音樂節',   sub:'夜間活動、熱鬧氣氛',  scores:{ festival:4 } },
     ]
   },
   {
     icon: '💰',
     q: '每人預算大概是？',
     options: [
-      { icon:'💵', text:'NT$ 7,000 以下',   sub:'輕鬆玩就好',         scores:{ sup:4 } },
-      { icon:'💳', text:'NT$ 7,000–10,000', sub:'合理預算，體驗豐富',  scores:{ classic:2, family:2, neihai:2, festival:1 } },
-      { icon:'🌟', text:'NT$ 10,000–15,000',sub:'值得的體驗不計較',    scores:{ festival:3, turtle:2, classic:1 } },
-      { icon:'👑', text:'不設限',            sub:'最棒的體驗最重要',    scores:{ eco:4, turtle:2 } },
+      { icon:'💵', text:'NT$ 5,000 以下',    sub:'輕鬆玩就好',       scores:{ neihai:2, tides:2 } },
+      { icon:'💳', text:'NT$ 5,000–10,000',  sub:'合理預算體驗豐富', scores:{ family:2, island:2, festival:1 } },
+      { icon:'🌟', text:'NT$ 10,000 以上',   sub:'值得的體驗不計較', scores:{ festival:2, island:2, family:1 } },
+      { icon:'🤔', text:'還沒抓預算',         sub:'看推薦再決定',     scores:{ neihai:1, tides:1, family:1, island:1, festival:1 } },
+    ]
+  },
+  {
+    icon: '⏳',
+    q: '這次打算玩幾天？',
+    options: [
+      { icon:'⚡', text:'半天 / 一日',  sub:'順遊、時間有限',    scores:{ neihai:3, tides:2 } },
+      { icon:'🌙', text:'2 天 1 夜',   sub:'週末快閃',          scores:{ neihai:2, tides:2, island:1 } },
+      { icon:'☀️', text:'3 天 2 夜',   sub:'剛剛好不趕又充實',  scores:{ festival:3, family:2, neihai:1 } },
+      { icon:'🏝️', text:'4 天 3 夜以上', sub:'深度慢遊玩個夠',   scores:{ island:3, family:1 } },
     ]
   },
 ];
 
 const QUIZ_RESULTS = {
-  festival: {
-    type: '追風音樂節玩家 🎵',
-    desc: '你適合把白天的海島散步和晚上的音樂燈光節排在同一趟旅程裡。三天兩夜剛剛好，交通、住宿與活動節奏都交給潮旅協助安排。',
-    tour: { name:'2026 澎湖追風音樂燈光節主題行程', duration:'3天2夜', price:'專人報價', img:'/images/festival-poster.png', interest:'festival', url:'/preorder/festival' },
-  },
   neihai: {
     type: '內海慢遊收藏家 🚤',
     desc: '你喜歡小而美、有人帶路的在地體驗。小城故事・內海巡禮很適合想輕鬆看海、聽故事、拍美照，也想避開大型人潮的旅人。',
-    tour: { name:'小城故事・內海巡禮', duration:'約90分鐘', price:'試航價 NT$1,000 起', img:'/images/neihai-cruise-hero-2026.jpg', interest:'neihai', url:'/neihai-preorder.html' },
+    tour: { name:'小城故事・內海巡禮', duration:'約90分鐘', price:'試航價 NT$1,000 起', img:'/images/neihai-cruise-hero-2026.jpg', interest:'neihai', url:'/neihai-preorder.html', cta:'查看內海巡禮預購' },
   },
-  sup: {
-    type: '海洋冒險家 🤿',
-    desc: '你熱愛刺激、說走就走，短假期也要玩得盡興！站上 SUP 衝浪板、浮潛看珊瑚礁，用最直接的方式感受澎湖海洋的魅力。',
-    tour: { name:'SUP × 浮潛 × 海洋體驗', duration:'2天1夜', price:'NT$ 5,800 起', img:'https://images.unsplash.com/photo-1506953823976-52e1fdc0149a?w=400&q=80', interest:'sup2d' },
-  },
-  classic: {
-    type: '澎湖經典探索者 🌅',
-    desc: '你喜歡豐富多元的旅遊體驗，奎壁山摩西分海、跨海大橋、七美雙心石滬……澎湖的經典美景一次都不想錯過！',
-    tour: { name:'澎湖經典三日遊', duration:'3天2夜', price:'NT$ 8,800 起', img:'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=80', interest:'classic3d' },
+  festival: {
+    type: '追風音樂節玩家 🎵',
+    desc: '你適合把白天的海島散步和晚上的音樂燈光節排在同一趟旅程裡。追風音樂節三天兩夜剛剛好，交通、住宿與活動節奏都交給潮旅協助安排。',
+    tour: { name:'追風音樂節三天兩夜', duration:'3天2夜', price:'專人報價', img:'/images/festival-poster.png', interest:'festival', url:'/preorder/festival', cta:'查看音樂節行程預購' },
   },
   family: {
     type: '親子海島守護者 👨‍👩‍👧',
-    desc: '家人的笑容是旅途中最美的風景！安全、溫馨又有趣的行程，讓孩子與海洋親密接觸，留下一家人最珍貴的回憶。',
-    tour: { name:'親子海島體驗行程', duration:'3天2夜', price:'NT$ 9,500 起', img:'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=400&q=80', interest:'family3d' },
+    desc: '家人的笑容是旅途中最美的風景！安全、溫馨又有趣的親子澎湖 3 天 2 夜，讓孩子與海洋親密接觸，留下一家人最珍貴的回憶。',
+    tour: { name:'親子澎湖 3 天 2 夜', duration:'3天2夜', price:'NT$ 9,500 起', img:'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=400&q=80', interest:'family3d', cta:'立即諮詢這個行程' },
   },
-  turtle: {
-    type: '海龜慢旅實踐者 🐢',
-    desc: '你重視旅遊的深度與意義，不只是走馬看花。跟著海龜走進望安的山與海，體驗永續旅遊的美好，這趟旅行將改變你對澎湖的想像！',
-    tour: { name:'🐢 2026 跟著海龜漫旅', duration:'4天3夜', price:'NT$ 6,999 起', img:'https://images.unsplash.com/photo-1583212292454-1fe6229603b7?w=400&q=80', interest:'turtle4d' },
+  island: {
+    type: '跳島冒險家 🏝️',
+    desc: '你熱愛海洋與探索，望安七美跳島最適合你！雙心石滬、綠蠵龜故鄉、大菓葉玄武岩，一次收集澎湖最經典的離島秘境。',
+    tour: { name:'望安七美跳島', duration:'3–4天', price:'NT$ 6,999 起', img:'https://images.unsplash.com/photo-1583212292454-1fe6229603b7?w=400&q=80', interest:'turtle4d', cta:'立即諮詢這個行程' },
   },
-  eco: {
-    type: '永續生態旅行者 🌿',
-    desc: '你是真正熱愛大自然、有深度的旅人。望安綠蠵龜保護區、花宅古厝聚落……離開澎湖時，你帶走的不只是美照，更是滿滿的感動與故事。',
-    tour: { name:'望安永續生態旅行', duration:'4天3夜', price:'NT$ 12,800 起', img:'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=400&q=80', interest:'eco4d' },
+  tides: {
+    type: '潮汐秘境獵人 🌅',
+    desc: '你懂得看時機玩澎湖！退潮才現身的摩西分海、S 彎沙灘與潮間帶秘境，跟著潮汐表安排，拍到別人拍不到的絕景。',
+    tour: { name:'潮汐秘境玩法', duration:'彈性安排', price:'依行程報價', img:'/images/neihai-cruise-hero-2026.jpg', interest:'other', url:'/tides', cta:'查看潮汐查詢系統' },
   },
 };
 
@@ -787,9 +788,10 @@ window.quizAnswer = function(qIdx, optIdx) {
 };
 
 function renderQuizResult(forcedKey, fromShare = false) {
-  const totals = { festival:0, neihai:0, sup:0, classic:0, family:0, turtle:0, eco:0 };
-  quizAnswers.forEach(s => Object.entries(s).forEach(([k,v]) => { totals[k] = (totals[k]||0) + v; }));
-  const best = forcedKey || Object.entries(totals).sort((a,b) => b[1]-a[1])[0][0];
+  const totals = { neihai:0, festival:0, family:0, island:0, tides:0 };
+  quizAnswers.forEach(s => Object.entries(s).forEach(([k,v]) => { if (k in totals) totals[k] = (totals[k]||0) + v; }));
+  const best = (forcedKey && QUIZ_RESULTS[forcedKey]) ? forcedKey
+    : Object.entries(totals).sort((a,b) => b[1]-a[1])[0][0];
   const r = QUIZ_RESULTS[best];
   const wrap = document.getElementById('quiz-wrap');
   const shareUrl = `${window.location.origin}${window.location.pathname}?quiz=${encodeURIComponent(best)}#quiz`;
@@ -823,13 +825,19 @@ function renderQuizResult(forcedKey, fromShare = false) {
           </div>
         </div>
       </div>
-      <p class="quiz-share-note">把結果分享給旅伴，或直接傳 LINE 給潮旅，讓專人依照你的玩法安排日期、交通與行程。</p>
+      <p class="quiz-share-note">把結果傳給 LINE 專人幫你排，或留資料領取專屬的澎湖行程建議表，我們依你的玩法安排日期、交通與行程。</p>
       <div class="quiz-result-actions">
-        <a href="${primaryHref}" class="btn btn-primary"${primaryAction}>
-          <i class="fas fa-route"></i> ${r.tour.url ? '查看推薦預購' : '立即諮詢這個行程'}
+        <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" rel="noopener noreferrer" class="btn btn-primary" onclick="prefillTour('${r.tour.interest}');trackQuizCta('${best}','line')">
+          <i class="fab fa-line"></i> 把結果傳給 LINE 專人幫我排
         </a>
-        <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" rel="noopener noreferrer" class="btn btn-outline" onclick="prefillTour('${r.tour.interest}');trackQuizCta('${best}','line')">
-          <i class="fab fa-line"></i> LINE 詢問安排
+        <button class="btn btn-outline" onclick="openQuizLead('${best}')">
+          <i class="fas fa-file-lines"></i> 領取澎湖行程建議表
+        </button>
+      </div>
+      <div id="quiz-lead-box" style="display:none"></div>
+      <div class="quiz-result-actions" style="margin-top:10px">
+        <a href="${primaryHref}" class="quiz-retry"${primaryAction}>
+          <i class="fas fa-route"></i> ${r.tour.cta || (r.tour.url ? '查看推薦預購' : '立即諮詢這個行程')}
         </a>
         <button class="quiz-retry" onclick="shareQuizResult('${best}')">
           <i class="fas fa-share-nodes"></i> 分享結果
@@ -898,6 +906,62 @@ function trackQuizCta(key, channel) {
   }
 }
 window.trackQuizCta = trackQuizCta;
+
+/* 領取澎湖行程建議表：展開輕量名單表單（姓名＋電話/LINE＋月份/人數） */
+function openQuizLead(key) {
+  const r = QUIZ_RESULTS[key];
+  if (!r) return;
+  const box = document.getElementById('quiz-lead-box');
+  if (!box) return;
+  if (box.style.display === 'block') { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div style="background:#f6fbff;border:1px solid #cde7f7;border-radius:16px;padding:18px;margin-top:14px;text-align:left">
+      <div style="font-weight:800;color:#0d4f83;margin-bottom:6px"><i class="fas fa-gift"></i> 領取「${r.tour.name}」專屬行程建議表</div>
+      <p style="font-size:.86rem;color:#5a7a94;margin-bottom:12px">留下聯絡方式，潮旅在地顧問會依你的診斷結果，把建議行程、費用與可出發日期整理好傳給你。</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <input id="qlead-name" placeholder="稱呼 *" style="padding:10px;border:1px solid #cde0ee;border-radius:10px;width:100%" />
+        <input id="qlead-phone" placeholder="電話 / LINE ID *" style="padding:10px;border:1px solid #cde0ee;border-radius:10px;width:100%" />
+        <input id="qlead-month" placeholder="預計月份（選填）" style="padding:10px;border:1px solid #cde0ee;border-radius:10px;width:100%" />
+        <input id="qlead-people" placeholder="人數（選填）" style="padding:10px;border:1px solid #cde0ee;border-radius:10px;width:100%" />
+      </div>
+      <button class="btn btn-primary" style="margin-top:12px;width:100%;justify-content:center" onclick="submitQuizLead('${key}')">
+        <i class="fas fa-paper-plane"></i> 送出，領取行程建議表
+      </button>
+      <div id="qlead-msg" style="font-size:.86rem;margin-top:8px"></div>
+    </div>`;
+}
+window.openQuizLead = openQuizLead;
+
+async function submitQuizLead(key) {
+  const r = QUIZ_RESULTS[key];
+  const g = id => (document.getElementById(id) || {}).value || '';
+  const name = g('qlead-name').trim(), phone = g('qlead-phone').trim();
+  const msg = document.getElementById('qlead-msg');
+  if (!name || !phone) { msg.style.color = '#c53030'; msg.textContent = '請填寫稱呼與聯絡方式。'; return; }
+  const btn = document.querySelector('#quiz-lead-box .btn-primary');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 送出中...'; }
+  try {
+    const res = await fetch('/api/quiz-lead', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name, phone, month: g('qlead-month').trim(), people: g('qlead-people').trim(),
+        result_type: r ? r.type : key, result_name: r ? r.tour.name : '',
+      }),
+    });
+    const d = await res.json();
+    if (!res.ok || !d.ok) throw new Error(d.error || '送出失敗');
+    if (typeof gtag === 'function') gtag('event', 'generate_lead', { method: 'quiz_guide', result_type: r ? r.type : key });
+    if (typeof fbq === 'function') fbq('track', 'Lead', { content_name: `行程診斷建議表：${r ? r.type : key}`, content_category: '澎湖行程診斷' });
+    document.getElementById('quiz-lead-box').innerHTML =
+      '<div style="background:#e8fff4;border:1px solid #9ae6b4;border-radius:16px;padding:20px;margin-top:14px;text-align:center;color:#0a6b45;font-weight:700">' +
+      '<i class="fas fa-circle-check"></i> 已收到！潮旅顧問會盡快把專屬行程建議表傳給你，也歡迎先加官方 LINE @phbay2018 加速聯繫。</div>';
+  } catch (err) {
+    msg.style.color = '#c53030'; msg.textContent = err.message || '送出失敗，請稍後再試或改用 LINE 聯繫。';
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> 送出，領取行程建議表'; }
+  }
+}
+window.submitQuizLead = submitQuizLead;
 
 /* 診斷結果圖卡：Canvas 產生 1080×1350 分享圖（Logo＋官網＋LINE＋CTA） */
 async function downloadQuizCard(key) {
