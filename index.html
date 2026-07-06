@@ -358,25 +358,17 @@
   </section>
 
   <!-- ═══════════════════════════════════════════════
-       30 秒行程診斷曝光入口
+       澎湖行程診斷（30 秒旅行人格測驗）— 首頁主要互動入口
   ════════════════════════════════════════════════ -->
-  <section class="diagnosis-entry" id="trip-diagnosis-entry">
+  <section class="quiz-section" id="quiz">
     <div class="container">
-      <div class="diagnosis-card">
-        <div class="diagnosis-copy">
-          <span class="diagnosis-kicker">30 秒找到你的澎湖玩法</span>
-          <h2>不知道澎湖怎麼排？先測你的旅行類型</h2>
-          <p>回答 4 題，系統會推薦適合的澎湖行程，結果可分享給旅伴，也能直接傳 LINE 讓潮旅專人協助安排。</p>
-          <div class="diagnosis-points">
-            <span><i class="fas fa-check"></i> 親子 / 情侶 / 朋友都能測</span>
-            <span><i class="fas fa-check"></i> 連到內海巡禮、音樂節與套裝行程</span>
-            <span><i class="fas fa-check"></i> 分享結果幫網站自然擴散</span>
-          </div>
-        </div>
-        <div class="diagnosis-actions">
-          <a href="#quiz" class="btn btn-primary"><i class="fas fa-wand-magic-sparkles"></i> 開始行程診斷</a>
-          <a href="/preorder/festival" class="btn btn-outline"><i class="fas fa-music"></i> 看音樂節預購</a>
-        </div>
+      <div class="section-header">
+        <span class="section-kicker">澎湖行程診斷</span>
+        <h2 data-i18n="quiz.title">30 秒測出你的澎湖旅行人格</h2>
+        <p data-i18n="quiz.subtitle">5 個問題・30 秒・測完傳 LINE 專人幫你排，或領取專屬行程建議表</p>
+      </div>
+      <div class="quiz-wrap" id="quiz-wrap">
+        <!-- 由 script.js initQuiz() 動態產生 -->
       </div>
     </div>
   </section>
@@ -499,9 +491,8 @@
             <h2 data-i18n="about.title">關於我們</h2>
             <p>潮旅國際旅行社</p>
           </div>
-          <p data-i18n="about.p1">潮旅國際旅行社是一家以<strong>澎湖在地深度旅遊</strong>為核心的旅行社，我們相信旅行不只是打卡，而是一段讓心靈留白的美好時光。</p>
-          <p data-i18n="about.p2">我們專注於<strong>親子旅行、海洋體驗與永續旅遊</strong>，每一條行程都由在地嚮導親自規劃，走進一般觀光客看不到的澎湖風情。</p>
-          <p data-i18n="about.p3">從浮潛、SUP、潮間帶生態到望安綠蠵龜保育，我們帶你用最深刻的方式，認識這片藍色寶島。</p>
+          <p data-i18n="about.p1">潮旅國際旅行社是一家以<strong>澎湖在地深度旅遊</strong>為核心的旅行社。每一條行程都由在地嚮導親自規劃，帶你走進一般觀光客看不到的澎湖風情。</p>
+          <p data-i18n="about.p2">我們專注於<strong>親子旅行、海洋體驗與永續旅遊</strong>，用最深刻的方式，帶你認識這片藍色寶島。</p>
           <div class="about-stats">
             <div class="stat-item">
               <span class="stat-number">500+</span>
@@ -522,22 +513,6 @@
             <span>潮旅國際旅行社｜統編：60305305｜交觀乙第1864號｜澎品保0188號｜負責人：唐瑋汝｜營業地址：880008 澎湖縣馬公市啟明里民權路13號2樓｜電話：06-9271288｜服務時間：週一至週五 08:30–17:30（週六、日及國定假日休假）</span>
           </div>
         </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══════════════════════════════════════════════
-       行程心理測驗
-  ════════════════════════════════════════════════ -->
-  <section class="quiz-section" id="quiz">
-    <div class="container">
-      <div class="section-header">
-        <span class="section-kicker">澎湖行程診斷</span>
-        <h2 data-i18n="quiz.title">30 秒測出你的澎湖旅行人格</h2>
-        <p data-i18n="quiz.subtitle">5 個問題・30 秒・測完傳 LINE 專人幫你排，或領取專屬行程建議表</p>
-      </div>
-      <div class="quiz-wrap" id="quiz-wrap">
-        <!-- 由 script.js initQuiz() 動態產生 -->
       </div>
     </div>
   </section>
