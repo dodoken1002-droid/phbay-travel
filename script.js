@@ -459,10 +459,45 @@ function renderAllTours() {
       grid.appendChild(renderTourCard(tour));
       renderTourModal(tour);
     });
-    // 該分頁沒有行程時顯示佔位說明（若 HTML 有提供）
+    // 空分頁：連同頁籤一起隱藏（不再顯示「敬請期待」佔位），讓版面更精練
+    const hasTours = list.length > 0;
+    const tabBtn = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
+    if (tabBtn) tabBtn.style.display = hasTours ? '' : 'none';
     const empty = document.querySelector(`.tours-empty[data-empty="${tab}"]`);
-    if (empty) empty.style.display = list.length ? 'none' : '';
+    if (empty) empty.style.display = 'none';
   });
+  refreshTourCategories();
+}
+
+/* 隱藏空分頁後：確保每個分類的作用中頁籤是可見的；整個分類都空則收起分類鈕 */
+function refreshTourCategories() {
+  document.querySelectorAll('.tour-cat').forEach(cat => {
+    const visibleTabs = [...cat.querySelectorAll('.tab-btn')].filter(b => b.style.display !== 'none');
+    // 分類內作用中的頁籤若被隱藏，改選第一個可見頁籤
+    if (visibleTabs.length) {
+      const activeBtn = cat.querySelector('.tab-btn.active');
+      if (!activeBtn || activeBtn.style.display === 'none') {
+        cat.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        cat.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        visibleTabs[0].classList.add('active');
+        const panel = cat.querySelector(`.tab-panel[data-panel="${visibleTabs[0].dataset.tab}"]`);
+        if (panel) panel.classList.add('active');
+      }
+    }
+    // 若整個分類都沒有可上架的行程，隱藏此分類的上層分類鈕
+    const catKey = cat.dataset.catPanel;
+    const catBtn = document.querySelector(`.cat-btn[data-cat="${catKey}"]`);
+    if (catBtn) catBtn.style.display = visibleTabs.length ? '' : 'none';
+  });
+  // 作用中的上層分類若被隱藏，改選第一個可見分類
+  const visibleCats = [...document.querySelectorAll('.cat-btn')].filter(b => b.style.display !== 'none');
+  const activeCat = document.querySelector('.cat-btn.active');
+  if (visibleCats.length && (!activeCat || activeCat.style.display === 'none')) {
+    visibleCats[0].click();
+  }
+  // 只剩一個分類時，隱藏整排分類切換鈕（沒有切換的必要）
+  const catBar = document.querySelector('.tour-cat-buttons');
+  if (catBar) catBar.style.display = visibleCats.length > 1 ? '' : 'none';
 }
 
 // 語言切換時由 i18n.js 呼叫 → 重新渲染動態行程

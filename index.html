@@ -612,7 +612,7 @@
                 <input type="date" id="travel-date-end" name="travel_date_end" required />
               </div>
             </div>
-            <!-- 人數 + 預算 -->
+            <!-- 人數 + 交通方式（必填） -->
             <div class="form-row">
               <div class="form-group">
                 <label for="people"><i class="fas fa-users"></i> <span data-i18n="form.people">旅遊人數</span> <span class="required">*</span></label>
@@ -625,20 +625,6 @@
                 </select>
               </div>
               <div class="form-group">
-                <label for="budget"><i class="fas fa-wallet"></i> <span data-i18n="form.budget">每人預算</span></label>
-                <select id="budget" name="budget">
-                  <option value="" data-i18n="form.budgetPh">請選擇預算範圍</option>
-                  <option value="under5000">NT$ 5,000 以下</option>
-                  <option value="5000-8000">NT$ 5,000 – 8,000</option>
-                  <option value="8000-12000">NT$ 8,000 – 12,000</option>
-                  <option value="12000-18000">NT$ 12,000 – 18,000</option>
-                  <option value="18000+">NT$ 18,000 以上</option>
-                </select>
-              </div>
-            </div>
-            <!-- 交通方式 + 出發地 -->
-            <div class="form-row">
-              <div class="form-group">
                 <label><i class="fas fa-plane"></i> <span data-i18n="form.transport">往返交通方式</span> <span class="required">*</span></label>
                 <div class="radio-group">
                   <label class="radio-label">
@@ -649,35 +635,51 @@
                   </label>
                 </div>
               </div>
-              <div class="form-group" id="departure-group">
-                <label for="departure"><i class="fas fa-map-marker-alt"></i> <span data-i18n="form.departure">出發地</span></label>
-                <select id="departure" name="departure_city">
-                  <option value="" data-i18n="form.departurePh">請先選擇交通方式</option>
-                </select>
+            </div>
+            <!-- 補充旅遊細節（選填，收合以降低填寫負擔） -->
+            <details class="form-more">
+              <summary><i class="fas fa-sliders"></i> <span data-i18n="form.more">補充旅遊細節（選填）— 填越詳細，越快幫你安排</span></summary>
+              <div class="form-more-body">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="budget"><i class="fas fa-wallet"></i> <span data-i18n="form.budget">每人預算</span></label>
+                    <select id="budget" name="budget">
+                      <option value="" data-i18n="form.budgetPh">請選擇預算範圍</option>
+                      <option value="under5000">NT$ 5,000 以下</option>
+                      <option value="5000-8000">NT$ 5,000 – 8,000</option>
+                      <option value="8000-12000">NT$ 8,000 – 12,000</option>
+                      <option value="12000-18000">NT$ 12,000 – 18,000</option>
+                      <option value="18000+">NT$ 18,000 以上</option>
+                    </select>
+                  </div>
+                  <div class="form-group" id="departure-group">
+                    <label for="departure"><i class="fas fa-map-marker-alt"></i> <span data-i18n="form.departure">出發地</span></label>
+                    <select id="departure" name="departure_city">
+                      <option value="" data-i18n="form.departurePh">請先選擇交通方式</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="tour-interest"><i class="fas fa-map"></i> <span data-i18n="form.tourInterest">有興趣的行程</span> <span class="label-hint" data-i18n="form.tourHint">（選擇後可指定出發梯次）</span></label>
+                  <select id="tour-interest" name="tour_interest" onchange="loadSlotOptions(this)">
+                    <option value="" data-i18n="form.tourPh">請選擇行程（可不填）</option>
+                    <!-- 行程選項由 script.js populateTourInterest() 依資料庫動態填入 -->
+                    <option value="其他" id="tour-interest-other">其他（請在備註說明）</option>
+                  </select>
+                </div>
+                <div class="form-group" id="slot-group" style="display:none;">
+                  <label for="slot-select"><i class="fas fa-calendar-check"></i> <span data-i18n="form.slot">選擇出發梯次</span></label>
+                  <select id="slot-select" name="slot_id">
+                    <option value="">載入中...</option>
+                  </select>
+                  <div id="slot-status" class="slot-status-hint"></div>
+                </div>
+                <div class="form-group">
+                  <label for="notes"><i class="fas fa-sticky-note"></i> <span data-i18n="form.notes">備註 / 特殊需求</span></label>
+                  <textarea id="notes" name="notes" rows="3" placeholder="例：有嬰兒車、素食需求、慶生安排等..." data-i18n-ph="form.notesPh"></textarea>
+                </div>
               </div>
-            </div>
-            <!-- 有興趣的行程 -->
-            <div class="form-group">
-              <label for="tour-interest"><i class="fas fa-map"></i> <span data-i18n="form.tourInterest">有興趣的行程</span> <span class="label-hint" data-i18n="form.tourHint">（選擇後可指定出發梯次）</span></label>
-              <select id="tour-interest" name="tour_interest" onchange="loadSlotOptions(this)">
-                <option value="" data-i18n="form.tourPh">請選擇行程（可不填）</option>
-                <!-- 行程選項由 script.js populateTourInterest() 依資料庫動態填入 -->
-                <option value="其他" id="tour-interest-other">其他（請在備註說明）</option>
-              </select>
-            </div>
-            <!-- 梯次選擇（動態顯示） -->
-            <div class="form-group" id="slot-group" style="display:none;">
-              <label for="slot-select"><i class="fas fa-calendar-check"></i> <span data-i18n="form.slot">選擇出發梯次</span></label>
-              <select id="slot-select" name="slot_id">
-                <option value="">載入中...</option>
-              </select>
-              <div id="slot-status" class="slot-status-hint"></div>
-            </div>
-            <!-- 備註 -->
-            <div class="form-group">
-              <label for="notes"><i class="fas fa-sticky-note"></i> <span data-i18n="form.notes">備註 / 特殊需求</span></label>
-              <textarea id="notes" name="notes" rows="4" placeholder="例：有嬰兒車、素食需求、慶生安排等..." data-i18n-ph="form.notesPh"></textarea>
-            </div>
+            </details>
             <!-- 旅遊定型化契約確認 -->
             <label style="display:flex;gap:8px;align-items:flex-start;margin:14px 0;font-size:.92rem;line-height:1.6;color:#3a4a5a">
               <input type="checkbox" id="contract-consent" name="contract_consent" style="margin-top:3px;width:auto" />
