@@ -1724,17 +1724,28 @@ function importCsvFile(input, kind) {
     const orders = groupImportRows(rows.slice(1), col, kind);
     if (!orders.length) { showToast('解析後沒有可匯入的訂單', 'error'); return; }
     const pax = orders.reduce((s, o) => s + o.passengers.length, 0);
-    if (!confirm(`即將匯入 ${orders.length} 筆訂單（共 ${pax} 位乘客）。\n訂單編號已存在者會自動略過。確定匯入？`)) return;
+    const hasRef = orders.some(o => o.booking_ref);
+    if (!confirm(`即將匯入 ${orders.length} 筆訂單（共 ${pax} 位乘客）。確定匯入？`)) return;
+    // 檔案中有訂單編號時，詢問遇到既有編號的處理方式
+    let overwrite = false;
+    if (hasRef) {
+      overwrite = confirm(
+        '若檔案中的「訂單編號」已存在於系統：\n\n' +
+        '　按【確定】＝覆蓋更新舊單（該單資料與乘客整批換成檔案內容）\n' +
+        '　按【取消】＝略過舊單，只新增系統還沒有的\n\n' +
+        '（沒有編號或編號是新的訂單，一律新增，不受此選擇影響）');
+    }
     const url = kind === 'neihai' ? '/api/admin/neihai/import' : '/api/admin/preorder/import';
     fetch(`${url}?key=${encodeURIComponent(ADMIN_KEY)}`, {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ orders, _key: ADMIN_KEY }),
+      body: JSON.stringify({ orders, mode: overwrite ? 'overwrite' : '', _key: ADMIN_KEY }),
     }).then(r => r.json()).then(d => {
       if (!d.ok) { showToast(d.error || '匯入失敗', 'error'); return; }
-      let msg = `匯入完成：新增 ${d.created.length} 筆`;
-      if (d.skipped.length) msg += `、略過 ${d.skipped.length} 筆（編號已存在）`;
-      if (d.errors.length) msg += `、失敗 ${d.errors.length} 筆`;
-      showToast(msg, d.errors.length ? 'error' : 'success');
+      const parts = [`新增 ${d.created.length} 筆`];
+      if ((d.updated || []).length) parts.push(`覆蓋更新 ${d.updated.length} 筆`);
+      if (d.skipped.length) parts.push(`略過 ${d.skipped.length} 筆（編號已存在）`);
+      if (d.errors.length) parts.push(`失敗 ${d.errors.length} 筆`);
+      showToast('匯入完成：' + parts.join('、'), d.errors.length ? 'error' : 'success');
       if (d.errors.length || d.warnings.length)
         alert(['匯入結果', ...d.errors.map(e => '❌ ' + e), ...d.warnings.map(w => '⚠️ ' + w)].join('\n'));
       if (kind === 'neihai') loadNeihaiOrders(); else loadPreorderOrders();
