@@ -1898,6 +1898,11 @@ function renderPreorderGroups(orders) {
 function renderPreorderCard(o) {
   const archivedTag = o.archived
     ? '<span style="background:#718096;color:#fff;padding:2px 10px;border-radius:20px;font-weight:800;font-size:.78rem;margin-left:8px">已封存</span>' : '';
+  const logs = (o.logs || []).map(l =>
+    `<div style="font-size:.82rem;color:var(--mid)">・${nEsc(String(l.changed_at).slice(0,16).replace('T',' '))}　${nEsc(l.summary)}</div>`).join('');
+  const historyHtml = logs
+    ? `<details style="margin-top:10px"><summary style="cursor:pointer;color:var(--blue-main);font-size:.88rem">修改紀錄（${o.logs.length}）</summary><div style="margin-top:6px">${logs}</div></details>`
+    : '';
   return `
     <div class="contact-card" style="display:block${o.archived ? ';opacity:.62' : ''}">
       <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px">
@@ -1921,6 +1926,7 @@ function renderPreorderCard(o) {
         <thead><tr><th>旅客</th><th>身分證字號</th><th>出生年月日</th><th>電話</th></tr></thead>
         <tbody>${(o.passengers || []).map(p => `<tr><td>${nEsc(p.name)}</td><td style="font-family:monospace">${nEsc(p.national_id)}</td><td>${nEsc(p.birth_date)}</td><td>${nEsc(p.phone)}</td></tr>`).join('')}</tbody>
       </table>
+      ${historyHtml}
     </div>`;
 }
 

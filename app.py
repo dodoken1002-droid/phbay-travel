@@ -295,6 +295,15 @@ def init_db():
             created_at      TIMESTAMP DEFAULT NOW()
         )
     """)
+    # 通用預購訂單修改紀錄（與內海一致）
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS preorder_order_logs (
+            id           SERIAL PRIMARY KEY,
+            order_id     INT NOT NULL REFERENCES preorder_orders(id) ON DELETE CASCADE,
+            summary      TEXT NOT NULL,
+            changed_at   TIMESTAMP DEFAULT NOW()
+        )
+    """)
     # 種子商品：2026 追風音樂節主題行程（已存在則不動，後台/DB 可再調整）
     cur.execute("""
         INSERT INTO preorder_products
@@ -2280,6 +2289,7 @@ def admin_preorder_orders():
         orders = [dict(r) for r in cur.fetchall()]
         ids = [o['id'] for o in orders]
         passengers_by_order = {i: [] for i in ids}
+        logs_by_order = {i: [] for i in ids}
         if ids:
             cur.execute('SELECT * FROM preorder_passengers WHERE order_id = ANY(%s) ORDER BY order_id, id', (ids,))
             for r in cur.fetchall():
@@ -2287,6 +2297,10 @@ def admin_preorder_orders():
                 r['birth_date'] = str(r['birth_date'])
                 if r.get('created_at'): r['created_at'] = str(r['created_at'])
                 passengers_by_order[r['order_id']].append(r)
+            cur.execute("""SELECT order_id, summary, changed_at FROM preorder_order_logs
+                           WHERE order_id = ANY(%s) ORDER BY order_id, changed_at DESC""", (ids,))
+            for r in cur.fetchall():
+                logs_by_order[r['order_id']].append({'summary': r['summary'], 'changed_at': str(r['changed_at'])})
         cur.execute('SELECT slug, name FROM preorder_products WHERE is_active=TRUE ORDER BY id')
         products = [dict(r) for r in cur.fetchall()]
         cur.close(); conn.close()
@@ -2294,6 +2308,7 @@ def admin_preorder_orders():
             for k in ('departure_date', 'created_at', 'updated_at'):
                 if o.get(k): o[k] = str(o[k])
             o['passengers'] = passengers_by_order.get(o['id'], [])
+            o['logs'] = logs_by_order.get(o['id'], [])
         return jsonify(ok=True, month=start.strftime('%Y-%m'), orders=orders, products=products)
     except ValueError as e:
         return jsonify(ok=False, error=str(e)), 400
@@ -2314,17 +2329,26 @@ def admin_update_preorder(order_id):
         if not order:
             cur.close(); conn.close()
             return jsonify(ok=False, error='找不到訂單'), 404
-        set_parts, params = [], []
+        order = dict(order)
+        set_parts, params, changes = [], [], []
+        FLABEL = {'agency_name': '業者', 'contact_name': '主要聯絡姓名', 'contact_phone': '聯絡電話',
+                  'contact_email': 'Email', 'notes': '備註'}
 
         if 'status' in data:
             status = (data.get('status') or '').strip()
             if status not in PREORDER_VALID_STATUSES:
                 cur.close(); conn.close()
                 return jsonify(ok=False, error='狀態不正確'), 400
-            set_parts.append('status=%s'); params.append(status)
+            if status != order['status']:
+                changes.append(f"狀態：{NEIHAI_STATUS_LABELS.get(order['status'], order['status'])}"
+                               f" → {NEIHAI_STATUS_LABELS.get(status, status)}")
+                set_parts.append('status=%s'); params.append(status)
 
         if 'archived' in data:
-            set_parts.append('archived=%s'); params.append(bool(data.get('archived')))
+            new_arch = bool(data.get('archived'))
+            if new_arch != bool(order.get('archived')):
+                changes.append('封存訂單' if new_arch else '取消封存')
+                set_parts.append('archived=%s'); params.append(new_arch)
 
         for field in ('agency_name', 'contact_name', 'contact_phone', 'contact_email', 'notes'):
             if field in data:
@@ -2332,7 +2356,9 @@ def admin_update_preorder(order_id):
                 if field in ('contact_name', 'contact_phone') and not v:
                     cur.close(); conn.close()
                     return jsonify(ok=False, error='聯絡姓名與電話不可空白'), 400
-                set_parts.append(f'{field}=%s'); params.append(v)
+                if v != (order.get(field) or ''):
+                    changes.append(f"{FLABEL[field]}：{order.get(field) or '（空）'} → {v or '（空）'}")
+                    set_parts.append(f'{field}=%s'); params.append(v)
 
         if data.get('departure_date'):
             try:
@@ -2340,9 +2366,14 @@ def admin_update_preorder(order_id):
             except ValueError:
                 cur.close(); conn.close()
                 return jsonify(ok=False, error='出發日期格式需為 YYYY-MM-DD'), 400
-            set_parts.append('departure_date=%s'); params.append(dep)
+            if str(dep) != str(order.get('departure_date')):
+                changes.append(f"出發日期：{order.get('departure_date')} → {dep}")
+                set_parts.append('departure_date=%s'); params.append(dep)
         if 'departure_time' in data:
-            set_parts.append('departure_time=%s'); params.append((data.get('departure_time') or '').strip())
+            nt = (data.get('departure_time') or '').strip()
+            if nt != (order.get('departure_time') or ''):
+                changes.append(f"出發時間：{order.get('departure_time') or '（空）'} → {nt or '（空）'}")
+                set_parts.append('departure_time=%s'); params.append(nt)
 
         if set_parts:
             set_parts.append('updated_at=NOW()')
@@ -2373,11 +2404,17 @@ def admin_update_preorder(order_id):
                     elif f in ('name', 'national_id') and not v:
                         cur.close(); conn.close()
                         return jsonify(ok=False, error=f'第 {i} 位旅客姓名/身分證不可空白'), 400
-                    pset.append(f'{f}=%s'); pparams.append(v)
+                    if v != str(cur_p.get(f) or ''):
+                        plabel = {'name': '姓名', 'national_id': '身分證字號', 'birth_date': '生日', 'phone': '電話'}[f]
+                        changes.append(f"旅客「{cur_p['name']}」{plabel}：{cur_p.get(f) or ''} → {v}")
+                        pset.append(f'{f}=%s'); pparams.append(v)
                 if pset:
                     cur.execute(f"UPDATE preorder_passengers SET {', '.join(pset)} WHERE id=%s",
                                 tuple(pparams) + (cur_p['id'],))
 
+        if changes:
+            cur.execute("INSERT INTO preorder_order_logs (order_id, summary) VALUES (%s,%s)",
+                        (order_id, "；".join(changes)))
         conn.commit(); cur.close(); conn.close()
         return jsonify(ok=True)
     except Exception as e:
@@ -2473,6 +2510,8 @@ def admin_preorder_import():
                     cur.execute("""INSERT INTO preorder_passengers (order_id, name, national_id, birth_date, phone)
                                    VALUES (%s,%s,%s,%s,%s)""",
                                 (existing_id, ps['name'], ps['national_id'], ps['birth_date'], ps['phone']))
+                cur.execute("INSERT INTO preorder_order_logs (order_id, summary) VALUES (%s,%s)",
+                            (existing_id, '後台匯入覆蓋更新'))
                 updated.append(ref)
             else:
                 cur.execute("""
@@ -2489,6 +2528,8 @@ def admin_preorder_import():
                     cur.execute("""INSERT INTO preorder_passengers (order_id, name, national_id, birth_date, phone)
                                    VALUES (%s,%s,%s,%s,%s)""",
                                 (oid, ps['name'], ps['national_id'], ps['birth_date'], ps['phone']))
+                cur.execute("INSERT INTO preorder_order_logs (order_id, summary) VALUES (%s,%s)",
+                            (oid, '後台匯入建立'))
                 created.append(new_ref)
         conn.commit(); cur.close(); conn.close()
         return jsonify(ok=True, created=created, updated=updated, skipped=skipped,
