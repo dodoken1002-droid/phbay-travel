@@ -230,6 +230,9 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
     <button id="tabbtn-users" onclick="switchTab('users',this)">
       <i class="fas fa-users-gear"></i> 使用者管理
     </button>
+    <button id="tabbtn-audit" onclick="switchTab('audit',this)">
+      <i class="fas fa-shield-halved"></i> 個資稽核
+    </button>
   </nav>
 
   <div class="admin-body">
@@ -400,6 +403,31 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
       <div id="users-list">載入中…</div>
       <p style="color:#8aa4b8;font-size:.82rem;margin-top:14px">
         ※ 帳號登入有效 12 小時。停用帳號立即失效；密碼可由管理者在此重設。管理金鑰（ADMIN_KEY）永遠等同管理者權限。
+      </p>
+    </div>
+
+    <!-- ── 個資稽核（僅 owner）── -->
+    <div class="tab-content" id="tab-audit">
+      <div class="toolbar">
+        <h2>個資稽核紀錄</h2>
+        <div class="toolbar-right">
+          <select id="audit-action" class="search-input" style="width:150px" onchange="loadAudit()">
+            <option value="">全部動作</option>
+            <option value="export">匯出</option>
+            <option value="import">匯入</option>
+          </select>
+          <select id="audit-days" class="search-input" style="width:150px" onchange="loadAudit()">
+            <option value="30">近 30 天</option>
+            <option value="90">近 90 天</option>
+            <option value="365">近 1 年</option>
+            <option value="">全部</option>
+          </select>
+          <button class="btn btn-primary" onclick="loadAudit()"><i class="fas fa-sync"></i> 重新整理</button>
+        </div>
+      </div>
+      <div id="audit-list">載入中…</div>
+      <p style="color:#8aa4b8;font-size:.82rem;margin-top:14px">
+        ※ 記錄含個資的名單「匯出／匯入」事件（操作者、時間、範圍、筆數、來源 IP），供個資保護稽核使用。匯出為唯讀下載，不影響訂單資料。
       </p>
     </div>
   </div>
@@ -752,7 +780,7 @@ let ME = null;  // 目前登入者 {name, role, ...}
 
 /* 角色 → 可見分頁（owner 全開） */
 const ROLE_TABS = {
-  owner:  ['tours','slots','posts','neihai','preorder','contacts','users'],
+  owner:  ['tours','slots','posts','neihai','preorder','contacts','users','audit'],
   orders: ['neihai','preorder'],
   editor: ['posts'],
 };
@@ -803,7 +831,7 @@ function showAdmin() {
   const roleLabel = { owner:'管理者', orders:'訂位人員', editor:'小編' }[role] || role;
   document.getElementById('me-badge').textContent = `${(ME && ME.name) || ''}（${roleLabel}）`;
   // 只顯示有權限的分頁，並切到第一個
-  ['tours','slots','posts','neihai','preorder','contacts','users'].forEach(t => {
+  ['tours','slots','posts','neihai','preorder','contacts','users','audit'].forEach(t => {
     const btn = document.getElementById('tabbtn-' + t);
     if (btn) btn.style.display = allowed.includes(t) ? '' : 'none';
   });
@@ -911,6 +939,41 @@ function resetUserPass(id, username) {
 }
 
 /* ══════════════════════════════════════
+   個資稽核（僅 owner）
+══════════════════════════════════════ */
+function loadAudit() {
+  const list = document.getElementById('audit-list');
+  list.innerHTML = '載入中…';
+  const action = document.getElementById('audit-action').value;
+  const days = document.getElementById('audit-days').value;
+  fetch(`/api/admin/audit?action=${encodeURIComponent(action)}&days=${encodeURIComponent(days)}&key=${encodeURIComponent(ADMIN_KEY)}`)
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) { list.innerHTML = d.error || '載入失敗'; return; }
+      if (!d.logs.length) {
+        list.innerHTML = '<p style="color:#a0aec0;text-align:center;padding:40px">此範圍尚無稽核紀錄</p>';
+        return;
+      }
+      const roleLabel = { owner:'管理者', orders:'訂位人員', editor:'小編' };
+      const actColor = a => a === 'export' ? '#c05621' : (a === 'import' ? '#2b6cb0' : '#4a5568');
+      list.innerHTML = `<table class="tour-table"><thead>
+        <tr><th>時間</th><th>操作者</th><th>動作</th><th>類別</th><th>範圍</th><th>筆數</th><th>個資筆數</th><th>來源 IP</th></tr></thead><tbody>` +
+        d.logs.map(l => `
+          <tr>
+            <td style="white-space:nowrap;font-size:.85rem">${nEsc(String(l.created_at).slice(0,16).replace('T',' '))}</td>
+            <td>${nEsc(l.display_name || l.username || '—')}<br><span style="font-size:.78rem;color:var(--mid)">${roleLabel[l.role] || nEsc(l.role || '')}</span></td>
+            <td style="font-weight:800;color:${actColor(l.action)}">${nEsc(l.action_label)}</td>
+            <td>${nEsc(l.category || '—')}</td>
+            <td style="font-size:.85rem">${nEsc(l.scope || '—')}${l.detail ? `<br><span style="font-size:.78rem;color:var(--mid)">${nEsc(l.detail)}</span>` : ''}</td>
+            <td style="text-align:center">${l.record_count || 0}</td>
+            <td style="text-align:center;font-weight:700">${l.pax_count || 0}</td>
+            <td style="font-family:monospace;font-size:.82rem">${nEsc(l.ip || '—')}</td>
+          </tr>`).join('') + '</tbody></table>';
+    })
+    .catch(() => { list.innerHTML = '載入失敗'; });
+}
+
+/* ══════════════════════════════════════
    Tab 切換
 ══════════════════════════════════════ */
 function switchTab(name, btn) {
@@ -925,6 +988,7 @@ function switchTab(name, btn) {
   if (name === 'preorder') loadPreorderOrders();
   if (name === 'users')    loadUsers();
   if (name === 'tours')    loadTours();
+  if (name === 'audit')    loadAudit();
 }
 
 /* ══════════════════════════════════════
@@ -1554,6 +1618,8 @@ function exportNeihaiCsv() {
   });
   const month = (document.getElementById('neihai-month')||{}).value || '';
   downloadCsv(rows, `內海預購訂單_${onlyDate || month}.csv`);
+  const paxN = orders.reduce((s,o)=>s+((o.passengers||[]).length||0),0);
+  recordAudit({ action:'export', category:'內海預購', scope:(onlyDate || month), record_count:orders.length, pax_count:paxN });
 }
 
 /* ── CSV 匯入（格式與匯出相同，Excel 另存 CSV 後可直接回匯）── */
@@ -1798,6 +1864,8 @@ function exportPreorderCsv() {
   });
   const month = (document.getElementById('preorder-month')||{}).value || '';
   downloadCsv(rows, `行程預購訂單_${onlyDate || month}.csv`);
+  const paxN = orders.reduce((s,o)=>s+((o.passengers||[]).length||0),0);
+  recordAudit({ action:'export', category:'行程預購', scope:(onlyDate || month), record_count:orders.length, pax_count:paxN });
 }
 
 function exportContactsCsv() {
@@ -1809,6 +1877,17 @@ function exportContactsCsv() {
     c.people||'', c.transport||'', c.departure_city||'', c.budget||'', c.tour_interest||'',
     c.is_waitlist ? '候補' : (c.slot_id ? '正團' : ''), c.notes||'', c.created_at||'']));
   downloadCsv(rows, `諮詢紀錄_${new Date().toISOString().slice(0,10)}.csv`);
+  recordAudit({ action:'export', category:'諮詢名單', scope:new Date().toISOString().slice(0,10), record_count:contacts.length, pax_count:contacts.length });
+}
+
+/* 個資稽核：回報匯出/檢視事件（操作者身分由後端 session 決定） */
+function recordAudit(payload) {
+  try {
+    fetch(`/api/admin/audit?key=${encodeURIComponent(ADMIN_KEY)}`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ ...payload, _key: ADMIN_KEY }),
+    }).catch(() => {});
+  } catch (_) {}
 }
 
 function updateNeihaiOrderStatus(id, status) {

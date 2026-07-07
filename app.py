@@ -86,6 +86,23 @@ def has_role(role):
     return bool(u and (u['role'] == 'owner' or u['role'] == role))
 
 
+def _client_ip():
+    xff = request.headers.get('X-Forwarded-For', '')
+    return (xff.split(',')[0].strip() if xff else request.remote_addr) or ''
+
+
+def write_audit(cur, action, category='', scope='', record_count=0, pax_count=0, detail=''):
+    """寫一筆個資稽核紀錄（操作者身分由伺服器端 session 決定，不信任前端）。
+    傳入既有 cursor，與呼叫端同一交易一起 commit。"""
+    u = current_admin() or {}
+    cur.execute("""
+        INSERT INTO audit_logs (username, display_name, role, action, category, scope,
+                                record_count, pax_count, detail, ip)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+    """, (u.get('username', ''), u.get('name', ''), u.get('role', ''), action, category, scope,
+          int(record_count or 0), int(pax_count or 0), detail, _client_ip()))
+
+
 # ─── 資料表初始化 ──────────────────────────────────────────
 def init_db():
     conn = get_db()
@@ -231,6 +248,25 @@ def init_db():
             last_login    TIMESTAMP
         )
     """)
+
+    # 個資稽核紀錄（誰在何時匯出/匯入/檢視含個資的名單）
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id           SERIAL PRIMARY KEY,
+            username     VARCHAR(80),
+            display_name VARCHAR(120),
+            role         VARCHAR(20),
+            action       VARCHAR(30) NOT NULL,
+            category     VARCHAR(40),
+            scope        VARCHAR(160),
+            record_count INT DEFAULT 0,
+            pax_count    INT DEFAULT 0,
+            detail       TEXT,
+            ip           VARCHAR(60),
+            created_at   TIMESTAMP DEFAULT NOW()
+        )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs (created_at DESC)")
 
     # LINE 官方帳號互動用戶（webhook 記錄，用於取得 userId 與對照訂單）
     cur.execute("""
@@ -1776,6 +1812,12 @@ def admin_neihai_import():
                 cur.execute("INSERT INTO neihai_preorder_logs (preorder_id, summary) VALUES (%s,%s)",
                             (oid, '後台匯入建立'))
                 created.append(new_ref)
+        if created or updated:
+            pax = sum(len(o.get('passengers') or []) for o in orders)
+            write_audit(cur, 'import', category='內海預購',
+                        scope=f'新增{len(created)}／覆蓋{len(updated)}',
+                        record_count=len(created) + len(updated), pax_count=pax,
+                        detail=('覆蓋模式' if overwrite else '一般匯入'))
         conn.commit(); cur.close(); conn.close()
         return jsonify(ok=True, created=created, updated=updated, skipped=skipped,
                        errors=errors, warnings=warnings)
@@ -1895,6 +1937,64 @@ def admin_update_user(uid):
         cur.execute(f"UPDATE admin_users SET {', '.join(sets)} WHERE id=%s", tuple(params) + (uid,))
         conn.commit(); cur.close(); conn.close()
         return jsonify(ok=True)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+AUDIT_ACTION_LABELS = {'export': '匯出', 'import': '匯入', 'view_full_id': '顯示完整身分證'}
+
+
+@app.route('/api/admin/audit', methods=['POST'])
+def admin_record_audit():
+    """記錄一筆個資稽核事件（前端匯出時呼叫；操作者身分以 session 為準）。"""
+    u = current_admin()
+    if not u:
+        return jsonify(ok=False, error='未授權'), 401
+    data = request.get_json(force=True, silent=True) or {}
+    action = (data.get('action') or '').strip()
+    if action not in AUDIT_ACTION_LABELS:
+        return jsonify(ok=False, error='動作不正確'), 400
+    try:
+        conn = get_db(); cur = conn.cursor()
+        write_audit(cur, action,
+                    category=(data.get('category') or '').strip()[:40],
+                    scope=(data.get('scope') or '').strip()[:160],
+                    record_count=data.get('record_count') or 0,
+                    pax_count=data.get('pax_count') or 0,
+                    detail=(data.get('detail') or '').strip()[:500])
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.route('/api/admin/audit', methods=['GET'])
+def admin_list_audit():
+    """個資稽核紀錄清單（僅 owner）。可用 ?action= / ?days= 過濾。"""
+    if not is_admin():
+        return jsonify(ok=False, error='未授權'), 401
+    try:
+        action = (request.args.get('action') or '').strip()
+        days = request.args.get('days')
+        where, params = [], []
+        if action in AUDIT_ACTION_LABELS:
+            where.append('action=%s'); params.append(action)
+        if days and str(days).isdigit():
+            where.append("created_at >= NOW() - INTERVAL '%s days'" % int(days))
+        sql = 'SELECT * FROM audit_logs'
+        if where:
+            sql += ' WHERE ' + ' AND '.join(where)
+        sql += ' ORDER BY created_at DESC LIMIT 500'
+        conn = get_db(); cur = conn.cursor()
+        cur.execute(sql, tuple(params))
+        rows = []
+        for r in cur.fetchall():
+            r = dict(r)
+            r['created_at'] = str(r['created_at'])
+            r['action_label'] = AUDIT_ACTION_LABELS.get(r['action'], r['action'])
+            rows.append(r)
+        cur.close(); conn.close()
+        return jsonify(ok=True, logs=rows, action_labels=AUDIT_ACTION_LABELS)
     except Exception as e:
         return jsonify(ok=False, error=str(e)), 500
 
@@ -2531,6 +2631,12 @@ def admin_preorder_import():
                 cur.execute("INSERT INTO preorder_order_logs (order_id, summary) VALUES (%s,%s)",
                             (oid, '後台匯入建立'))
                 created.append(new_ref)
+        if created or updated:
+            pax = sum(len(o.get('passengers') or []) for o in orders)
+            write_audit(cur, 'import', category='行程預購',
+                        scope=f'新增{len(created)}／覆蓋{len(updated)}',
+                        record_count=len(created) + len(updated), pax_count=pax,
+                        detail=('覆蓋模式' if overwrite else '一般匯入'))
         conn.commit(); cur.close(); conn.close()
         return jsonify(ok=True, created=created, updated=updated, skipped=skipped,
                        errors=errors, warnings=warnings)
