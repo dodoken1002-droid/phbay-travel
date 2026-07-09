@@ -14,6 +14,10 @@ import os
 import sys
 from datetime import date, timedelta
 
+# Windows 主控台預設 cp950,直接印中文會亂碼
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 from dotenv import load_dotenv
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -49,12 +53,13 @@ def _service():
 
 def report_sitemaps(svc) -> None:
     print("== Sitemap 狀態 ==")
-    resp = svc.sitemaps().list(siteUrl=PROPERTY).execute()
-    entries = resp.get("sitemap", [])
-    if not any(s.get("path") == SITEMAP_URL for s in entries):
-        print(f"  {SITEMAP_URL} 尚未提交，現在提交…")
+    entries = svc.sitemaps().list(siteUrl=PROPERTY).execute().get("sitemap", [])
+    mine = next((s for s in entries if s.get("path") == SITEMAP_URL), None)
+    # 沒提交過、或 Google 從未成功下載 → (重新)提交以觸發重抓
+    if mine is None or not mine.get("lastDownloaded"):
+        print(f"  {SITEMAP_URL} {'尚未提交' if mine is None else 'Google 尚未成功抓取'}，(重新)提交…")
         svc.sitemaps().submit(siteUrl=PROPERTY, feedpath=SITEMAP_URL).execute()
-        print("  已提交。")
+        print("  已提交，Google 會在數小時～數天內排程抓取。")
         entries = svc.sitemaps().list(siteUrl=PROPERTY).execute().get("sitemap", [])
     for s in entries:
         counts = s.get("contents", [{}])[0]
@@ -95,22 +100,23 @@ def report_brand(svc, days: int = 28) -> None:
     print(f"== 品牌詞成效（近 {days} 天）==")
     end = date.today() - timedelta(days=2)  # GSC 資料延遲約 2 天
     start = end - timedelta(days=days)
-    body = {
-        "startDate": start.isoformat(),
-        "endDate": end.isoformat(),
-        "dimensions": ["query"],
-        "dimensionFilterGroups": [{
-            "groupType": "or",
-            "filters": [
-                {"dimension": "query", "operator": "contains", "expression": t}
-                for t in BRAND_TERMS
-            ],
-        }],
-        "rowLimit": 25,
-    }
-    rows = (
-        svc.searchanalytics().query(siteUrl=PROPERTY, body=body).execute().get("rows", [])
-    )
+    # GSC API 的 filter group 只支援 and，OR 語意得逐詞查再合併
+    merged = {}
+    for term in BRAND_TERMS:
+        body = {
+            "startDate": start.isoformat(),
+            "endDate": end.isoformat(),
+            "dimensions": ["query"],
+            "dimensionFilterGroups": [{
+                "filters": [{"dimension": "query", "operator": "contains",
+                             "expression": term}],
+            }],
+            "rowLimit": 25,
+        }
+        for r in (svc.searchanalytics().query(siteUrl=PROPERTY, body=body)
+                  .execute().get("rows", [])):
+            merged[r["keys"][0]] = r
+    rows = sorted(merged.values(), key=lambda r: -r["impressions"])
     if not rows:
         print("  （沒有品牌詞資料——品牌搜尋還沒有曝光，符合先前診斷）")
         return
