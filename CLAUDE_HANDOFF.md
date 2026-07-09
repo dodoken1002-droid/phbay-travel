@@ -141,3 +141,13 @@
 ## 給接手者的一句話
 
 這個專案目前已進入「能導流、能接單、能管理訂單、能稽核個資」的階段。後續優先順序應該是：穩定訂單資料與個資安全，其次把真實出團素材轉成社群流量，再把流量導回行程診斷、預購頁與 LINE 諮詢。
+
+## Blog Publishing Coordination
+
+To reduce collisions between Codex and Claude when publishing repository-managed blog posts:
+
+1. Before creating or pushing any new `content/posts/*.json` article, run `git pull --rebase` on `main`.
+2. New article JSON files must include a `published_at` field using Taiwan time, for example `2026-07-09T09:00:00+08:00`.
+3. New article JSON files must end with a trailing newline.
+4. Publish only the single new article JSON unless the task explicitly asks for other changes.
+5. If a push collides with another agent's commit, rebase safely and re-check that only the intended article JSON is being published.
