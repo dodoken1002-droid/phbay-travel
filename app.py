@@ -2644,6 +2644,60 @@ def admin_preorder_import():
         return jsonify(ok=False, error=str(e)), 500
 
 
+# 追風音樂節 FAQ：同一份資料同時供「可見 HTML」與「FAQPage 結構化資料」使用，
+# 兩者文字務必逐字一致（Google 要求 structured data 與頁面可見內容相符）。
+FESTIVAL_FAQ = [
+    ("2026 追風音樂節主題行程幾人成行？",
+     "兩人即可成行，每一梯次最多 5 人，屬於小團形式。實際出發日期可於預購頁選擇，"
+     "潮旅國際旅行社會由專人與您確認名額與行程細節。"),
+    ("三天兩夜行程怎麼安排？包含哪些內容？",
+     "這是三天兩夜的主題套裝，主軸圍繞 2026 澎湖追風音樂燈光節（觀音亭園區，燈光展演 9/12–10/11），"
+     "並搭配澎湖在地玩法。選擇出發日後，回程日自動為第三天；詳細行程內容與報價會由潮旅專人"
+     "依您的需求與出發日與您確認。"),
+    ("追風音樂節主題行程適合親子嗎？",
+     "適合。行程採兩人成行、每梯最多 5 人的小團形式，步調可依同行者調整。若有長輩或孩童同行，"
+     "建議在預購時先告知，潮旅會協助安排較適合的節奏與注意事項。"),
+    ("沒有交通工具可以參加嗎？",
+     "可以。相關接送與交通安排屬於行程細節之一，請在預購時，或透過 LINE @phbay2018、"
+     "電話 06-9271288 告知，潮旅專人會與您一併確認。"),
+]
+
+
+def _preorder_seo_section(slug):
+    """festival 專頁的伺服器渲染可見內容（介紹＋FAQ），讓爬蟲/AI 不必等 JS 就能取得重點文字。"""
+    if slug != 'festival':
+        return ''
+    faq_html = ''.join(
+        f'<details class="preorder-faq-item"><summary>{_html.escape(q)}</summary>'
+        f'<p>{_html.escape(a)}</p></details>'
+        for q, a in FESTIVAL_FAQ
+    )
+    return (
+        '<section class="preorder-main preorder-seo">'
+        '<div class="panel">'
+        '<h2>2026 澎湖追風音樂燈光節主題行程</h2>'
+        '<p>潮旅國際旅行社為 2026 澎湖追風音樂燈光節官方合作旅行社，推出三天兩夜主題套裝行程。'
+        '行程主軸圍繞觀音亭園區的音樂燈光展演（展演期間 9/12–10/11），並搭配澎湖在地玩法，'
+        '採兩人成行、每梯最多 5 人的小團形式。於上方選擇出發日期後，回程日自動為第三天，'
+        '詳細行程內容與報價由潮旅專人與您確認。</p>'
+        '<ul class="preorder-seo-points">'
+        '<li><strong>活動：</strong>2026 澎湖追風音樂燈光節（觀音亭園區，燈光展演 9/12–10/11）</li>'
+        '<li><strong>行程：</strong>三天兩夜主題套裝，選擇出發日後回程日為第三天</li>'
+        '<li><strong>成行：</strong>兩人成行，每梯最多 5 人的小團</li>'
+        '<li><strong>適合對象：</strong>情侶、朋友、親子與想看音樂節的澎湖自由行旅客</li>'
+        '<li><strong>安排方式：</strong>行程細節、交通接送與報價由潮旅專人確認</li>'
+        '</ul>'
+        '<p class="preorder-seo-cta">想先了解玩法，可參考 <a href="/blog">澎湖旅遊部落格</a>；'
+        '或透過 LINE @phbay2018、電話 06-9271288 與潮旅聯繫。</p>'
+        '</div>'
+        '<div class="panel">'
+        '<h2>常見問題</h2>'
+        f'{faq_html}'
+        '</div>'
+        '</section>'
+    )
+
+
 def _preorder_seo_data(slug, product=None):
     """通用預購頁的伺服器端 SEO；避免 /preorder/<slug> 只呈現通用標題。"""
     product = product or {}
@@ -2713,6 +2767,16 @@ def _preorder_seo_data(slug, product=None):
             },
             'organizer': {'@type': 'TravelAgency', 'name': '潮旅國際旅行社', 'url': SITE}
         })
+        graph.append({
+            '@context': 'https://schema.org',
+            '@type': 'FAQPage',
+            '@id': f'{canonical}#faq',
+            'mainEntity': [
+                {'@type': 'Question', 'name': q,
+                 'acceptedAnswer': {'@type': 'Answer', 'text': a}}
+                for q, a in FESTIVAL_FAQ
+            ]
+        })
     return {'title': title, 'description': desc, 'canonical': canonical, 'image': image, 'graph': graph}
 
 
@@ -2747,6 +2811,7 @@ def _render_preorder_template(slug, product=None):
         count=1,
         flags=re.S | re.I
     )
+    html_doc = html_doc.replace('<!--PREORDER_SEO_SECTION-->', _preorder_seo_section(slug))
     return html_doc
 
 
