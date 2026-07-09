@@ -2,6 +2,9 @@
 .env
 *.env
 
+# 服務帳戶金鑰（絕對不能上傳！）
+.secrets/
+
 # Python
 __pycache__/
 *.py[cod]
