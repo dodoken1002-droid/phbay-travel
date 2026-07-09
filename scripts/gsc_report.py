@@ -32,6 +32,7 @@ KEY_URLS = [
     f"{SITE}/neihai-preorder.html",
     f"{SITE}/blog/2026-07-07-penghu-fenggui-cave-sound-guide",
     f"{SITE}/blog/2026-07-08-penghu-tongliang-banyan-north-ring-guide",
+    f"{SITE}/blog/2026-07-09-penghu-summer-chat-survival-guide",
 ]
 
 BRAND_TERMS = ["潮旅", "phbay"]
