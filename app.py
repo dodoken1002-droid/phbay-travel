@@ -3044,7 +3044,8 @@ def admin_delete_post(pid):
         return jsonify(ok=False, error=str(e)), 500
 
 # ── 伺服器渲染：共用外殼 ──
-def _render_blog(title, desc, canonical, body, head_extra=''):
+def _render_blog(title, desc, canonical, body, head_extra='', image=None):
+    img = image or f'{SITE}/images/festival-poster.png'
     nav = '''<div class="top-banner"><div class="banner-static"><span>潮旅國際旅行社</span><span class="banner-sep">｜</span><span>2026 澎湖追風音樂燈光節 官方合作旅行社</span><span class="banner-sep">｜</span><span>電話：06-9271288</span></div></div>
 <nav class="navbar" id="navbar"><div class="nav-container"><a href="/" class="nav-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a><button class="nav-toggle" id="nav-toggle" aria-label="選單"><span></span><span></span><span></span></button><ul class="nav-links" id="nav-links"><li><a href="/">首頁</a></li><li><a href="/#tours">行程介紹</a></li><li class="nav-item has-submenu"><a href="/neihai-preorder.html">預購行程 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/neihai-preorder.html">小城故事內海巡禮</a></li><li><a href="/preorder/festival">追風音樂節</a></li></ul></li><li class="nav-item has-submenu"><a href="/blog">旅遊大小事 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/tides">潮汐查詢系統</a></li><li><a href="/blog">旅遊文章分享</a></li><li><a href="/reviews">旅客評價</a></li></ul></li><li class="nav-item has-submenu"><a href="/#about">關於我們 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/#contact">聯絡資訊</a></li></ul></li></ul></div></nav>'''
     footer = '''<footer class="footer"><div class="container"><div class="footer-bottom"><p>© 2026 潮旅國際旅行社 All Rights Reserved.｜<a href="/" style="color:inherit">官網</a>｜<a href="/blog" style="color:inherit">部落格</a>｜<a href="/reviews" style="color:inherit">旅客評價</a></p></div></div></footer>
@@ -3061,10 +3062,15 @@ def _render_blog(title, desc, canonical, body, head_extra=''):
         f'<meta property="og:type" content="article"/><meta property="og:title" content="{_html.escape(title)}"/>'
         f'<meta property="og:description" content="{_html.escape(desc)}"/><meta property="og:url" content="{canonical}"/>'
         '<meta property="og:site_name" content="潮旅國際旅行社"/><meta property="og:locale" content="zh_TW"/>'
+        f'<meta property="og:image" content="{_html.escape(img)}"/>'
+        '<meta name="twitter:card" content="summary_large_image"/>'
+        f'<meta name="twitter:title" content="{_html.escape(title)}"/>'
+        f'<meta name="twitter:description" content="{_html.escape(desc)}"/>'
+        f'<meta name="twitter:image" content="{_html.escape(img)}"/>'
         '<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns=\'http://www.w3.org/2000/svg\'%20viewBox=\'0%200%20100%20100\'%3E%3Crect%20width=\'100\'%20height=\'100\'%20rx=\'22\'%20fill=\'%231a6b9e\'/%3E%3Ctext%20x=\'50\'%20y=\'73\'%20font-size=\'62\'%20text-anchor=\'middle\'%20fill=\'white\'%20font-family=\'sans-serif\'%3E潮%3C/text%3E%3C/svg%3E"/>'
         '<link rel="stylesheet" href="/style.css"/>'
         '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>'
-        '<style>.blog-wrap{max-width:820px;margin:0 auto;padding:36px 20px 60px}.blog-wrap h1{font-size:clamp(1.5rem,4vw,2.1rem);color:var(--blue-dark);font-weight:800;line-height:1.35;margin-bottom:12px}.blog-meta{color:var(--text-light);font-size:.9rem;margin-bottom:20px}.blog-cover{width:100%;border-radius:14px;margin-bottom:24px}.blog-body{font-size:1.04rem;line-height:1.9;color:var(--text-dark)}.blog-body h2{font-size:1.4rem;color:var(--blue-dark);margin:28px 0 12px;font-weight:800}.blog-body h3{font-size:1.15rem;color:var(--blue-main);margin:22px 0 10px;font-weight:700}.blog-body p{margin-bottom:16px}.blog-body img{max-width:100%;border-radius:10px;margin:12px 0}.blog-body ul,.blog-body ol{margin:0 0 16px 22px}.blog-body li{margin-bottom:6px}.blog-body a{color:var(--blue-main);text-decoration:underline}.post-card{display:block;background:var(--white);border:1px solid #e6edf3;border-radius:14px;overflow:hidden;transition:.2s;box-shadow:0 2px 10px rgba(0,0,0,.05)}.post-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-hover)}.post-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;margin-top:28px}.post-card img{width:100%;height:170px;object-fit:cover}.post-card-body{padding:16px 18px}.post-card-body h2{font-size:1.1rem;color:var(--blue-dark);margin-bottom:8px;line-height:1.4}.post-card-body p{color:var(--text-mid);font-size:.9rem;line-height:1.6}.post-tags{margin-top:10px}.post-tag{display:inline-block;background:var(--blue-pale);color:var(--blue-main);font-size:.74rem;padding:2px 9px;border-radius:20px;margin:2px 4px 2px 0}.blog-cta{margin-top:40px;background:var(--blue-pale);border-radius:16px;padding:28px;text-align:center}.blog-cta a{margin:4px}.blog-back{display:inline-block;margin-bottom:18px;color:var(--blue-main);font-weight:600}.rv-summary{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:8px 0 24px;padding:16px 20px;background:var(--blue-pale);border-radius:14px}.rv-avg{font-size:2.2rem;font-weight:800;color:var(--blue-dark);line-height:1}.rv-avg-stars{color:#f5a623;font-size:1.2rem;letter-spacing:2px}.rv-count{color:var(--text-mid);font-size:.95rem}.rv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-top:8px}.rv-card{background:var(--white);border:1px solid #e6edf3;border-radius:14px;padding:18px 20px;box-shadow:0 2px 10px rgba(0,0,0,.05)}.rv-stars{color:#f5a623;letter-spacing:2px;font-size:1.05rem}.rv-num{color:var(--text-mid);font-size:.85rem;margin-left:8px;letter-spacing:0}.rv-body{margin:10px 0 14px;line-height:1.8;color:var(--text-dark)}.rv-meta{color:var(--text-light);font-size:.86rem;border-top:1px solid #eef2f5;padding-top:10px}</style>'
+        '<style>.blog-wrap{max-width:820px;margin:0 auto;padding:36px 20px 60px}.blog-wrap h1{font-size:clamp(1.5rem,4vw,2.1rem);color:var(--blue-dark);font-weight:800;line-height:1.35;margin-bottom:12px}.blog-meta{color:var(--text-light);font-size:.9rem;margin-bottom:20px}.blog-cover{width:100%;border-radius:14px;margin-bottom:24px}.blog-body{font-size:1.04rem;line-height:1.9;color:var(--text-dark)}.blog-body h2{font-size:1.4rem;color:var(--blue-dark);margin:28px 0 12px;font-weight:800}.blog-body h3{font-size:1.15rem;color:var(--blue-main);margin:22px 0 10px;font-weight:700}.blog-body p{margin-bottom:16px}.blog-body img{max-width:100%;border-radius:10px;margin:12px 0}.blog-body ul,.blog-body ol{margin:0 0 16px 22px}.blog-body li{margin-bottom:6px}.blog-body a{color:var(--blue-main);text-decoration:underline}.post-card{display:block;background:var(--white);border:1px solid #e6edf3;border-radius:14px;overflow:hidden;transition:.2s;box-shadow:0 2px 10px rgba(0,0,0,.05)}.post-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-hover)}.post-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;margin-top:28px}.post-card img{width:100%;height:170px;object-fit:cover}.post-card-body{padding:16px 18px}.post-card-body h2{font-size:1.1rem;color:var(--blue-dark);margin-bottom:8px;line-height:1.4}.post-card-body p{color:var(--text-mid);font-size:.9rem;line-height:1.6}.post-tags{margin-top:10px}.post-tag{display:inline-block;background:var(--blue-pale);color:var(--blue-main);font-size:.74rem;padding:2px 9px;border-radius:20px;margin:2px 4px 2px 0}.blog-cta{margin-top:40px;background:var(--blue-pale);border-radius:16px;padding:28px;text-align:center}.blog-cta a{margin:4px}.blog-back{display:inline-block;margin-bottom:18px;color:var(--blue-main);font-weight:600}.rv-summary{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:8px 0 24px;padding:16px 20px;background:var(--blue-pale);border-radius:14px}.rv-avg{font-size:2.2rem;font-weight:800;color:var(--blue-dark);line-height:1}.rv-avg-stars{color:#f5a623;font-size:1.2rem;letter-spacing:2px}.rv-count{color:var(--text-mid);font-size:.95rem}.rv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-top:8px}.rv-card{background:var(--white);border:1px solid #e6edf3;border-radius:14px;padding:18px 20px;box-shadow:0 2px 10px rgba(0,0,0,.05)}.rv-stars{color:#f5a623;letter-spacing:2px;font-size:1.05rem}.rv-num{color:var(--text-mid);font-size:.85rem;margin-left:8px;letter-spacing:0}.rv-body{margin:10px 0 14px;line-height:1.8;color:var(--text-dark)}.rv-meta{color:var(--text-light);font-size:.86rem;border-top:1px solid #eef2f5;padding-top:10px}.blog-cats{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 8px}.blog-cats .post-tag{margin:0;font-size:.82rem;padding:5px 12px;cursor:pointer}.blog-cats .post-tag.active{background:var(--blue-main);color:#fff}.blog-pager{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:36px}.pager-btn{display:inline-block;padding:9px 18px;border-radius:24px;background:var(--blue-pale);color:var(--blue-main);font-weight:600;text-decoration:none}.pager-btn:hover{background:var(--blue-main);color:#fff}.pager-btn.disabled{opacity:.4;pointer-events:none}.pager-info{color:var(--text-mid);font-size:.9rem}</style>'
         f'{head_extra}</head><body>{nav}<main>{body}</main>{footer}</body></html>')
 
 @app.route('/blog')
@@ -3076,12 +3082,34 @@ def blog_index():
         posts = cur.fetchall(); cur.close(); conn.close()
     except Exception:
         posts = []
+    all_posts = list(posts)
     sel = (request.args.get('tag') or '').strip()
     if sel:
         posts = [p for p in posts
                  if sel in [t.strip() for t in (p.get('tags') or '').split(',')]]
+
+    # 分頁：部落格首頁只顯示一頁，避免全部文章塞在同一頁（HTML 過大）
+    PER_PAGE = 15
+    try:
+        page = int(request.args.get('page', 1))
+    except (TypeError, ValueError):
+        page = 1
+    total = len(posts)
+    pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
+    page = min(max(page, 1), pages)
+    offset = (page - 1) * PER_PAGE
+    page_posts = posts[offset:offset + PER_PAGE]
+
+    def _blog_url(n):
+        parts = []
+        if sel:
+            parts.append(f'tag={sel}')
+        if n > 1:
+            parts.append(f'page={n}')
+        return '/blog' + ('?' + '&'.join(parts) if parts else '')
+
     cards = ''
-    for p in posts:
+    for p in page_posts:
         img = f'<img src="{_html.escape(p["cover_image"])}" alt="{_html.escape(p["title"])}" loading="lazy"/>' if p.get('cover_image') else ''
         tags = ''.join(f'<a class="post-tag" href="/blog?tag={_html.escape(t.strip())}">{_html.escape(t.strip())}</a>' for t in (p.get('tags') or '').split(',') if t.strip())
         cards += (f'<a class="post-card" href="/blog/{_html.escape(p["slug"])}">{img}'
@@ -3090,24 +3118,66 @@ def blog_index():
                   f'<div class="post-tags">{tags}</div></div></a>')
     if not cards:
         cards = '<p style="color:#888;text-align:center;padding:40px">部落格文章準備中，敬請期待！</p>'
+
+    # 分類入口：依實際文章 tag 出現頻率取前 8，保證點進去不是空分類
+    from collections import Counter
+    freq = Counter()
+    for p in all_posts:
+        for t in (p.get('tags') or '').split(','):
+            t = t.strip()
+            if t:
+                freq[t] += 1
+    cat_links = ''.join(
+        f'<a class="post-tag{" active" if t == sel else ""}" href="/blog?tag={_html.escape(t)}">{_html.escape(t)}</a>'
+        for t, _c in freq.most_common(8))
+    cat_bar = f'<div class="blog-cats">{cat_links}</div>' if cat_links else ''
+
+    page_suffix = f'（第 {page} 頁）' if page > 1 else ''
     if sel:
         heading = f'{_html.escape(sel)}｜澎湖旅遊部落格'
         sub = f'分類：{_html.escape(sel)}　<a class="blog-back" style="margin:0" href="/blog">← 看全部文章</a>'
-        canonical = f'{SITE}/blog?tag={sel}'
-        title = f'{sel}｜澎湖旅遊部落格 - 潮旅國際旅行社'
+        title = f'{sel}｜澎湖旅遊部落格{page_suffix} - 潮旅國際旅行社'
         desc = f'潮旅國際旅行社部落格「{sel}」分類：澎湖旅遊相關文章與分享。'
-        trail = [("首頁", f"{SITE}/"), ("部落格", f"{SITE}/blog"), (sel, canonical)]
+        trail = [("首頁", f"{SITE}/"), ("部落格", f"{SITE}/blog"), (sel, f'{SITE}/blog?tag={sel}')]
     else:
         heading = '澎湖旅遊部落格'
         sub = '在地旅行社分享澎湖玩法、攻略與故事'
-        canonical = f'{SITE}/blog'
-        title = '澎湖旅遊部落格｜攻略、玩法、在地故事 - 潮旅國際旅行社'
+        title = f'澎湖旅遊部落格｜攻略、玩法、在地故事{page_suffix} - 潮旅國際旅行社'
         desc = '潮旅國際旅行社的澎湖旅遊部落格：行程攻略、景點玩法、美食推薦、跳島與音樂節在地分享。'
-        trail = [("首頁", f"{SITE}/"), ("部落格", canonical)]
+        trail = [("首頁", f"{SITE}/"), ("部落格", f"{SITE}/blog")]
+    canonical = f'{SITE}{_blog_url(page)}'
+
+    if pages > 1:
+        prev_btn = (f'<a class="pager-btn" href="{_blog_url(page - 1)}">← 上一頁</a>'
+                    if page > 1 else '<span class="pager-btn disabled">← 上一頁</span>')
+        next_btn = (f'<a class="pager-btn" href="{_blog_url(page + 1)}">下一頁 →</a>'
+                    if page < pages else '<span class="pager-btn disabled">下一頁 →</span>')
+        pager = f'<nav class="blog-pager">{prev_btn}<span class="pager-info">第 {page} / {pages} 頁</span>{next_btn}</nav>'
+    else:
+        pager = ''
+
     body = (f'<div class="blog-wrap"><h1>{heading}</h1>'
             f'<p class="blog-meta">{sub}</p>'
-            f'<div class="post-grid">{cards}</div></div>')
-    head_extra = '<script type="application/ld+json">' + json.dumps(_breadcrumb_ld(trail), ensure_ascii=False) + '</script>'
+            f'{cat_bar}'
+            f'<div class="post-grid">{cards}</div>'
+            f'{pager}</div>')
+
+    item_list = {
+        "@context": "https://schema.org", "@type": "ItemList",
+        "itemListElement": [
+            {"@type": "ListItem", "position": offset + i + 1,
+             "url": f'{SITE}/blog/{p["slug"]}', "name": p["title"]}
+            for i, p in enumerate(page_posts)
+        ]
+    }
+    rel_links = ''
+    if page > 1:
+        rel_links += f'<link rel="prev" href="{SITE}{_blog_url(page - 1)}"/>'
+    if page < pages:
+        rel_links += f'<link rel="next" href="{SITE}{_blog_url(page + 1)}"/>'
+    head_extra = (rel_links
+                  + '<script type="application/ld+json">' + json.dumps(_breadcrumb_ld(trail), ensure_ascii=False) + '</script>'
+                  + '<script type="application/ld+json">' + json.dumps(item_list, ensure_ascii=False) + '</script>')
     return _render_blog(title, desc, canonical, body, head_extra)
 
 @app.route('/blog/<slug>')
@@ -3159,7 +3229,8 @@ def blog_post(slug):
             f'<a href="/preorder/festival" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-music"></i> 音樂節行程預購</a> '
             f'<a href="/#quiz" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-compass"></i> 30 秒測你的澎湖玩法</a>'
             f'</div></article>')
-    return _render_blog(f'{p["title"]} - 潮旅國際旅行社部落格', desc, canonical, body, head_extra)
+    return _render_blog(f'{p["title"]} - 潮旅國際旅行社部落格', desc, canonical, body, head_extra,
+                        image=(imgs[0] if imgs else None))
 
 # ── 旅客評價（遊客心得）──
 @app.route('/reviews')
