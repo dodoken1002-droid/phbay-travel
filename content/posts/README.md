@@ -20,3 +20,7 @@ Optional fields:
 - `source_urls`: an array of fact-checking sources retained in version history
 
 Run `python validate_repo_posts.py` before committing.
+
+Use `tool-blog-topic-backlog.md` as the topic backlog for utility-style daily
+articles such as transportation, accommodation, best months to visit, rainy-day
+plans, quick answers, and FAQ-led guides.
