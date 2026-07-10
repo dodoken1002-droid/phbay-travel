@@ -23,7 +23,7 @@ from datetime import date, datetime, timedelta
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from flask import Flask, send_from_directory, request, jsonify, session
+from flask import Flask, send_from_directory, request, jsonify, session, redirect
 from werkzeug.security import generate_password_hash, check_password_hash
 import psycopg2
 import psycopg2.extras
@@ -617,6 +617,16 @@ def ensure_db():
 @app.route('/')
 def index():
     return send_from_directory('.', 'index.html')
+
+
+@app.route('/lottery/')
+def lottery():
+    return send_from_directory('lottery', 'index.html')
+
+
+@app.route('/lottery')
+def lottery_redirect():
+    return redirect('/lottery/', code=308)
 
 
 @app.route('/admin')

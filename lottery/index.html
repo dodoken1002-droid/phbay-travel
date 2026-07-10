@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#103f5c">
+  <title>潮旅幸運抽獎</title>
+  <link rel="stylesheet" href="lottery.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">潮</span>
+      <div>
+        <h1>潮旅幸運抽獎</h1>
+        <p>現場抽獎控制台</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span class="save-state" id="saveState">已儲存於本機</span>
+      <button class="icon-button" id="fullscreenButton" type="button" title="全螢幕" aria-label="切換全螢幕">
+        <span aria-hidden="true">⛶</span>
+      </button>
+      <button class="danger-button" id="resetButton" type="button">清除重來</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <aside class="setup-panel" aria-label="抽獎設定">
+      <section class="panel-section">
+        <div class="section-heading">
+          <div>
+            <span class="step">01</span>
+            <h2>參加名單</h2>
+          </div>
+          <span class="count-pill"><strong id="participantCount">0</strong> 人</span>
+        </div>
+
+        <label class="field-label" for="participantInput">每行一人，可填「編號,姓名」</label>
+        <textarea id="participantInput" rows="8" placeholder="A001,王小明&#10;A002,陳怡君&#10;A003,林志豪"></textarea>
+        <div class="inline-actions">
+          <label class="file-button" for="fileInput">匯入 CSV / TXT</label>
+          <input id="fileInput" type="file" accept=".csv,.txt,text/csv,text/plain">
+          <button class="secondary-button" id="applyParticipants" type="button">套用名單</button>
+        </div>
+        <p class="field-message" id="participantMessage" role="status">名單只會保留在這台裝置。</p>
+      </section>
+
+      <section class="panel-section prize-section">
+        <div class="section-heading">
+          <div>
+            <span class="step">02</span>
+            <h2>獎項與名額</h2>
+          </div>
+          <button class="icon-button small" id="addPrizeButton" type="button" title="新增獎項" aria-label="新增獎項">＋</button>
+        </div>
+        <div class="prize-labels" aria-hidden="true"><span>獎項名稱</span><span>名額</span><span></span></div>
+        <div id="prizeList" class="prize-list"></div>
+      </section>
+    </aside>
+
+    <section class="draw-panel" aria-label="抽獎舞台">
+      <div class="draw-controls">
+        <label for="prizeSelect">目前獎項</label>
+        <select id="prizeSelect"></select>
+        <div class="draw-quantity">
+          <label for="drawQuantity">本次抽出</label>
+          <input id="drawQuantity" type="number" min="1" value="1" inputmode="numeric">
+          <span>人</span>
+        </div>
+      </div>
+
+      <div class="lottery-stage" id="lotteryStage">
+        <div class="stage-glow" aria-hidden="true"></div>
+        <p class="stage-kicker" id="stageKicker">準備開始</p>
+        <div class="ticket-machine" id="ticketMachine" aria-hidden="true">
+          <div class="ticket-chute"><span></span></div>
+          <div class="ticket-pool">
+            <div class="pool-tickets" id="poolTickets"></div>
+            <div class="pool-shine"></div>
+          </div>
+          <span class="pool-count" id="poolCount">0 張抽獎券</span>
+        </div>
+        <div class="winner-reveal" id="winnerReveal">
+          <div class="rolling-name" id="rollingName" aria-live="polite">等待名單</div>
+          <p class="stage-detail" id="stageDetail">請先套用參加名單並設定獎項</p>
+        </div>
+      </div>
+
+      <div class="draw-status">
+        <div><span>候選人</span><strong id="eligibleCount">0</strong></div>
+        <div><span>已得獎</span><strong id="winnerCount">0</strong></div>
+        <div><span>本獎剩餘</span><strong id="prizeRemaining">0</strong></div>
+      </div>
+
+      <div class="draw-actions">
+        <button class="draw-button" id="drawButton" type="button" disabled>
+          <span class="draw-button-dot" aria-hidden="true"></span>
+          開始抽獎
+        </button>
+        <button class="draw-all-button" id="drawAllButton" type="button" disabled>一次抽完全部獎項</button>
+      </div>
+      <p class="draw-message" id="drawMessage" role="status"></p>
+    </section>
+
+    <aside class="results-panel" aria-label="得獎結果">
+      <div class="results-heading">
+        <div>
+          <span class="step">03</span>
+          <h2>得獎紀錄</h2>
+        </div>
+        <button class="secondary-button compact" id="exportButton" type="button" disabled>匯出 CSV</button>
+      </div>
+      <div class="results-summary" id="resultsSummary">尚未抽出得獎者</div>
+      <ol class="winner-list" id="winnerList"></ol>
+    </aside>
+  </main>
+
+  <div class="confetti" id="confetti" aria-hidden="true"></div>
+  <script src="lottery.js"></script>
+</body>
+</html>
