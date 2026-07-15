@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Google Analytics 4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-47DV1VPF9J"></script>
+  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-47DV1VPF9J');</script>
+  <!-- Meta Pixel -->
+  <script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init', '25643845041980148');fbq('track', 'PageView');</script>
+  <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=25643845041980148&ev=PageView&noscript=1"/></noscript>
+
+  <title>澎湖元宵乞龜・擲筊小遊戲｜連擲三聖筊領小禮物｜潮旅國際旅行社</title>
+  <meta name="description" content="體驗澎湖元宵節乞龜文化！線上擲筊，連續擲出三個聖筊即可獲得澎湖限定小禮物。了解乞龜由來，跟著潮旅玩澎湖。" />
+  <link rel="canonical" href="https://www.phbay.info/qigui/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="潮旅國際旅行社" />
+  <meta property="og:title" content="澎湖元宵乞龜・擲筊小遊戲｜連擲三聖筊領小禮物" />
+  <meta property="og:description" content="線上體驗澎湖乞龜擲筊！連續三聖筊，澎湖限定小禮物帶回家。" />
+  <meta property="og:url" content="https://www.phbay.info/qigui/" />
+  <meta property="og:locale" content="zh_TW" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="qigui.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "澎湖元宵乞龜・擲筊小遊戲",
+    "description": "體驗澎湖元宵節乞龜文化的線上擲筊小遊戲，連續擲出三個聖筊即可獲得澎湖限定小禮物。",
+    "url": "https://www.phbay.info/qigui/",
+    "isPartOf": { "@type": "WebSite", "name": "潮旅國際旅行社", "url": "https://www.phbay.info/" }
+  }
+  </script>
+</head>
+<body>
+
+  <!-- 漂浮燈籠背景 -->
+  <div class="lanterns" aria-hidden="true">
+    <span class="lantern l1">🏮</span>
+    <span class="lantern l2">🏮</span>
+    <span class="lantern l3">🏮</span>
+    <span class="lantern l4">🏮</span>
+    <span class="lantern l5">🏮</span>
+  </div>
+
+  <header class="qg-header">
+    <a href="/" class="qg-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a>
+  </header>
+
+  <main class="qg-main">
+
+    <!-- 標題區 -->
+    <section class="qg-hero">
+      <span class="qg-kicker">澎湖元宵限定</span>
+      <h1>乞龜・擲筊</h1>
+      <p class="qg-sub">向金龜祈福，連續擲出 <strong>三個聖筊</strong>，<br>澎湖限定小禮物帶回家！</p>
+    </section>
+
+    <!-- 遊戲區 -->
+    <section class="qg-game">
+
+      <!-- 金龜與進度 -->
+      <div class="qg-turtle-zone">
+        <div class="qg-turtle" id="qg-turtle">🐢</div>
+        <div class="qg-progress" id="qg-progress">
+          <span class="qg-dot" data-i="1">聖</span>
+          <span class="qg-dot" data-i="2">聖</span>
+          <span class="qg-dot" data-i="3">聖</span>
+        </div>
+      </div>
+
+      <!-- 筊杯 -->
+      <div class="qg-blocks" id="qg-blocks">
+        <div class="qg-jiao" id="jiao-a"><div class="qg-jiao-body"></div><span class="qg-jiao-label" id="label-a"></span></div>
+        <div class="qg-jiao" id="jiao-b"><div class="qg-jiao-body"></div><span class="qg-jiao-label" id="label-b"></span></div>
+      </div>
+
+      <!-- 結果訊息 -->
+      <div class="qg-result" id="qg-result">雙手合十，誠心默念想乞的心願…</div>
+
+      <!-- 擲筊按鈕 -->
+      <button class="qg-throw-btn" id="qg-throw" onclick="throwJiao()">
+        <i class="fas fa-hands-praying"></i> 擲筊
+      </button>
+      <p class="qg-hint" id="qg-hint">每人每日一次挑戰機會，擲出笑筊或陰筊即結束</p>
+    </section>
+
+    <!-- 中獎畫面（預設隱藏） -->
+    <section class="qg-win" id="qg-win" style="display:none">
+      <div class="qg-win-card">
+        <div class="qg-win-turtle">🐢✨</div>
+        <h2>恭喜乞得金龜！</h2>
+        <p class="qg-win-desc">您連續擲出三個聖筊，神明應允了！<br>獲得 <strong>澎湖限定實體小禮物一份</strong></p>
+        <div class="qg-code-box">
+          <span class="qg-code-label">中獎憑證</span>
+          <div class="qg-code" id="qg-code">——</div>
+        </div>
+        <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" rel="noopener noreferrer"
+           class="qg-line-btn" onclick="trackLineClaim()">
+          <i class="fab fa-line"></i> 加官方 LINE 領取小禮物
+        </a>
+        <p class="qg-win-note">請加入潮旅官方 LINE（@phbay2018），<strong>截圖此畫面並傳送中獎憑證</strong>，<br>小禮物於門市或參加行程時領取。每組憑證限兌換一次。</p>
+      </div>
+    </section>
+
+    <!-- 乞龜文化介紹 -->
+    <section class="qg-culture">
+      <h2>🏮 什麼是澎湖「乞龜」？</h2>
+      <p>每年元宵節，澎湖各廟宇會擺出以糯米、麵線、黃金打造的「祈福龜」。信眾向神明<strong>擲筊</strong>請示，獲得聖筊便能把龜「乞」回家，分享平安與福氣；隔年再以更大的龜還願。這是澎湖傳承百年的元宵盛事，規模全台獨有。</p>
+      <div class="qg-jiao-guide">
+        <div class="qg-guide-item"><span class="qg-guide-icon">🌓</span><strong>聖筊</strong><span>一平一凸——神明應允</span></div>
+        <div class="qg-guide-item"><span class="qg-guide-icon">🌕</span><strong>笑筊</strong><span>兩平面朝上——神明笑而不答</span></div>
+        <div class="qg-guide-item"><span class="qg-guide-icon">🌑</span><strong>陰筊</strong><span>兩凸面朝上——神明不允</span></div>
+      </div>
+      <p class="qg-cta-row">
+        想在元宵親身體驗澎湖乞龜？
+        <a href="/#contact" class="qg-link">找潮旅安排行程 <i class="fas fa-arrow-right"></i></a>
+      </p>
+    </section>
+
+  </main>
+
+  <footer class="qg-footer">
+    <p>潮旅國際旅行社｜交觀乙第1864號｜澎品保0188號｜電話 06-9271288｜LINE @phbay2018</p>
+    <p><a href="/">回潮旅官網</a>｜<a href="/neihai-preorder.html">內海巡禮預購</a>｜<a href="/#quiz">30 秒行程診斷</a></p>
+  </footer>
+
+  <script src="qigui.js"></script>
+</body>
+</html>

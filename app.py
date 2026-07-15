@@ -19,7 +19,8 @@ import hmac
 import hashlib
 import urllib.request
 import urllib.error
-from datetime import date, datetime, timedelta
+import urllib.parse
+from datetime import date, datetime, timedelta, timezone
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -627,6 +628,223 @@ def lottery():
 @app.route('/lottery')
 def lottery_redirect():
     return redirect('/lottery/', code=308)
+
+
+@app.route('/qigui/')
+def qigui():
+    return send_from_directory('qigui', 'index.html')
+
+
+@app.route('/qigui')
+def qigui_redirect():
+    return redirect('/qigui/', code=308)
+
+
+# ─── 抽獎工具：Meta 留言名單匯入 ────────────────────────────
+class MetaAPIError(Exception):
+    def __init__(self, message, status=502):
+        super().__init__(message)
+        self.status = status
+
+
+def _meta_config(platform):
+    token = (os.environ.get('META_PAGE_ACCESS_TOKEN')
+             or os.environ.get('META_ACCESS_TOKEN') or '').strip()
+    if platform == 'facebook':
+        account_id = os.environ.get('META_FB_PAGE_ID', '').strip()
+    elif platform == 'instagram':
+        account_id = os.environ.get('META_IG_USER_ID', '').strip()
+    else:
+        raise MetaAPIError('不支援的社群平台', 400)
+    return token, account_id
+
+
+def _meta_graph_get(object_path, params=None):
+    """呼叫 Meta Graph API；權杖只存在伺服器端，不回傳給前端。"""
+    if not re.fullmatch(r'[A-Za-z0-9_:/.-]+', object_path or ''):
+        raise MetaAPIError('Meta 資源編號格式不正確', 400)
+    token = (os.environ.get('META_PAGE_ACCESS_TOKEN')
+             or os.environ.get('META_ACCESS_TOKEN') or '').strip()
+    if not token:
+        raise MetaAPIError('Meta API 尚未設定', 503)
+    version = os.environ.get('META_GRAPH_API_VERSION', 'v25.0').strip()
+    if not re.fullmatch(r'v\d+\.\d+', version):
+        version = 'v25.0'
+    query = dict(params or {})
+    query['access_token'] = token
+    url = (f'https://graph.facebook.com/{version}/{object_path.lstrip("/")}?' +
+           urllib.parse.urlencode(query))
+    req = urllib.request.Request(url, headers={'Accept': 'application/json'})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            return json.loads(resp.read().decode('utf-8'))
+    except urllib.error.HTTPError as exc:
+        try:
+            payload = json.loads(exc.read().decode('utf-8', 'replace'))
+            detail = ((payload.get('error') or {}).get('message') or '')
+        except Exception:
+            detail = ''
+        if exc.code in (401, 403):
+            message = 'Meta 授權已失效或權限不足'
+        elif exc.code == 429:
+            message = 'Meta API 使用量已達上限，請稍後再試'
+        else:
+            message = detail[:180] or f'Meta API 回應錯誤（HTTP {exc.code}）'
+        raise MetaAPIError(message, 502) from exc
+    except (urllib.error.URLError, TimeoutError) as exc:
+        raise MetaAPIError('目前無法連線至 Meta API，請稍後再試', 502) from exc
+    except (ValueError, TypeError) as exc:
+        raise MetaAPIError('Meta API 回傳格式異常', 502) from exc
+
+
+def _meta_fetch_comments(object_id, fields, max_items=1000):
+    comments = []
+    after = ''
+    while len(comments) < max_items:
+        params = {'fields': fields, 'limit': min(100, max_items - len(comments))}
+        if after:
+            params['after'] = after
+        payload = _meta_graph_get(f'{object_id}/comments', params)
+        page = payload.get('data') or []
+        comments.extend(page)
+        after = (((payload.get('paging') or {}).get('cursors') or {}).get('after') or '')
+        if not page or not after:
+            break
+    return comments[:max_items], bool(after and len(comments) >= max_items)
+
+
+def _meta_datetime(value):
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    except (TypeError, ValueError):
+        return None
+
+
+def _meta_required(platform):
+    token, account_id = _meta_config(platform)
+    if not token or not account_id:
+        missing = []
+        if not token:
+            missing.append('META_PAGE_ACCESS_TOKEN')
+        if not account_id:
+            missing.append('META_FB_PAGE_ID' if platform == 'facebook' else 'META_IG_USER_ID')
+        raise MetaAPIError('Meta 連線尚未完成設定：' + '、'.join(missing), 503)
+    return account_id
+
+
+@app.route('/api/lottery/meta/status')
+def lottery_meta_status():
+    if not is_admin():
+        return jsonify(ok=False, error='請先登入潮旅管理後台'), 401
+    token = bool((os.environ.get('META_PAGE_ACCESS_TOKEN')
+                  or os.environ.get('META_ACCESS_TOKEN') or '').strip())
+    return jsonify(ok=True, configured={
+        'facebook': token and bool(os.environ.get('META_FB_PAGE_ID', '').strip()),
+        'instagram': token and bool(os.environ.get('META_IG_USER_ID', '').strip())
+    })
+
+
+@app.route('/api/lottery/meta/posts')
+def lottery_meta_posts():
+    if not is_admin():
+        return jsonify(ok=False, error='請先登入潮旅管理後台'), 401
+    platform = (request.args.get('platform') or '').strip().lower()
+    try:
+        account_id = _meta_required(platform)
+        if platform == 'facebook':
+            fields = 'id,message,created_time,permalink_url'
+            payload = _meta_graph_get(f'{account_id}/posts', {'fields': fields, 'limit': 25})
+            posts = [{
+                'id': row.get('id', ''),
+                'text': (row.get('message') or '（無文字貼文）')[:180],
+                'timestamp': row.get('created_time', ''),
+                'url': row.get('permalink_url', '')
+            } for row in (payload.get('data') or []) if row.get('id')]
+        else:
+            fields = 'id,caption,media_type,permalink,timestamp'
+            payload = _meta_graph_get(f'{account_id}/media', {'fields': fields, 'limit': 25})
+            posts = [{
+                'id': row.get('id', ''),
+                'text': (row.get('caption') or f'（{row.get("media_type", "貼文")}）')[:180],
+                'timestamp': row.get('timestamp', ''),
+                'url': row.get('permalink', '')
+            } for row in (payload.get('data') or []) if row.get('id')]
+        return jsonify(ok=True, platform=platform, posts=posts)
+    except MetaAPIError as exc:
+        return jsonify(ok=False, error=str(exc)), exc.status
+
+
+@app.route('/api/lottery/meta/comments', methods=['POST'])
+def lottery_meta_comments():
+    if not is_admin():
+        return jsonify(ok=False, error='請先登入潮旅管理後台'), 401
+    data = request.get_json(force=True, silent=True) or {}
+    platform = (data.get('platform') or '').strip().lower()
+    object_id = (data.get('post_id') or '').strip()
+    keyword = (data.get('keyword') or '').strip()
+    cutoff_raw = (data.get('cutoff') or '').strip()
+    cutoff = _meta_datetime(cutoff_raw)
+    if not object_id or not re.fullmatch(r'[A-Za-z0-9_:-]{3,120}', object_id):
+        return jsonify(ok=False, error='請選擇有效的活動貼文'), 400
+    if cutoff_raw and not cutoff:
+        return jsonify(ok=False, error='活動截止時間格式不正確'), 400
+    try:
+        _meta_required(platform)
+        fields = ('id,message,created_time,from{id,name}' if platform == 'facebook'
+                  else 'id,text,timestamp,username,from{id,username}')
+        comments, truncated = _meta_fetch_comments(object_id, fields)
+        participants = []
+        seen = set()
+        excluded_keyword = 0
+        excluded_author = 0
+        excluded_cutoff = 0
+        for comment in comments:
+            text = str(comment.get('message') or comment.get('text') or '')
+            comment_time = _meta_datetime(comment.get('created_time') or comment.get('timestamp'))
+            if cutoff and comment_time and comment_time > cutoff:
+                excluded_cutoff += 1
+                continue
+            if keyword and keyword.casefold() not in text.casefold():
+                excluded_keyword += 1
+                continue
+            author = comment.get('from') or {}
+            if platform == 'instagram':
+                username = str(author.get('username') or comment.get('username') or '').strip().lstrip('@')
+                source_id = str(author.get('id') or username).strip()
+                name = f'@{username}' if username else ''
+            else:
+                source_id = str(author.get('id') or '').strip()
+                name = str(author.get('name') or '').strip()
+            if not source_id or not name:
+                excluded_author += 1
+                continue
+            dedupe_key = f'{platform}:{source_id.casefold()}'
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            participants.append({
+                'source': platform,
+                'source_id': source_id,
+                'name': name,
+                'comment_id': str(comment.get('id') or ''),
+                'comment': text[:240]
+            })
+        return jsonify(ok=True, platform=platform, participants=participants, stats={
+            'comments': len(comments),
+            'eligible': len(participants),
+            'duplicates': max(0, len(comments) - excluded_keyword - excluded_author - excluded_cutoff - len(participants)),
+            'keyword_excluded': excluded_keyword,
+            'missing_author': excluded_author,
+            'after_cutoff': excluded_cutoff,
+            'truncated': truncated
+        })
+    except MetaAPIError as exc:
+        return jsonify(ok=False, error=str(exc)), exc.status
 
 
 @app.route('/admin')
