@@ -233,6 +233,9 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
     <button id="tabbtn-audit" onclick="switchTab('audit',this)">
       <i class="fas fa-shield-halved"></i> 個資稽核
     </button>
+    <button id="tabbtn-qigui" onclick="switchTab('qigui',this)">
+      <i class="fas fa-dice"></i> 乞龜活動
+    </button>
   </nav>
 
   <div class="admin-body">
@@ -428,6 +431,30 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
       <div id="audit-list">載入中…</div>
       <p style="color:#8aa4b8;font-size:.82rem;margin-top:14px">
         ※ 記錄含個資的名單「匯出／匯入」事件（操作者、時間、範圍、筆數、來源 IP），供個資保護稽核使用。匯出為唯讀下載，不影響訂單資料。
+      </p>
+    </div>
+
+    <!-- ── 乞龜活動（僅 owner）── -->
+    <div class="tab-content" id="tab-qigui">
+      <div class="toolbar">
+        <h2>乞龜擲筊活動庫存</h2>
+        <button class="btn btn-primary" onclick="loadQiguiStatus()"><i class="fas fa-sync"></i> 重新整理</button>
+      </div>
+      <div id="qigui-summary" class="stats-row"></div>
+      <div id="qigui-days" style="margin-top:16px">載入中…</div>
+
+      <div class="contact-card" style="display:block;margin-top:20px">
+        <h3 style="color:var(--blue-dk);margin-bottom:10px"><i class="fas fa-check-double"></i> 現場核銷中獎憑證</h3>
+        <p style="color:var(--mid);font-size:.85rem;margin-bottom:10px">客人出示畫面上的憑證編號，輸入後按核銷；已核銷過的憑證無法重複兌換。</p>
+        <div style="display:flex;gap:10px">
+          <input id="qigui-claim-code" placeholder="例：龜260716-9K6N" style="flex:1;padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-family:monospace;text-transform:uppercase" />
+          <button class="btn btn-primary" onclick="claimQiguiCode()"><i class="fas fa-gift"></i> 核銷發放</button>
+        </div>
+        <div id="qigui-claim-msg" style="margin-top:10px;font-size:.9rem"></div>
+      </div>
+
+      <p style="color:#8aa4b8;font-size:.82rem;margin-top:14px">
+        ※ 每日禮物名額與中獎判定皆由後端伺服器控管，前端無法竄改；名額發完後即使玩家擲出三聖筊也不會再中獎，確保 4 天總發放數不超過禮物庫存。
       </p>
     </div>
   </div>
@@ -780,7 +807,7 @@ let ME = null;  // 目前登入者 {name, role, ...}
 
 /* 角色 → 可見分頁（owner 全開） */
 const ROLE_TABS = {
-  owner:  ['tours','slots','posts','neihai','preorder','contacts','users','audit'],
+  owner:  ['tours','slots','posts','neihai','preorder','contacts','users','audit','qigui'],
   orders: ['neihai','preorder'],
   editor: ['posts'],
 };
@@ -831,7 +858,7 @@ function showAdmin() {
   const roleLabel = { owner:'管理者', orders:'訂位人員', editor:'小編' }[role] || role;
   document.getElementById('me-badge').textContent = `${(ME && ME.name) || ''}（${roleLabel}）`;
   // 只顯示有權限的分頁，並切到第一個
-  ['tours','slots','posts','neihai','preorder','contacts','users','audit'].forEach(t => {
+  ['tours','slots','posts','neihai','preorder','contacts','users','audit','qigui'].forEach(t => {
     const btn = document.getElementById('tabbtn-' + t);
     if (btn) btn.style.display = allowed.includes(t) ? '' : 'none';
   });
@@ -974,6 +1001,67 @@ function loadAudit() {
 }
 
 /* ══════════════════════════════════════
+   乞龜活動庫存（僅 owner）
+══════════════════════════════════════ */
+function loadQiguiStatus() {
+  const box = document.getElementById('qigui-days');
+  box.innerHTML = '載入中…';
+  fetch(`/api/admin/qigui/status?key=${encodeURIComponent(ADMIN_KEY)}`)
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) { box.innerHTML = d.error || '載入失敗'; return; }
+      const remain = d.total_limit - d.total_given;
+      document.getElementById('qigui-summary').innerHTML = `
+        <div class="stat-card"><div class="num">${d.total_given}</div><div class="lbl">已發放（總庫存 ${d.total_limit}）</div></div>
+        <div class="stat-card"><div class="num">${remain}</div><div class="lbl">剩餘份數</div></div>
+        <div class="stat-card"><div class="num">${d.total_wins}</div><div class="lbl">中獎人次</div></div>
+        <div class="stat-card"><div class="num">${d.total_claimed}</div><div class="lbl">已核銷發放</div></div>`;
+      if (!d.days.length) {
+        box.innerHTML = '<p style="color:#a0aec0;text-align:center;padding:30px">尚無資料（活動開始後第一位玩家擲筊會自動建立當日名額）</p>';
+        return;
+      }
+      const wd = ['日','一','二','三','四','五','六'];
+      box.innerHTML = `<table class="tour-table"><thead>
+        <tr><th>日期</th><th>當日上限</th><th>已發放</th><th>剩餘</th><th>進度</th></tr></thead><tbody>` +
+        d.days.map(row => {
+          const left = row.daily_limit - row.given_out;
+          const pct = Math.min(100, Math.round(row.given_out / row.daily_limit * 100));
+          const w = wd[new Date(row.quota_date + 'T00:00:00').getDay()];
+          const full = left <= 0;
+          return `<tr>
+            <td>${row.quota_date}（${w}）</td>
+            <td style="text-align:center">${row.daily_limit}</td>
+            <td style="text-align:center;font-weight:700">${row.given_out}</td>
+            <td style="text-align:center;font-weight:800;color:${full ? '#c53030' : '#2f855a'}">${full ? '已發完' : left}</td>
+            <td><div style="background:#edf2f7;border-radius:8px;height:10px;overflow:hidden;min-width:100px">
+              <div style="background:${full ? '#c53030' : '#2f855a'};height:100%;width:${pct}%"></div></div></td>
+          </tr>`;
+        }).join('') + '</tbody></table>';
+    })
+    .catch(() => { box.innerHTML = '載入失敗'; });
+}
+
+function claimQiguiCode() {
+  const input = document.getElementById('qigui-claim-code');
+  const msg = document.getElementById('qigui-claim-msg');
+  const code = input.value.trim().toUpperCase();
+  if (!code) { msg.style.color = '#c53030'; msg.textContent = '請輸入憑證編號'; return; }
+  fetch(`/api/admin/qigui/claim?key=${encodeURIComponent(ADMIN_KEY)}`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ code, _key: ADMIN_KEY }),
+  }).then(r => r.json()).then(d => {
+    if (d.ok) {
+      msg.style.color = '#2f855a';
+      msg.textContent = `✔ ${d.code} 核銷成功，請發放小禮物給客人！`;
+      input.value = '';
+    } else {
+      msg.style.color = '#c53030';
+      msg.textContent = d.error || '核銷失敗';
+    }
+  }).catch(() => { msg.style.color = '#c53030'; msg.textContent = '核銷失敗，請稍後再試'; });
+}
+
+/* ══════════════════════════════════════
    Tab 切換
 ══════════════════════════════════════ */
 function switchTab(name, btn) {
@@ -989,6 +1077,7 @@ function switchTab(name, btn) {
   if (name === 'users')    loadUsers();
   if (name === 'tours')    loadTours();
   if (name === 'audit')    loadAudit();
+  if (name === 'qigui')    loadQiguiStatus();
 }
 
 /* ══════════════════════════════════════

@@ -17,6 +17,7 @@ import json
 import base64
 import hmac
 import hashlib
+import random
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -268,6 +269,26 @@ def init_db():
         )
     """)
     cur.execute("CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs (created_at DESC)")
+
+    # 乞龜擲筊活動：每日禮物庫存（旅展現場限定，實體禮物有限，需硬性上限避免超發）
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS qigui_daily_quota (
+            quota_date   DATE PRIMARY KEY,
+            daily_limit  INT NOT NULL DEFAULT 125,
+            given_out    INT NOT NULL DEFAULT 0
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS qigui_wins (
+            id           SERIAL PRIMARY KEY,
+            win_code     VARCHAR(20) UNIQUE NOT NULL,
+            quota_date   DATE NOT NULL,
+            claimed      BOOLEAN DEFAULT FALSE,
+            claimed_at   TIMESTAMP,
+            ip           VARCHAR(60),
+            created_at   TIMESTAMP DEFAULT NOW()
+        )
+    """)
 
     # LINE 官方帳號互動用戶（webhook 記錄，用於取得 userId 與對照訂單）
     cur.execute("""
@@ -638,6 +659,143 @@ def qigui():
 @app.route('/qigui')
 def qigui_redirect():
     return redirect('/qigui/', code=308)
+
+
+# ─── 乞龜擲筊活動：後端權威判定（含每日禮物庫存硬上限）───────────
+QIGUI_DAILY_LIMIT = 125           # 每日禮物名額（500 份 ÷ 4 天）
+QIGUI_HOLY_PROB = 0.8879          # 單次擲筊「聖筊」機率，連續3次約 70%（0.8879^3 ≈ 0.70）
+
+
+def _qigui_get_or_create_quota(cur, d):
+    cur.execute("SELECT * FROM qigui_daily_quota WHERE quota_date=%s FOR UPDATE", (d,))
+    row = cur.fetchone()
+    if not row:
+        cur.execute("""INSERT INTO qigui_daily_quota (quota_date, daily_limit, given_out)
+                       VALUES (%s,%s,0) RETURNING *""", (d, QIGUI_DAILY_LIMIT))
+        row = cur.fetchone()
+    return dict(row)
+
+
+def _qigui_make_code(d):
+    chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    rand = ''.join(random.choice(chars) for _ in range(4))
+    return f"龜{d.strftime('%y%m%d')}-{rand}"
+
+
+@app.route('/api/qigui/throw', methods=['POST'])
+def qigui_throw():
+    """後端權威擲筊：機率與每日庫存都由伺服器決定，前端只負責動畫呈現。
+    以 Flask session 追蹤單一訪客當日的連續聖筊數與是否已用完當日挑戰。"""
+    today = _taiwan_now().date()
+    today_str = str(today)
+    if session.get('qigui_date') != today_str:
+        session['qigui_date'] = today_str
+        session['qigui_streak'] = 0
+        session['qigui_played'] = False
+        session['qigui_won'] = False
+        session['qigui_code'] = None
+
+    if session.get('qigui_won'):
+        return jsonify(ok=True, locked=True, already_won=True, code=session.get('qigui_code'))
+    if session.get('qigui_played'):
+        return jsonify(ok=True, locked=True, message='今日挑戰已使用，請明日再來')
+
+    try:
+        conn = get_db(); cur = conn.cursor()
+        quota = _qigui_get_or_create_quota(cur, today)
+        if quota['given_out'] >= quota['daily_limit']:
+            conn.commit(); cur.close(); conn.close()
+            session['qigui_played'] = True
+            return jsonify(ok=True, locked=True, sold_out=True,
+                           message='今日禮物名額已全數送出，感謝您的參與，請明日再來挑戰！')
+
+        holy = random.random() < QIGUI_HOLY_PROB
+        if not holy:
+            session['qigui_played'] = True
+            session['qigui_streak'] = 0
+            conn.commit(); cur.close(); conn.close()
+            outcome = 'laugh' if random.random() < 0.5 else 'yin'
+            return jsonify(ok=True, outcome=outcome, streak=0, won=False, locked=True)
+
+        streak = int(session.get('qigui_streak', 0)) + 1
+        session['qigui_streak'] = streak
+
+        if streak >= 3:
+            cur.execute("""UPDATE qigui_daily_quota SET given_out = given_out + 1
+                           WHERE quota_date=%s AND given_out < daily_limit
+                           RETURNING given_out""", (today,))
+            got = cur.fetchone()
+            if not got:
+                # 極端情況：兩人同時擲到最後一份，晚一步的人名額被搶走
+                conn.commit(); cur.close(); conn.close()
+                session['qigui_played'] = True
+                return jsonify(ok=True, locked=True, sold_out=True,
+                               message='差一點點！今日名額剛好在您擲出的瞬間發完，請明日再來。')
+            code = _qigui_make_code(today)
+            cur.execute("""INSERT INTO qigui_wins (win_code, quota_date, ip)
+                           VALUES (%s,%s,%s)""", (code, today, _client_ip()))
+            conn.commit(); cur.close(); conn.close()
+            session['qigui_played'] = True
+            session['qigui_won'] = True
+            session['qigui_code'] = code
+            return jsonify(ok=True, outcome='holy', streak=streak, won=True, code=code, locked=True)
+
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True, outcome='holy', streak=streak, won=False, locked=False)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.route('/api/admin/qigui/status', methods=['GET'])
+def admin_qigui_status():
+    """乞龜活動庫存總覽（僅 owner）：各日已發放/上限、中獎與領獎統計。"""
+    if not is_admin():
+        return jsonify(ok=False, error='未授權'), 401
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT * FROM qigui_daily_quota ORDER BY quota_date")
+        days = []
+        for r in cur.fetchall():
+            r = dict(r)
+            r['quota_date'] = str(r['quota_date'])
+            days.append(r)
+        cur.execute("SELECT COUNT(*) AS c FROM qigui_wins")
+        total_wins = cur.fetchone()['c']
+        cur.execute("SELECT COUNT(*) AS c FROM qigui_wins WHERE claimed=TRUE")
+        total_claimed = cur.fetchone()['c']
+        cur.close(); conn.close()
+        total_given = sum(d['given_out'] for d in days)
+        total_limit = sum(d['daily_limit'] for d in days)
+        return jsonify(ok=True, days=days, total_given=total_given, total_limit=total_limit,
+                       total_wins=total_wins, total_claimed=total_claimed)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.route('/api/admin/qigui/claim', methods=['POST'])
+def admin_qigui_claim():
+    """後台核銷中獎憑證（現場發放實體禮物時使用，避免同一組憑證被重複兌換）。"""
+    if not is_admin():
+        return jsonify(ok=False, error='未授權'), 401
+    data = request.get_json(force=True, silent=True) or {}
+    code = (data.get('code') or '').strip().upper()
+    if not code:
+        return jsonify(ok=False, error='請提供憑證編號'), 400
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT * FROM qigui_wins WHERE win_code=%s", (code,))
+        row = cur.fetchone()
+        if not row:
+            cur.close(); conn.close()
+            return jsonify(ok=False, error='查無此憑證，請確認編號'), 404
+        if row['claimed']:
+            cur.close(); conn.close()
+            return jsonify(ok=False, error=f"此憑證已於 {row['claimed_at']} 兌換過，不可重複兌換"), 400
+        cur.execute("UPDATE qigui_wins SET claimed=TRUE, claimed_at=NOW() WHERE win_code=%s", (code,))
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True, code=code)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
 
 
 # ─── 抽獎工具：Meta 留言名單匯入 ────────────────────────────
