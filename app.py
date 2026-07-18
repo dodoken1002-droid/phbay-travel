@@ -48,7 +48,7 @@ def get_db():
         raise RuntimeError('DATABASE_URL 未設定')
     if url.startswith('postgres://'):
         url = url.replace('postgres://', 'postgresql://', 1)
-    return psycopg2.connect(url, cursor_factory=psycopg2.extras.RealDictCursor)
+    return psycopg2.connect(url, cursor_factory=psycopg2.extras.RealDictCursor, connect_timeout=5)
 
 
 # ─── 管理員驗證（金鑰＝owner；帳號登入依角色分權）──────────────
