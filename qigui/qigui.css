@@ -28,8 +28,22 @@ body {
 }
 
 /* ── Header / Footer ── */
-.qg-header { position: relative; z-index: 2; padding: 18px 24px; }
+.qg-header {
+  position: relative; z-index: 2; padding: 18px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 10px;
+}
 .qg-logo { color: #ffd970; text-decoration: none; font-weight: 800; font-size: 1.05rem; }
+.qg-header-line {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: #06c755; color: #fff; text-decoration: none;
+  font-weight: 800; font-size: .92rem;
+  padding: 8px 18px; border-radius: 30px;
+  box-shadow: 0 4px 14px rgba(6, 199, 85, .4);
+  transition: transform .15s;
+}
+.qg-header-line:hover { transform: translateY(-1px); }
+.qg-header-line i { font-size: 1.15rem; }
 .qg-footer {
   position: relative; z-index: 2;
   text-align: center; padding: 28px 16px 36px;
