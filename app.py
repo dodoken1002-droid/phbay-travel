@@ -39,6 +39,24 @@ app = Flask(__name__, static_folder='.', static_url_path='')
 app.secret_key = os.environ.get('FLASK_SECRET_KEY') or os.environ.get('ADMIN_KEY') or 'phbay-dev-secret'
 app.permanent_session_lifetime = timedelta(hours=12)
 
+# ─── 靜態資源快取 ──────────────────────────────────────────
+# CSS/JS/圖片長快取；改動 css/js 時必須同步調整各 HTML 引用的 ?v= 版本字串，
+# 否則使用者會拿到快取的舊資源（版本字串統一用 ASSET_VERSION）。
+ASSET_VERSION = '20260719'
+_LONG_CACHE_EXT = ('.css', '.js', '.png', '.jpg', '.jpeg', '.webp', '.avif',
+                   '.gif', '.svg', '.ico', '.woff', '.woff2')
+
+@app.after_request
+def _set_cache_headers(resp):
+    path = request.path.lower()
+    if path.startswith('/api/'):
+        return resp
+    if path.endswith(_LONG_CACHE_EXT):
+        resp.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+    elif resp.mimetype == 'text/html':
+        resp.headers['Cache-Control'] = 'no-cache'
+    return resp
+
 _db_initialized = False
 
 # ─── 資料庫連線 ────────────────────────────────────────────
@@ -3455,7 +3473,7 @@ def _render_blog(title, desc, canonical, body, head_extra='', image=None):
         f'<meta name="twitter:description" content="{_html.escape(desc)}"/>'
         f'<meta name="twitter:image" content="{_html.escape(img)}"/>'
         '<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns=\'http://www.w3.org/2000/svg\'%20viewBox=\'0%200%20100%20100\'%3E%3Crect%20width=\'100\'%20height=\'100\'%20rx=\'22\'%20fill=\'%231a6b9e\'/%3E%3Ctext%20x=\'50\'%20y=\'73\'%20font-size=\'62\'%20text-anchor=\'middle\'%20fill=\'white\'%20font-family=\'sans-serif\'%3E潮%3C/text%3E%3C/svg%3E"/>'
-        '<link rel="stylesheet" href="/style.css"/>'
+        f'<link rel="stylesheet" href="/style.css?v={ASSET_VERSION}"/>'
         '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>'
         '<style>.blog-wrap{max-width:820px;margin:0 auto;padding:36px 20px 60px}.blog-wrap h1{font-size:clamp(1.5rem,4vw,2.1rem);color:var(--blue-dark);font-weight:800;line-height:1.35;margin-bottom:12px}.blog-meta{color:var(--text-light);font-size:.9rem;margin-bottom:20px}.blog-cover{width:100%;border-radius:14px;margin-bottom:24px}.blog-body{font-size:1.04rem;line-height:1.9;color:var(--text-dark)}.blog-body h2{font-size:1.4rem;color:var(--blue-dark);margin:28px 0 12px;font-weight:800}.blog-body h3{font-size:1.15rem;color:var(--blue-main);margin:22px 0 10px;font-weight:700}.blog-body p{margin-bottom:16px}.blog-body img{max-width:100%;border-radius:10px;margin:12px 0}.blog-body ul,.blog-body ol{margin:0 0 16px 22px}.blog-body li{margin-bottom:6px}.blog-body a{color:var(--blue-main);text-decoration:underline}.post-card{display:block;background:var(--white);border:1px solid #e6edf3;border-radius:14px;overflow:hidden;transition:.2s;box-shadow:0 2px 10px rgba(0,0,0,.05)}.post-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-hover)}.post-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;margin-top:28px}.post-card img{width:100%;height:170px;object-fit:cover}.post-card-body{padding:16px 18px}.post-card-body h2{font-size:1.1rem;color:var(--blue-dark);margin-bottom:8px;line-height:1.4}.post-card-body p{color:var(--text-mid);font-size:.9rem;line-height:1.6}.post-tags{margin-top:10px}.post-tag{display:inline-block;background:var(--blue-pale);color:var(--blue-main);font-size:.74rem;padding:2px 9px;border-radius:20px;margin:2px 4px 2px 0}.blog-cta{margin-top:40px;background:var(--blue-pale);border-radius:16px;padding:28px;text-align:center}.blog-cta a{margin:4px}.blog-back{display:inline-block;margin-bottom:18px;color:var(--blue-main);font-weight:600}.rv-summary{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:8px 0 24px;padding:16px 20px;background:var(--blue-pale);border-radius:14px}.rv-avg{font-size:2.2rem;font-weight:800;color:var(--blue-dark);line-height:1}.rv-avg-stars{color:#f5a623;font-size:1.2rem;letter-spacing:2px}.rv-count{color:var(--text-mid);font-size:.95rem}.rv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-top:8px}.rv-card{background:var(--white);border:1px solid #e6edf3;border-radius:14px;padding:18px 20px;box-shadow:0 2px 10px rgba(0,0,0,.05)}.rv-stars{color:#f5a623;letter-spacing:2px;font-size:1.05rem}.rv-num{color:var(--text-mid);font-size:.85rem;margin-left:8px;letter-spacing:0}.rv-body{margin:10px 0 14px;line-height:1.8;color:var(--text-dark)}.rv-meta{color:var(--text-light);font-size:.86rem;border-top:1px solid #eef2f5;padding-top:10px}.blog-cats{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 8px}.blog-cats .post-tag{margin:0;font-size:.82rem;padding:5px 12px;cursor:pointer}.blog-cats .post-tag.active{background:var(--blue-main);color:#fff}.blog-pager{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:36px}.pager-btn{display:inline-block;padding:9px 18px;border-radius:24px;background:var(--blue-pale);color:var(--blue-main);font-weight:600;text-decoration:none}.pager-btn:hover{background:var(--blue-main);color:#fff}.pager-btn.disabled{opacity:.4;pointer-events:none}.pager-info{color:var(--text-mid);font-size:.9rem}</style>'
         f'{head_extra}</head><body>{nav}<main>{body}</main>{footer}</body></html>')
