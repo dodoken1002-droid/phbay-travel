@@ -12,7 +12,13 @@
     prizeRemaining: $("#prizeRemaining"), drawButton: $("#drawButton"), drawAllButton: $("#drawAllButton"), drawMessage: $("#drawMessage"),
     winnerList: $("#winnerList"), resultsSummary: $("#resultsSummary"), exportButton: $("#exportButton"),
     resetButton: $("#resetButton"), fullscreenButton: $("#fullscreenButton"), saveState: $("#saveState"), confetti: $("#confetti"),
-    ticketMachine: $("#ticketMachine"), poolTickets: $("#poolTickets"), poolCount: $("#poolCount"), winnerReveal: $("#winnerReveal")
+    ticketMachine: $("#ticketMachine"), poolTickets: $("#poolTickets"), poolCount: $("#poolCount"), winnerReveal: $("#winnerReveal"),
+    manualSourceTab: $("#manualSourceTab"), metaSourceTab: $("#metaSourceTab"), manualSourcePanel: $("#manualSourcePanel"),
+    metaSourcePanel: $("#metaSourcePanel"), metaConnectionDot: $("#metaConnectionDot"), metaConnectionText: $("#metaConnectionText"),
+    adminLoginLink: $("#adminLoginLink"), metaPlatform: $("#metaPlatform"), loadMetaPosts: $("#loadMetaPosts"),
+    metaPost: $("#metaPost"), metaKeyword: $("#metaKeyword"), metaCutoff: $("#metaCutoff"), fetchMetaComments: $("#fetchMetaComments"),
+    metaPreview: $("#metaPreview"), metaPreviewSummary: $("#metaPreviewSummary"), metaNameList: $("#metaNameList"),
+    applyMetaParticipants: $("#applyMetaParticipants")
   };
 
   let state = loadState();
@@ -21,6 +27,8 @@
   let drawing = false;
   let batchDrawing = false;
   let stageMode = state.participants.length ? "pool" : "empty";
+  let metaConfigured = { facebook: false, instagram: false };
+  let pendingMetaParticipants = [];
 
   function defaultState() {
     return {
@@ -59,15 +67,18 @@
     const participants = [];
     saved.participants.forEach((participant) => {
       const oldId = String(participant.id || "").trim();
+      const source = String(participant.source || "").trim().toLowerCase();
+      const sourceId = String(participant.sourceId || participant.source_id || "").trim();
       const wasGeneratedId = participant.explicitId === false || (participant.explicitId == null && /^P\d{3,}$/i.test(oldId));
       const explicitId = Boolean(oldId) && !wasGeneratedId;
       const id = explicitId ? oldId : "";
       const name = String(participant.name || "").trim();
-      const key = explicitId ? `id:${id.toLocaleLowerCase()}` : `name:${normalizeName(name)}`;
+      const key = source && sourceId ? `source:${source}:${sourceId.toLocaleLowerCase()}`
+        : (explicitId ? `id:${id.toLocaleLowerCase()}` : `name:${normalizeName(name)}`);
       keyMap.set(participant.key, key);
       if (!name || seen.has(key)) return;
       seen.add(key);
-      participants.push({ id, name, key, explicitId });
+      participants.push({ id, name, key, explicitId, source, sourceId });
     });
     const participantKeys = new Set(participants.map((participant) => participant.key));
     const winners = saved.winners.map((winner) => {
@@ -126,7 +137,8 @@
   }
 
   function participantsToInput() {
-    return state.participants.map((participant) => participant.id ? `${participant.id},${participant.name}` : participant.name).join("\n");
+    return state.participants.map((participant) => participant.explicitId && participant.id
+      ? `${participant.id},${participant.name}` : participant.name).join("\n");
   }
 
   function renderPrizeRows() {
@@ -258,23 +270,181 @@
     if (state.participants.length && stageMode === "pool") renderTicketPool(false);
   }
 
-  function applyParticipantText(text) {
-    const participants = parseParticipants(text);
+  function commitParticipants(participants, message, updateInput) {
     if (!participants.length) {
       elements.participantMessage.textContent = "找不到有效名單，請確認每行至少有一個姓名。";
       elements.participantMessage.classList.add("error");
-      return;
+      return false;
     }
     const oldKeys = new Set(participants.map((participant) => participant.key));
     const removedWinners = state.winners.filter((winner) => !oldKeys.has(winner.participantKey)).length;
     state.participants = participants;
     if (removedWinners) state.winners = state.winners.filter((winner) => oldKeys.has(winner.participantKey));
-    elements.participantMessage.textContent = `已套用 ${participants.length} 人${removedWinners ? `，並移除 ${removedWinners} 筆不在新名單中的紀錄` : ""}。`;
+    if (updateInput) elements.participantInput.value = participantsToInput();
+    elements.participantMessage.textContent = `${message || `已套用 ${participants.length} 人`}${removedWinners ? `，並移除 ${removedWinners} 筆不在新名單中的紀錄` : ""}。`;
     elements.participantMessage.classList.remove("error");
     saveState();
     stageMode = "pool";
     renderAll();
     showPoolState(true);
+    return true;
+  }
+
+  function applyParticipantText(text) {
+    return commitParticipants(parseParticipants(text), "", false);
+  }
+
+  function switchSource(source) {
+    const meta = source === "meta";
+    elements.manualSourceTab.classList.toggle("active", !meta);
+    elements.metaSourceTab.classList.toggle("active", meta);
+    elements.manualSourceTab.setAttribute("aria-selected", String(!meta));
+    elements.metaSourceTab.setAttribute("aria-selected", String(meta));
+    elements.manualSourcePanel.hidden = meta;
+    elements.metaSourcePanel.hidden = !meta;
+    if (meta) loadMetaStatus();
+  }
+
+  async function metaRequest(path, options) {
+    const response = await fetch(path, {
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      ...options
+    });
+    let payload = {};
+    try { payload = await response.json(); } catch (error) { payload = {}; }
+    if (!response.ok || !payload.ok) {
+      const failure = new Error(payload.error || "Meta 名單服務目前無法使用");
+      failure.status = response.status;
+      throw failure;
+    }
+    return payload;
+  }
+
+  function setMetaConnection(kind, text, showLogin) {
+    elements.metaConnectionDot.className = `connection-dot ${kind || ""}`.trim();
+    elements.metaConnectionText.textContent = text;
+    elements.adminLoginLink.hidden = !showLogin;
+  }
+
+  function resetMetaPosts(message) {
+    elements.metaPost.innerHTML = `<option value="">${escapeHtml(message || "尚未載入貼文")}</option>`;
+    elements.metaPost.disabled = true;
+    elements.fetchMetaComments.disabled = true;
+    elements.metaPreview.hidden = true;
+    pendingMetaParticipants = [];
+  }
+
+  async function loadMetaStatus() {
+    setMetaConnection("", "正在確認連線…", false);
+    try {
+      const payload = await metaRequest("/api/lottery/meta/status");
+      metaConfigured = payload.configured || metaConfigured;
+      const platform = elements.metaPlatform.value;
+      const configuredCount = [metaConfigured.facebook, metaConfigured.instagram].filter(Boolean).length;
+      if (configuredCount === 2) setMetaConnection("ready", "Facebook 與 Instagram 已連線", false);
+      else if (configuredCount === 1) setMetaConnection("partial", `${metaConfigured.facebook ? "Facebook" : "Instagram"} 已連線`, false);
+      else setMetaConnection("error", "Meta 連線尚未設定", false);
+      elements.loadMetaPosts.disabled = !metaConfigured[platform];
+    } catch (error) {
+      const needsLogin = error.status === 401;
+      setMetaConnection("error", needsLogin ? "請先登入潮旅管理後台" : error.message, needsLogin);
+      elements.loadMetaPosts.disabled = true;
+    }
+  }
+
+  function postOptionLabel(post) {
+    const date = post.timestamp ? new Date(post.timestamp) : null;
+    const dateLabel = date && !Number.isNaN(date.getTime())
+      ? date.toLocaleDateString("zh-TW", { month: "2-digit", day: "2-digit" }) : "";
+    const text = String(post.text || "無文字貼文").replace(/\s+/g, " ").slice(0, 55);
+    return [dateLabel, text].filter(Boolean).join(" · ");
+  }
+
+  async function loadMetaPosts() {
+    const platform = elements.metaPlatform.value;
+    elements.loadMetaPosts.disabled = true;
+    elements.loadMetaPosts.textContent = "載入中…";
+    resetMetaPosts("正在載入貼文…");
+    try {
+      const payload = await metaRequest(`/api/lottery/meta/posts?platform=${encodeURIComponent(platform)}`);
+      elements.metaPost.innerHTML = "";
+      if (!payload.posts.length) {
+        resetMetaPosts("找不到可用貼文");
+        return;
+      }
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "請選擇活動貼文";
+      elements.metaPost.appendChild(placeholder);
+      payload.posts.forEach((post) => {
+        const option = document.createElement("option");
+        option.value = post.id;
+        option.textContent = postOptionLabel(post);
+        elements.metaPost.appendChild(option);
+      });
+      elements.metaPost.disabled = false;
+      setMetaConnection("ready", `${platform === "facebook" ? "Facebook" : "Instagram"} 已載入 ${payload.posts.length} 篇貼文`, false);
+    } catch (error) {
+      resetMetaPosts("貼文載入失敗");
+      setMetaConnection("error", error.message, error.status === 401);
+    } finally {
+      elements.loadMetaPosts.textContent = "載入最近貼文";
+      elements.loadMetaPosts.disabled = !metaConfigured[platform];
+    }
+  }
+
+  async function fetchMetaComments() {
+    const platform = elements.metaPlatform.value;
+    const postId = elements.metaPost.value;
+    if (!postId) return;
+    elements.fetchMetaComments.disabled = true;
+    elements.fetchMetaComments.textContent = "整理留言中…";
+    elements.metaPreview.hidden = true;
+    try {
+      const payload = await metaRequest("/api/lottery/meta/comments", {
+        method: "POST",
+        body: JSON.stringify({
+          platform, post_id: postId, keyword: elements.metaKeyword.value.trim(),
+          cutoff: elements.metaCutoff.value ? new Date(elements.metaCutoff.value).toISOString() : ""
+        })
+      });
+      pendingMetaParticipants = payload.participants || [];
+      const stats = payload.stats || {};
+      const summaryParts = [
+        `${stats.comments || 0} 則留言`,
+        `${stats.eligible || 0} 位有效參加者`,
+        `重複 ${stats.duplicates || 0}`
+      ];
+      if (stats.keyword_excluded) summaryParts.push(`未含關鍵字 ${stats.keyword_excluded}`);
+      if (stats.after_cutoff) summaryParts.push(`超過截止時間 ${stats.after_cutoff}`);
+      if (stats.missing_author) summaryParts.push(`無作者資料 ${stats.missing_author}`);
+      if (stats.truncated) summaryParts.push("已達 1,000 則上限");
+      elements.metaPreviewSummary.textContent = summaryParts.join(" · ");
+      elements.metaNameList.innerHTML = pendingMetaParticipants.slice(0, 100)
+        .map((participant) => `<li title="${escapeHtml(participant.name)}">${escapeHtml(participant.name)}</li>`).join("");
+      elements.applyMetaParticipants.disabled = !pendingMetaParticipants.length;
+      elements.metaPreview.hidden = false;
+    } catch (error) {
+      setMetaConnection("error", error.message, error.status === 401);
+    } finally {
+      elements.fetchMetaComments.textContent = "整理留言名單";
+      elements.fetchMetaComments.disabled = !elements.metaPost.value;
+    }
+  }
+
+  function applyMetaParticipants() {
+    const participants = pendingMetaParticipants.map((participant) => {
+      const source = String(participant.source || elements.metaPlatform.value).toLowerCase();
+      const sourceId = String(participant.source_id || "");
+      return {
+        id: "", name: String(participant.name || "").trim(), explicitId: false,
+        source, sourceId, key: `source:${source}:${sourceId.toLocaleLowerCase()}`
+      };
+    }).filter((participant) => participant.name && participant.sourceId);
+    if (commitParticipants(participants, `已從 ${elements.metaPlatform.value === "facebook" ? "Facebook" : "Instagram"} 匯入 ${participants.length} 人`, true)) {
+      elements.metaPreview.hidden = true;
+    }
   }
 
   function secureRandomIndex(length) {
@@ -423,6 +593,23 @@
   }
 
   elements.applyParticipants.addEventListener("click", () => applyParticipantText(elements.participantInput.value));
+  elements.manualSourceTab.addEventListener("click", () => switchSource("manual"));
+  elements.metaSourceTab.addEventListener("click", () => switchSource("meta"));
+  elements.metaPlatform.addEventListener("change", () => {
+    resetMetaPosts();
+    elements.loadMetaPosts.disabled = !metaConfigured[elements.metaPlatform.value];
+    const platformName = elements.metaPlatform.value === "facebook" ? "Facebook" : "Instagram";
+    setMetaConnection(metaConfigured[elements.metaPlatform.value] ? "ready" : "error",
+      metaConfigured[elements.metaPlatform.value] ? `${platformName} 已連線` : `${platformName} 尚未設定`, false);
+  });
+  elements.loadMetaPosts.addEventListener("click", loadMetaPosts);
+  elements.metaPost.addEventListener("change", () => {
+    elements.fetchMetaComments.disabled = !elements.metaPost.value;
+    elements.metaPreview.hidden = true;
+    pendingMetaParticipants = [];
+  });
+  elements.fetchMetaComments.addEventListener("click", fetchMetaComments);
+  elements.applyMetaParticipants.addEventListener("click", applyMetaParticipants);
   elements.fileInput.addEventListener("change", async () => {
     const file = elements.fileInput.files[0];
     if (!file) return;

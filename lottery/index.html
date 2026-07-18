@@ -37,12 +37,47 @@
           <span class="count-pill"><strong id="participantCount">0</strong> 人</span>
         </div>
 
-        <label class="field-label" for="participantInput">每行一人，可填「編號,姓名」</label>
-        <textarea id="participantInput" rows="8" placeholder="A001,王小明&#10;A002,陳怡君&#10;A003,林志豪"></textarea>
-        <div class="inline-actions">
-          <label class="file-button" for="fileInput">匯入 CSV / TXT</label>
-          <input id="fileInput" type="file" accept=".csv,.txt,text/csv,text/plain">
-          <button class="secondary-button" id="applyParticipants" type="button">套用名單</button>
+        <div class="source-switch" role="tablist" aria-label="名單來源">
+          <button class="source-tab active" id="manualSourceTab" type="button" role="tab" aria-selected="true" aria-controls="manualSourcePanel">手動 / CSV</button>
+          <button class="source-tab" id="metaSourceTab" type="button" role="tab" aria-selected="false" aria-controls="metaSourcePanel">Facebook / Instagram</button>
+        </div>
+
+        <div id="manualSourcePanel" role="tabpanel" aria-labelledby="manualSourceTab">
+          <label class="field-label" for="participantInput">每行一人，可填「編號,姓名」</label>
+          <textarea id="participantInput" rows="8" placeholder="A001,王小明&#10;A002,陳怡君&#10;A003,林志豪"></textarea>
+          <div class="inline-actions">
+            <label class="file-button" for="fileInput">匯入 CSV / TXT</label>
+            <input id="fileInput" type="file" accept=".csv,.txt,text/csv,text/plain">
+            <button class="secondary-button" id="applyParticipants" type="button">套用名單</button>
+          </div>
+        </div>
+
+        <div id="metaSourcePanel" class="meta-source" role="tabpanel" aria-labelledby="metaSourceTab" hidden>
+          <div class="meta-status-row">
+            <span class="connection-dot" id="metaConnectionDot" aria-hidden="true"></span>
+            <span id="metaConnectionText">正在確認連線…</span>
+            <a class="admin-login-link" id="adminLoginLink" href="/admin" target="_blank" rel="noopener" hidden>登入後台</a>
+          </div>
+          <div class="meta-fields">
+            <label class="field-label" for="metaPlatform">平台</label>
+            <select id="metaPlatform">
+              <option value="facebook">Facebook 粉絲專頁</option>
+              <option value="instagram">Instagram 專業帳號</option>
+            </select>
+            <button class="secondary-button" id="loadMetaPosts" type="button">載入最近貼文</button>
+          </div>
+          <label class="field-label" for="metaPost">活動貼文</label>
+          <select id="metaPost" disabled><option value="">尚未載入貼文</option></select>
+          <label class="field-label" for="metaKeyword">留言關鍵字（選填）</label>
+          <input id="metaKeyword" type="text" maxlength="80" placeholder="例如：我要參加">
+          <label class="field-label" for="metaCutoff">活動截止時間（選填）</label>
+          <input id="metaCutoff" type="datetime-local">
+          <button class="meta-fetch-button" id="fetchMetaComments" type="button" disabled>整理留言名單</button>
+          <div class="meta-preview" id="metaPreview" hidden>
+            <div class="meta-preview-summary" id="metaPreviewSummary"></div>
+            <ul class="meta-name-list" id="metaNameList"></ul>
+            <button class="secondary-button meta-apply-button" id="applyMetaParticipants" type="button">投入抽獎池</button>
+          </div>
         </div>
         <p class="field-message" id="participantMessage" role="status">名單只會保留在這台裝置。</p>
       </section>
