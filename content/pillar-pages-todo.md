@@ -1,6 +1,6 @@
-# Pillar Pages 待辦規格（SEO/AEO/GEO 第二輪）
+# Pillar Pages 規格（SEO/AEO/GEO 第二輪）— ✅ 已於 2026-07-19 實作完成
 
-> 2026-07-19 由 Claude 依 CLAUDE_PROJECT_BRIEF_SEO_AEO_GEO.md 建立。本輪僅立規格，未實作。
+> 2026-07-19 由 Claude 建立規格，同日第二輪實作完成（pillar_pages.py＋app.py 路由）。本檔保留作規格紀錄。
 > 實作方式建議：app.py 伺服器渲染路由（沿用 `_render_blog()` 外殼），非靜態 HTML，方便共用導覽與追蹤碼。
 
 ## 共通要求（每頁）

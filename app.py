@@ -3591,6 +3591,19 @@ def blog_index():
                   + '<script type="application/ld+json">' + json.dumps(item_list, ensure_ascii=False) + '</script>')
     return _render_blog(title, desc, canonical, body, head_extra)
 
+def _pillar_link_for_tags(tags):
+    """依文章 tag 自動對應主題攻略頁（pillar page）內鏈；對不到回 None。"""
+    t = tags or ''
+    if '音樂節' in t or '追風' in t:
+        return ('/penghu-2026-festival-guide', '2026 澎湖追風音樂燈光節攻略')
+    if '親子' in t:
+        return ('/penghu-family-travel', '澎湖親子旅遊攻略')
+    if any(k in t for k in ('美食', '小吃', '伴手禮', '海鮮', '早餐')):
+        return ('/penghu-food-guide', '澎湖美食地圖')
+    if any(k in t for k in ('景點', '行程', '自由行', '跳島', '慢旅')):
+        return ('/penghu-3days-itinerary', '澎湖三天兩夜行程規劃')
+    return None
+
 @app.route('/blog/<slug>')
 def blog_post(slug):
     try:
@@ -3659,11 +3672,19 @@ def blog_post(slug):
                                  for x in faq_items]}
         head_extra += '<script type="application/ld+json">' + json.dumps(faq_ld, ensure_ascii=False) + '</script>'
 
+    # 主題攻略頁內鏈（依 tag 自動對應）
+    pillar_html = ''
+    pl = _pillar_link_for_tags(p.get('tags'))
+    if pl:
+        pillar_html = (f'<p style="margin-top:28px;padding:14px 18px;background:var(--blue-pale);border-radius:12px">'
+                       f'<strong>延伸攻略：</strong><a href="{pl[0]}">{pl[1]}</a>｜'
+                       f'把這篇的玩法放進完整行程。</p>')
+
     body = (f'<article class="blog-wrap"><a class="blog-back" href="/blog">← 回部落格</a>'
             f'<h1>{_html.escape(p["title"])}</h1>'
             f'<div class="blog-meta">{pub}｜{_html.escape(p.get("author") or "潮旅國際旅行社")}　{tags}</div>'
             f'{tldr}{infobox}'
-            f'{cover}<div class="blog-body">{p.get("content") or ""}</div>{faq_html}'
+            f'{cover}<div class="blog-body">{p.get("content") or ""}</div>{faq_html}{pillar_html}'
             f'<div class="blog-cta"><h3 style="color:var(--blue-dark);margin-bottom:10px">想規劃澎湖行程？</h3>'
             f'<a href="/#contact" class="btn btn-primary"><i class="fas fa-comment-dots"></i> 線上諮詢</a> '
             f'<a href="/neihai-preorder.html" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-ship"></i> 內海巡禮預購</a> '
@@ -3674,6 +3695,26 @@ def blog_post(slug):
                         image=(imgs[0] if imgs else None))
 
 # ── 旅客評價（遊客心得）──
+# ── Pillar pages（主題攻略頁，內容在 pillar_pages.py）──
+from pillar_pages import PILLAR_PAGES
+
+_PILLAR_OG_IMAGE = {
+    'penghu-3days-itinerary': f'{SITE}/images/summer-festival-hero-2026.jpg',
+    'penghu-family-travel': f'{SITE}/images/neihai-cruise-hero-2026.jpg',
+    'penghu-food-guide': f'{SITE}/images/penghu-small-squid-and-bigfin-reef-squid.jpg',
+    'penghu-2026-festival-guide': f'{SITE}/images/festival-poster.jpg',
+}
+
+@app.route('/penghu-3days-itinerary')
+@app.route('/penghu-family-travel')
+@app.route('/penghu-food-guide')
+@app.route('/penghu-2026-festival-guide')
+def pillar_page():
+    slug = request.path.strip('/')
+    p = PILLAR_PAGES[slug]
+    return _render_blog(p['title'], p['desc'], p['canonical'], p['body'],
+                        p['head_extra'], image=_PILLAR_OG_IMAGE.get(slug))
+
 @app.route('/reviews')
 def reviews_page():
     items = load_reviews()
@@ -3743,7 +3784,11 @@ def dynamic_sitemap():
     urls = [(f'{SITE}/', '1.0', 'weekly'), (f'{SITE}/faq.html', '0.8', 'monthly'),
             (f'{SITE}/blog', '0.7', 'weekly'), (f'{SITE}/reviews', '0.7', 'weekly'),
             (f'{SITE}/tides', '0.7', 'daily'),
-            (f'{SITE}/neihai-preorder.html', '0.8', 'weekly')]
+            (f'{SITE}/neihai-preorder.html', '0.8', 'weekly'),
+            (f'{SITE}/penghu-3days-itinerary', '0.8', 'monthly'),
+            (f'{SITE}/penghu-family-travel', '0.8', 'monthly'),
+            (f'{SITE}/penghu-food-guide', '0.8', 'monthly'),
+            (f'{SITE}/penghu-2026-festival-guide', '0.8', 'weekly')]
     try:
         conn = get_db(); cur = conn.cursor()
         cur.execute("SELECT slug, COALESCE(updated_at,published_at,created_at) AS m FROM posts WHERE is_published=TRUE")

@@ -164,3 +164,16 @@
 4. og:image 與 schema 圖已改用 `images/festival-poster.jpg`（211KB）；原 `festival-poster.png` 保留勿刪（舊分享連結）。文章 og:image 用各自 cover_image。
 5. 新增 `/llms-full.txt`；重要新頁面上線時請同步更新 llms.txt 與 llms-full.txt 的頁面清單。
 6. Pillar pages 規格見 `content/pillar-pages-todo.md`（尚未實作）。
+
+## Pillar Pages 已上線（2026-07-19 第二輪，分支 codex/pillar-pages-round2）
+
+四個主題攻略頁：/penghu-3days-itinerary、/penghu-family-travel、/penghu-food-guide、/penghu-2026-festival-guide。
+內容集中在 `pillar_pages.py`（app.py 只有路由），修改頁面內容改該檔即可；`dateModified` 在 `_webpage_ld()`，大改內容時記得更新。
+
+**新文章內鏈規則（發文時遵守）**：
+- 美食文章 → 內文連到 `/penghu-food-guide`
+- 親子／輕鬆玩法文章 → `/penghu-family-travel`
+- 行程規劃／景點文章 → `/penghu-3days-itinerary`
+- 追風音樂節文章 → `/penghu-2026-festival-guide`
+- 每篇至少：1 個 pillar page 內鏈＋2 個相關文章內鏈＋1 個首頁或 LINE CTA。
+- 另外文章頁模板會依 tag 自動在文末加一條「延伸攻略」連結（app.py `_pillar_link_for_tags()`），內文的內鏈仍建議照上面規則寫，兩者不衝突。
