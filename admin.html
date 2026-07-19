@@ -444,6 +444,23 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
       <div id="qigui-days" style="margin-top:16px">載入中…</div>
 
       <div class="contact-card" style="display:block;margin-top:20px">
+        <h3 style="color:var(--blue-dk);margin-bottom:10px"><i class="fas fa-sliders"></i> 調整當日名額上限</h3>
+        <p style="color:var(--mid);font-size:.85rem;margin-bottom:10px">臨時追加或調降某一天的禮物名額（不影響其他日期）；若該天已發出的份數比新上限還多，之後也不會再中獎。</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+          <div style="flex:1;min-width:150px">
+            <label style="display:block;font-size:.8rem;color:var(--mid);margin-bottom:4px">日期</label>
+            <input type="date" id="qigui-quota-date" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:8px" />
+          </div>
+          <div style="flex:1;min-width:120px">
+            <label style="display:block;font-size:.8rem;color:var(--mid);margin-bottom:4px">當日名額上限</label>
+            <input type="number" id="qigui-quota-limit" min="0" placeholder="例：225" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:8px" />
+          </div>
+          <button class="btn btn-primary" onclick="saveQiguiQuota()"><i class="fas fa-floppy-disk"></i> 儲存</button>
+        </div>
+        <div id="qigui-quota-msg" style="margin-top:10px;font-size:.9rem"></div>
+      </div>
+
+      <div class="contact-card" style="display:block;margin-top:20px">
         <h3 style="color:var(--blue-dk);margin-bottom:10px"><i class="fas fa-check-double"></i> 現場核銷中獎憑證</h3>
         <p style="color:var(--mid);font-size:.85rem;margin-bottom:10px">客人出示畫面上的憑證編號，輸入後按核銷；已核銷過的憑證無法重複兌換。</p>
         <div style="display:flex;gap:10px">
@@ -1037,8 +1054,37 @@ function loadQiguiStatus() {
               <div style="background:${full ? '#c53030' : '#2f855a'};height:100%;width:${pct}%"></div></div></td>
           </tr>`;
         }).join('') + '</tbody></table>';
+      const dateInput = document.getElementById('qigui-quota-date');
+      if (dateInput && !dateInput.value) {
+        const t = new Date();
+        dateInput.value = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+      }
     })
     .catch(() => { box.innerHTML = '載入失敗'; });
+}
+
+function saveQiguiQuota() {
+  const dateEl = document.getElementById('qigui-quota-date');
+  const limitEl = document.getElementById('qigui-quota-limit');
+  const msg = document.getElementById('qigui-quota-msg');
+  const date = dateEl.value;
+  const limit = limitEl.value;
+  if (!date) { msg.style.color = '#c53030'; msg.textContent = '請選擇日期'; return; }
+  if (limit === '' || Number(limit) < 0) { msg.style.color = '#c53030'; msg.textContent = '請輸入正確的名額數字'; return; }
+  fetch(`/api/admin/qigui/quota?key=${encodeURIComponent(ADMIN_KEY)}`, {
+    method: 'PATCH', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ date, daily_limit: Number(limit), _key: ADMIN_KEY }),
+  }).then(r => r.json()).then(d => {
+    if (d.ok) {
+      msg.style.color = '#2f855a';
+      msg.textContent = `✔ ${d.quota.quota_date} 名額已更新為 ${d.quota.daily_limit} 份（目前已發 ${d.quota.given_out} 份）`;
+      limitEl.value = '';
+      loadQiguiStatus();
+    } else {
+      msg.style.color = '#c53030';
+      msg.textContent = d.error || '更新失敗';
+    }
+  }).catch(() => { msg.style.color = '#c53030'; msg.textContent = '更新失敗，請稍後再試'; });
 }
 
 function claimQiguiCode() {

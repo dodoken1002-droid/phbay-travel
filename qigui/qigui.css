@@ -144,8 +144,11 @@ body {
 .qg-result.fail  { color: #ff9d8a; }
 .qg-result.holy  { color: #7dffb0; }
 
+.qg-throw-row {
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+  gap: 14px; margin-top: 10px;
+}
 .qg-throw-btn {
-  margin-top: 10px;
   background: linear-gradient(135deg, #f5b942, #e8542f);
   color: #fff; border: none; cursor: pointer;
   font-size: 1.25rem; font-weight: 900; letter-spacing: 6px;
@@ -156,6 +159,13 @@ body {
 }
 .qg-throw-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(232, 84, 47, .65); }
 .qg-throw-btn:disabled { opacity: .45; cursor: not-allowed; }
+.qg-throw-btn-auto {
+  background: linear-gradient(135deg, #4fd1c5, #0b8cc4);
+  font-size: 1.05rem; letter-spacing: 2px;
+  padding: 15px 34px;
+  box-shadow: 0 6px 24px rgba(11, 140, 196, .5);
+}
+.qg-throw-btn-auto:hover:not(:disabled) { box-shadow: 0 10px 30px rgba(11, 140, 196, .65); }
 .qg-hint { margin-top: 12px; font-size: .8rem; color: rgba(255, 245, 230, .5); }
 
 /* ── 中獎畫面 ── */
@@ -216,4 +226,6 @@ body {
   .qg-blocks { gap: 22px; }
   .qg-jiao-body { width: 82px; height: 40px; }
   .qg-throw-btn { padding: 14px 44px; font-size: 1.15rem; }
+  .qg-throw-row { flex-direction: column; gap: 10px; }
+  .qg-throw-btn-auto { padding: 13px 34px; font-size: 1rem; }
 }

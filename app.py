@@ -684,8 +684,8 @@ def qigui_redirect():
 
 # ─── 乞龜擲筊活動：後端權威判定（含每日禮物庫存硬上限）───────────
 QIGUI_DAILY_LIMIT = 125           # 每日禮物名額（500 份 ÷ 4 天）
-QIGUI_HOLY_PROB = 0.7937           # 單次擲筊「聖筊」機率，連續3次約 50%（0.7937^3 ≈ 0.50）
-                                    # 2026-07-16：70%→55%→35%→50%（依現場買氣回調）
+QIGUI_HOLY_PROB = 0.8879           # 單次擲筊「聖筊」機率，連續3次約 70%（0.8879^3 ≈ 0.70）
+                                    # 2026-07-16：70%→55%→35%→50%；2026-07-19：回到70%
 
 
 def _qigui_get_or_create_quota(cur, d):
@@ -790,6 +790,40 @@ def admin_qigui_status():
         total_limit = sum(d['daily_limit'] for d in days)
         return jsonify(ok=True, days=days, total_given=total_given, total_limit=total_limit,
                        total_wins=total_wins, total_claimed=total_claimed)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.route('/api/admin/qigui/quota', methods=['PATCH'])
+def admin_qigui_quota():
+    """調整指定日期的禮物名額上限（僅 owner）。用於臨時追加/調整某天的庫存，
+    不影響其他日期；若該日尚未建立名額列會自動建立。"""
+    if not is_admin():
+        return jsonify(ok=False, error='未授權'), 401
+    data = request.get_json(force=True, silent=True) or {}
+    date_str = (data.get('date') or '').strip()
+    try:
+        d = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify(ok=False, error='日期格式需為 YYYY-MM-DD'), 400
+    try:
+        new_limit = int(data.get('daily_limit'))
+    except (TypeError, ValueError):
+        return jsonify(ok=False, error='請提供正確的名額數字'), 400
+    if new_limit < 0:
+        return jsonify(ok=False, error='名額不可為負數'), 400
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO qigui_daily_quota (quota_date, daily_limit, given_out)
+            VALUES (%s,%s,0)
+            ON CONFLICT (quota_date) DO UPDATE SET daily_limit = EXCLUDED.daily_limit
+            RETURNING *
+        """, (d, new_limit))
+        row = dict(cur.fetchone())
+        conn.commit(); cur.close(); conn.close()
+        row['quota_date'] = str(row['quota_date'])
+        return jsonify(ok=True, quota=row)
     except Exception as e:
         return jsonify(ok=False, error=str(e)), 500
 
