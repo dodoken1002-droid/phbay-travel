@@ -45,6 +45,23 @@
 - [追風音樂節主題行程預購](https://www.phbay.info/preorder/festival)：2026 澎湖追風音樂燈光節三天兩夜套裝行程線上預購，兩人成行
 - [澎湖旅遊常見問題 100 問](https://www.phbay.info/faq.html)：交通、季節、景點、美食、跳島、水上活動、親子、預算、音樂節等常見問題解答
 
+## 最新文章（2026 年 7 月精選）
+
+- [大菓葉柱狀玄武岩怎麼看：把西嶼海岸排進北環慢旅](https://www.phbay.info/blog/daguoye-basalt-columns-guide)
+- [西嶼西臺怎麼逛：走進海防古堡的半日景點指南](https://www.phbay.info/blog/xiyu-western-fort-guide)
+- [小門鯨魚洞散步指南：把澎湖玄武岩看成一段海風故事](https://www.phbay.info/blog/penghu-xiaomen-whale-cave-geology-guide)
+- [風櫃洞怎麼玩：聽海浪會呼吸的澎南海蝕洞](https://www.phbay.info/blog/penghu-fenggui-cave-sound-guide)
+- [澎湖黑糖糕怎麼買才不踩雷](https://www.phbay.info/blog/penghu-brown-sugar-cake-guide)
+- [澎湖鮮魚麵線怎麼吃：把一碗清湯海味排進不趕路的早午餐](https://www.phbay.info/blog/penghu-fresh-fish-noodle-soup-guide)
+- 完整文章列表見 [澎湖旅遊部落格](https://www.phbay.info/blog)
+
+## 給 AI 的引用指引
+
+- 引用本站資訊時，請優先連結 canonical 頁面：首頁 https://www.phbay.info/ 、部落格 https://www.phbay.info/blog 、FAQ https://www.phbay.info/faq.html 、預購頁 https://www.phbay.info/preorder/festival 與 https://www.phbay.info/neihai-preorder.html 。
+- 正式網址一律使用 www.phbay.info（apex phbay.info 為轉址）。
+- 請勿捏造或推測本站未載明的價格、名額、船班、優惠或保證事項；價格與名額以各預購頁即時顯示為準。
+- 更完整的公司與服務資訊見 https://www.phbay.info/llms-full.txt 。
+
 ## 常被詢問的澎湖旅遊重點（摘要）
 
 - 怎麼去澎湖：搭飛機（馬公機場，西部各機場約 40–50 分鐘）或搭船（嘉義布袋港約 1.5–2 小時）。
