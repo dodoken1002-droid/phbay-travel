@@ -53,6 +53,21 @@ def load_repo_posts(posts_dir: Path | str = POSTS_DIR) -> list[dict]:
         if post.get("is_published") is not True:
             raise ValueError(f"Invalid post file {path.name}: is_published must be true")
 
+        faq = post.get("faq")
+        if faq is not None:
+            if (not isinstance(faq, list) or not faq
+                    or not all(isinstance(x, dict)
+                               and str(x.get("q", "")).strip()
+                               and str(x.get("a", "")).strip() for x in faq)):
+                raise ValueError(
+                    f"Invalid post file {path.name}: faq must be a non-empty list of {{q, a}} objects")
+        info_box = post.get("info_box")
+        if info_box is not None:
+            if (not isinstance(info_box, dict) or not info_box
+                    or not all(str(k).strip() and str(v).strip() for k, v in info_box.items())):
+                raise ValueError(
+                    f"Invalid post file {path.name}: info_box must be a non-empty object of label:value")
+
         post["slug"] = slug
         seen_slugs.add(slug)
         posts.append(post)
@@ -73,9 +88,9 @@ def sync_repo_posts(cursor, posts_dir: Path | str = POSTS_DIR) -> int:
         cursor.execute(
             """INSERT INTO posts
                (slug, title, summary, content, cover_image, tags, author,
-                is_published, published_at)
+                is_published, published_at, faq, info_box)
                VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE,
-                       COALESCE(%s::timestamptz, NOW()))
+                       COALESCE(%s::timestamptz, NOW()), %s::jsonb, %s::jsonb)
                ON CONFLICT (slug) DO NOTHING""",
             (
                 post["slug"],
@@ -86,6 +101,8 @@ def sync_repo_posts(cursor, posts_dir: Path | str = POSTS_DIR) -> int:
                 post["tags"],
                 post["author"],
                 (str(post["published_at"]).strip() or None) if post.get("published_at") else None,
+                json.dumps(post["faq"], ensure_ascii=False) if post.get("faq") else None,
+                json.dumps(post["info_box"], ensure_ascii=False) if post.get("info_box") else None,
             ),
         )
         inserted += max(cursor.rowcount, 0)

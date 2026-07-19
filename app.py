@@ -39,6 +39,24 @@ app = Flask(__name__, static_folder='.', static_url_path='')
 app.secret_key = os.environ.get('FLASK_SECRET_KEY') or os.environ.get('ADMIN_KEY') or 'phbay-dev-secret'
 app.permanent_session_lifetime = timedelta(hours=12)
 
+# ─── 靜態資源快取 ──────────────────────────────────────────
+# CSS/JS/圖片長快取；改動 css/js 時必須同步調整各 HTML 引用的 ?v= 版本字串，
+# 否則使用者會拿到快取的舊資源（版本字串統一用 ASSET_VERSION）。
+ASSET_VERSION = '20260719'
+_LONG_CACHE_EXT = ('.css', '.js', '.png', '.jpg', '.jpeg', '.webp', '.avif',
+                   '.gif', '.svg', '.ico', '.woff', '.woff2')
+
+@app.after_request
+def _set_cache_headers(resp):
+    path = request.path.lower()
+    if path.startswith('/api/'):
+        return resp
+    if path.endswith(_LONG_CACHE_EXT):
+        resp.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+    elif resp.mimetype == 'text/html':
+        resp.headers['Cache-Control'] = 'no-cache'
+    return resp
+
 _db_initialized = False
 
 # ─── 資料庫連線 ────────────────────────────────────────────
@@ -392,6 +410,9 @@ def init_db():
             updated_at   TIMESTAMP DEFAULT NOW()
         )
     """)
+    # AEO 選填欄位：faq=[{q,a},…] 文末常見問題；info_box={標籤:值,…} 文章資訊盒
+    cur.execute("ALTER TABLE posts ADD COLUMN IF NOT EXISTS faq JSONB")
+    cur.execute("ALTER TABLE posts ADD COLUMN IF NOT EXISTS info_box JSONB")
     conn.commit()
 
     # 若 tours 資料表是空的，寫入預設行程
@@ -3091,7 +3112,7 @@ def _preorder_seo_data(slug, product=None):
     name = product.get('name') or ('2026 澎湖追風音樂燈光節主題行程' if slug == 'festival' else '潮旅行程預購')
     desc = product.get('description') or '選擇出發日期、填寫旅客資料即可完成預購，潮旅國際旅行社將由專人與您確認行程細節。'
     canonical = f'{SITE}/preorder/{slug}'
-    image = f'{SITE}/images/festival-poster.png'
+    image = f'{SITE}/images/festival-poster.jpg'
     if slug == 'festival':
         title = '2026 澎湖追風音樂燈光節主題行程預購｜三天兩夜套裝｜潮旅國際旅行社'
         desc = '2026 澎湖追風音樂燈光節主題行程預購，三天兩夜套裝安排，兩人成行，搭配觀音亭園區燈光展演與澎湖在地玩法，由潮旅國際旅行社專人確認。'
@@ -3432,7 +3453,7 @@ def admin_delete_post(pid):
 
 # ── 伺服器渲染：共用外殼 ──
 def _render_blog(title, desc, canonical, body, head_extra='', image=None):
-    img = image or f'{SITE}/images/festival-poster.png'
+    img = image or f'{SITE}/images/festival-poster.jpg'
     nav = '''<div class="top-banner"><div class="banner-static"><span>潮旅國際旅行社</span><span class="banner-sep">｜</span><span>2026 澎湖追風音樂燈光節 官方合作旅行社</span><span class="banner-sep">｜</span><span>電話：06-9271288</span></div></div>
 <nav class="navbar" id="navbar"><div class="nav-container"><a href="/" class="nav-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a><button class="nav-toggle" id="nav-toggle" aria-label="選單"><span></span><span></span><span></span></button><ul class="nav-links" id="nav-links"><li><a href="/">首頁</a></li><li><a href="/#tours">行程介紹</a></li><li class="nav-item has-submenu"><a href="/neihai-preorder.html">預購行程 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/neihai-preorder.html">小城故事內海巡禮</a></li><li><a href="/preorder/festival">追風音樂節</a></li></ul></li><li class="nav-item has-submenu"><a href="/blog">旅遊大小事 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/tides">潮汐查詢系統</a></li><li><a href="/blog">旅遊文章分享</a></li><li><a href="/reviews">旅客評價</a></li></ul></li><li class="nav-item has-submenu"><a href="/#about">關於我們 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/#contact">聯絡資訊</a></li></ul></li></ul></div></nav>'''
     footer = '''<footer class="footer"><div class="container"><div class="footer-bottom"><p>© 2026 潮旅國際旅行社 All Rights Reserved.｜<a href="/" style="color:inherit">官網</a>｜<a href="/blog" style="color:inherit">部落格</a>｜<a href="/reviews" style="color:inherit">旅客評價</a></p></div></div></footer>
@@ -3455,9 +3476,12 @@ def _render_blog(title, desc, canonical, body, head_extra='', image=None):
         f'<meta name="twitter:description" content="{_html.escape(desc)}"/>'
         f'<meta name="twitter:image" content="{_html.escape(img)}"/>'
         '<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns=\'http://www.w3.org/2000/svg\'%20viewBox=\'0%200%20100%20100\'%3E%3Crect%20width=\'100\'%20height=\'100\'%20rx=\'22\'%20fill=\'%231a6b9e\'/%3E%3Ctext%20x=\'50\'%20y=\'73\'%20font-size=\'62\'%20text-anchor=\'middle\'%20fill=\'white\'%20font-family=\'sans-serif\'%3E潮%3C/text%3E%3C/svg%3E"/>'
-        '<link rel="stylesheet" href="/style.css"/>'
+        f'<link rel="stylesheet" href="/style.css?v={ASSET_VERSION}"/>'
         '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>'
-        '<style>.blog-wrap{max-width:820px;margin:0 auto;padding:36px 20px 60px}.blog-wrap h1{font-size:clamp(1.5rem,4vw,2.1rem);color:var(--blue-dark);font-weight:800;line-height:1.35;margin-bottom:12px}.blog-meta{color:var(--text-light);font-size:.9rem;margin-bottom:20px}.blog-cover{width:100%;border-radius:14px;margin-bottom:24px}.blog-body{font-size:1.04rem;line-height:1.9;color:var(--text-dark)}.blog-body h2{font-size:1.4rem;color:var(--blue-dark);margin:28px 0 12px;font-weight:800}.blog-body h3{font-size:1.15rem;color:var(--blue-main);margin:22px 0 10px;font-weight:700}.blog-body p{margin-bottom:16px}.blog-body img{max-width:100%;border-radius:10px;margin:12px 0}.blog-body ul,.blog-body ol{margin:0 0 16px 22px}.blog-body li{margin-bottom:6px}.blog-body a{color:var(--blue-main);text-decoration:underline}.post-card{display:block;background:var(--white);border:1px solid #e6edf3;border-radius:14px;overflow:hidden;transition:.2s;box-shadow:0 2px 10px rgba(0,0,0,.05)}.post-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-hover)}.post-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;margin-top:28px}.post-card img{width:100%;height:170px;object-fit:cover}.post-card-body{padding:16px 18px}.post-card-body h2{font-size:1.1rem;color:var(--blue-dark);margin-bottom:8px;line-height:1.4}.post-card-body p{color:var(--text-mid);font-size:.9rem;line-height:1.6}.post-tags{margin-top:10px}.post-tag{display:inline-block;background:var(--blue-pale);color:var(--blue-main);font-size:.74rem;padding:2px 9px;border-radius:20px;margin:2px 4px 2px 0}.blog-cta{margin-top:40px;background:var(--blue-pale);border-radius:16px;padding:28px;text-align:center}.blog-cta a{margin:4px}.blog-back{display:inline-block;margin-bottom:18px;color:var(--blue-main);font-weight:600}.rv-summary{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:8px 0 24px;padding:16px 20px;background:var(--blue-pale);border-radius:14px}.rv-avg{font-size:2.2rem;font-weight:800;color:var(--blue-dark);line-height:1}.rv-avg-stars{color:#f5a623;font-size:1.2rem;letter-spacing:2px}.rv-count{color:var(--text-mid);font-size:.95rem}.rv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-top:8px}.rv-card{background:var(--white);border:1px solid #e6edf3;border-radius:14px;padding:18px 20px;box-shadow:0 2px 10px rgba(0,0,0,.05)}.rv-stars{color:#f5a623;letter-spacing:2px;font-size:1.05rem}.rv-num{color:var(--text-mid);font-size:.85rem;margin-left:8px;letter-spacing:0}.rv-body{margin:10px 0 14px;line-height:1.8;color:var(--text-dark)}.rv-meta{color:var(--text-light);font-size:.86rem;border-top:1px solid #eef2f5;padding-top:10px}.blog-cats{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 8px}.blog-cats .post-tag{margin:0;font-size:.82rem;padding:5px 12px;cursor:pointer}.blog-cats .post-tag.active{background:var(--blue-main);color:#fff}.blog-pager{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:36px}.pager-btn{display:inline-block;padding:9px 18px;border-radius:24px;background:var(--blue-pale);color:var(--blue-main);font-weight:600;text-decoration:none}.pager-btn:hover{background:var(--blue-main);color:#fff}.pager-btn.disabled{opacity:.4;pointer-events:none}.pager-info{color:var(--text-mid);font-size:.9rem}</style>'
+        '<style>.blog-wrap{max-width:820px;margin:0 auto;padding:36px 20px 60px}.blog-wrap h1{font-size:clamp(1.5rem,4vw,2.1rem);color:var(--blue-dark);font-weight:800;line-height:1.35;margin-bottom:12px}.blog-meta{color:var(--text-light);font-size:.9rem;margin-bottom:20px}.blog-cover{width:100%;border-radius:14px;margin-bottom:24px}.blog-body{font-size:1.04rem;line-height:1.9;color:var(--text-dark)}.blog-body h2{font-size:1.4rem;color:var(--blue-dark);margin:28px 0 12px;font-weight:800}.blog-body h3{font-size:1.15rem;color:var(--blue-main);margin:22px 0 10px;font-weight:700}.blog-body p{margin-bottom:16px}.blog-body img{max-width:100%;border-radius:10px;margin:12px 0}.blog-body ul,.blog-body ol{margin:0 0 16px 22px}.blog-body li{margin-bottom:6px}.blog-body a{color:var(--blue-main);text-decoration:underline}.post-card{display:block;background:var(--white);border:1px solid #e6edf3;border-radius:14px;overflow:hidden;transition:.2s;box-shadow:0 2px 10px rgba(0,0,0,.05)}.post-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-hover)}.post-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;margin-top:28px}.post-card img{width:100%;height:170px;object-fit:cover}.post-card-body{padding:16px 18px}.post-card-body h2{font-size:1.1rem;color:var(--blue-dark);margin-bottom:8px;line-height:1.4}.post-card-body p{color:var(--text-mid);font-size:.9rem;line-height:1.6}.post-tags{margin-top:10px}.post-tag{display:inline-block;background:var(--blue-pale);color:var(--blue-main);font-size:.74rem;padding:2px 9px;border-radius:20px;margin:2px 4px 2px 0}.blog-cta{margin-top:40px;background:var(--blue-pale);border-radius:16px;padding:28px;text-align:center}.blog-cta a{margin:4px}.blog-back{display:inline-block;margin-bottom:18px;color:var(--blue-main);font-weight:600}.rv-summary{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:8px 0 24px;padding:16px 20px;background:var(--blue-pale);border-radius:14px}.rv-avg{font-size:2.2rem;font-weight:800;color:var(--blue-dark);line-height:1}.rv-avg-stars{color:#f5a623;font-size:1.2rem;letter-spacing:2px}.rv-count{color:var(--text-mid);font-size:.95rem}.rv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-top:8px}.rv-card{background:var(--white);border:1px solid #e6edf3;border-radius:14px;padding:18px 20px;box-shadow:0 2px 10px rgba(0,0,0,.05)}.rv-stars{color:#f5a623;letter-spacing:2px;font-size:1.05rem}.rv-num{color:var(--text-mid);font-size:.85rem;margin-left:8px;letter-spacing:0}.rv-body{margin:10px 0 14px;line-height:1.8;color:var(--text-dark)}.rv-meta{color:var(--text-light);font-size:.86rem;border-top:1px solid #eef2f5;padding-top:10px}.blog-cats{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 8px}.blog-cats .post-tag{margin:0;font-size:.82rem;padding:5px 12px;cursor:pointer}.blog-cats .post-tag.active{background:var(--blue-main);color:#fff}.blog-pager{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:36px}.pager-btn{display:inline-block;padding:9px 18px;border-radius:24px;background:var(--blue-pale);color:var(--blue-main);font-weight:600;text-decoration:none}.pager-btn:hover{background:var(--blue-main);color:#fff}.pager-btn.disabled{opacity:.4;pointer-events:none}.pager-info{color:var(--text-mid);font-size:.9rem}'
+        '.post-tldr{background:var(--blue-pale);border-left:4px solid var(--blue-main);border-radius:10px;padding:16px 20px;margin:0 0 18px}.post-tldr-label{display:inline-block;font-weight:800;color:var(--blue-dark);font-size:.85rem;background:#fff;border-radius:20px;padding:2px 12px;margin-bottom:8px}.post-tldr p{margin:6px 0 0;line-height:1.8;color:var(--text-dark)}'
+        '.post-infobox{border:1px solid #e6edf3;border-radius:12px;padding:6px 18px;margin:0 0 20px;background:#fff}.post-info-row{display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #f0f4f7;font-size:.95rem}.post-info-row:last-child{border-bottom:none}.post-info-k{flex:0 0 auto;min-width:96px;font-weight:700;color:var(--blue-dark)}.post-info-v{color:var(--text-mid);line-height:1.7}'
+        '.post-faq{margin-top:36px}.post-faq h2{font-size:1.4rem;color:var(--blue-dark);font-weight:800;margin-bottom:14px}.post-faq details{background:#fff;border:1px solid #e6edf3;border-radius:12px;margin-bottom:10px;padding:0 18px}.post-faq summary{cursor:pointer;font-weight:700;color:var(--blue-dark);padding:14px 0;list-style-position:inside}.post-faq details[open] summary{border-bottom:1px solid #eef2f5}.post-faq details p{padding:12px 0 16px;color:var(--text-mid);line-height:1.8}</style>'
         f'{head_extra}</head><body>{nav}<main>{body}</main>{footer}</body></html>')
 
 @app.route('/blog')
@@ -3590,7 +3614,7 @@ def blog_post(slug):
         "dateModified": str(p.get('updated_at') or ''),
         "author": {"@type": "Organization", "name": p.get('author') or '潮旅國際旅行社'},
         "publisher": {"@type": "Organization", "name": "潮旅國際旅行社",
-                      "logo": {"@type": "ImageObject", "url": f"{SITE}/images/festival-poster.png"}},
+                      "logo": {"@type": "ImageObject", "url": f"{SITE}/images/festival-poster.jpg"}},
         "mainEntityOfPage": canonical, "url": canonical,
         "inLanguage": "zh-TW"
     }
@@ -3606,10 +3630,40 @@ def blog_post(slug):
                                  (p['title'], canonical)])
     head_extra = ('<script type="application/ld+json">' + json.dumps(ld, ensure_ascii=False) + '</script>'
                   '<script type="application/ld+json">' + json.dumps(breadcrumb, ensure_ascii=False) + '</script>')
+
+    # 先講結論（AEO）：用 summary 產生，所有文章都有
+    tldr = ''
+    if p.get('summary'):
+        tldr = (f'<div class="post-tldr"><span class="post-tldr-label">先講結論</span>'
+                f'<p>{_html.escape(p["summary"])}</p></div>')
+
+    # 資訊盒（選填欄位 info_box：{標籤:值}）
+    infobox = ''
+    if isinstance(p.get('info_box'), dict) and p['info_box']:
+        rows = ''.join(f'<div class="post-info-row"><span class="post-info-k">{_html.escape(str(k))}</span>'
+                       f'<span class="post-info-v">{_html.escape(str(v))}</span></div>'
+                       for k, v in p['info_box'].items())
+        infobox = f'<div class="post-infobox">{rows}</div>'
+
+    # 文末 FAQ（選填欄位 faq：[{q,a}]）＋ FAQPage schema
+    faq_html = ''
+    faq_items = p.get('faq') if isinstance(p.get('faq'), list) else []
+    faq_items = [x for x in faq_items if isinstance(x, dict) and x.get('q') and x.get('a')]
+    if faq_items:
+        qa = ''.join(f'<details><summary>{_html.escape(str(x["q"]))}</summary>'
+                     f'<p>{_html.escape(str(x["a"]))}</p></details>' for x in faq_items)
+        faq_html = f'<section class="post-faq"><h2>常見問題</h2>{qa}</section>'
+        faq_ld = {"@context": "https://schema.org", "@type": "FAQPage",
+                  "mainEntity": [{"@type": "Question", "name": str(x["q"]),
+                                  "acceptedAnswer": {"@type": "Answer", "text": str(x["a"])}}
+                                 for x in faq_items]}
+        head_extra += '<script type="application/ld+json">' + json.dumps(faq_ld, ensure_ascii=False) + '</script>'
+
     body = (f'<article class="blog-wrap"><a class="blog-back" href="/blog">← 回部落格</a>'
             f'<h1>{_html.escape(p["title"])}</h1>'
             f'<div class="blog-meta">{pub}｜{_html.escape(p.get("author") or "潮旅國際旅行社")}　{tags}</div>'
-            f'{cover}<div class="blog-body">{p.get("content") or ""}</div>'
+            f'{tldr}{infobox}'
+            f'{cover}<div class="blog-body">{p.get("content") or ""}</div>{faq_html}'
             f'<div class="blog-cta"><h3 style="color:var(--blue-dark);margin-bottom:10px">想規劃澎湖行程？</h3>'
             f'<a href="/#contact" class="btn btn-primary"><i class="fas fa-comment-dots"></i> 線上諮詢</a> '
             f'<a href="/neihai-preorder.html" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-ship"></i> 內海巡禮預購</a> '

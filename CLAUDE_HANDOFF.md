@@ -151,3 +151,16 @@
 3. 新文章 JSON 必須保留檔尾換行。
 4. 除非任務明確要求，發文時只提交單一新增文章 JSON。
 5. 如果 push 與另一個 agent 的 commit 撞車，先安全 rebase，再重新確認只發布預期的文章 JSON。
+
+## SEO/AEO/GEO 改版協作規則（2026-07-19，分支 codex/seo-aeo-geo-home-articles）
+
+1. **靜態資源長快取已啟用**（app.py `_set_cache_headers`）：css/js/圖片回 `public, max-age=31536000, immutable`。
+   因此**只要修改 style.css / script.js / i18n.js / faq-i18n.js / lottery.css|js / qigui.css|js，必須同步把所有 HTML 引用處的 `?v=` 版本字串改成當天日期**（目前 `?v=20260719`，app.py 內 `ASSET_VERSION` 也要一起改）。忘了改版本號＝使用者一年內都拿舊檔。
+2. **文章 JSON 新增兩個選填欄位**（repo_posts.py 會驗證並寫入 posts 表 JSONB 欄位）：
+   - `"faq": [{"q": "問題？", "a": "答案。"}, …]` — 文章頁自動渲染文末「常見問題」區塊＋FAQPage schema。
+   - `"info_box": {"適合誰": "…", "建議停留時間": "…", "適合季節": "…"}` — 文章開頭資訊盒。
+   建議之後每篇新文章都帶 3–5 題 faq 與 info_box，AEO 效果最好。舊文章不強制回填。
+3. 文章頁現在自動用 `summary` 渲染開頭「先講結論」框——**summary 請寫成 2–3 句可直接被 AI 引用的結論**，不要寫成釣魚式開頭。
+4. og:image 與 schema 圖已改用 `images/festival-poster.jpg`（211KB）；原 `festival-poster.png` 保留勿刪（舊分享連結）。文章 og:image 用各自 cover_image。
+5. 新增 `/llms-full.txt`；重要新頁面上線時請同步更新 llms.txt 與 llms-full.txt 的頁面清單。
+6. Pillar pages 規格見 `content/pillar-pages-todo.md`（尚未實作）。
