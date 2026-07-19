@@ -3112,7 +3112,7 @@ def _preorder_seo_data(slug, product=None):
     name = product.get('name') or ('2026 澎湖追風音樂燈光節主題行程' if slug == 'festival' else '潮旅行程預購')
     desc = product.get('description') or '選擇出發日期、填寫旅客資料即可完成預購，潮旅國際旅行社將由專人與您確認行程細節。'
     canonical = f'{SITE}/preorder/{slug}'
-    image = f'{SITE}/images/festival-poster.png'
+    image = f'{SITE}/images/festival-poster.jpg'
     if slug == 'festival':
         title = '2026 澎湖追風音樂燈光節主題行程預購｜三天兩夜套裝｜潮旅國際旅行社'
         desc = '2026 澎湖追風音樂燈光節主題行程預購，三天兩夜套裝安排，兩人成行，搭配觀音亭園區燈光展演與澎湖在地玩法，由潮旅國際旅行社專人確認。'
@@ -3453,7 +3453,7 @@ def admin_delete_post(pid):
 
 # ── 伺服器渲染：共用外殼 ──
 def _render_blog(title, desc, canonical, body, head_extra='', image=None):
-    img = image or f'{SITE}/images/festival-poster.png'
+    img = image or f'{SITE}/images/festival-poster.jpg'
     nav = '''<div class="top-banner"><div class="banner-static"><span>潮旅國際旅行社</span><span class="banner-sep">｜</span><span>2026 澎湖追風音樂燈光節 官方合作旅行社</span><span class="banner-sep">｜</span><span>電話：06-9271288</span></div></div>
 <nav class="navbar" id="navbar"><div class="nav-container"><a href="/" class="nav-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a><button class="nav-toggle" id="nav-toggle" aria-label="選單"><span></span><span></span><span></span></button><ul class="nav-links" id="nav-links"><li><a href="/">首頁</a></li><li><a href="/#tours">行程介紹</a></li><li class="nav-item has-submenu"><a href="/neihai-preorder.html">預購行程 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/neihai-preorder.html">小城故事內海巡禮</a></li><li><a href="/preorder/festival">追風音樂節</a></li></ul></li><li class="nav-item has-submenu"><a href="/blog">旅遊大小事 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/tides">潮汐查詢系統</a></li><li><a href="/blog">旅遊文章分享</a></li><li><a href="/reviews">旅客評價</a></li></ul></li><li class="nav-item has-submenu"><a href="/#about">關於我們 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/#contact">聯絡資訊</a></li></ul></li></ul></div></nav>'''
     footer = '''<footer class="footer"><div class="container"><div class="footer-bottom"><p>© 2026 潮旅國際旅行社 All Rights Reserved.｜<a href="/" style="color:inherit">官網</a>｜<a href="/blog" style="color:inherit">部落格</a>｜<a href="/reviews" style="color:inherit">旅客評價</a></p></div></div></footer>
@@ -3614,7 +3614,7 @@ def blog_post(slug):
         "dateModified": str(p.get('updated_at') or ''),
         "author": {"@type": "Organization", "name": p.get('author') or '潮旅國際旅行社'},
         "publisher": {"@type": "Organization", "name": "潮旅國際旅行社",
-                      "logo": {"@type": "ImageObject", "url": f"{SITE}/images/festival-poster.png"}},
+                      "logo": {"@type": "ImageObject", "url": f"{SITE}/images/festival-poster.jpg"}},
         "mainEntityOfPage": canonical, "url": canonical,
         "inLanguage": "zh-TW"
     }
