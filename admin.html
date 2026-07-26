@@ -486,6 +486,19 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
     </div>
     <div class="modal-body-inner">
       <input type="hidden" id="p-id" />
+      <input type="hidden" id="p-faq" />
+      <!-- ── AI 產生草稿（Gemini）── -->
+      <div class="form-group full" style="background:#f0f7ff;border:1px solid #cfe3f7;border-radius:10px;padding:12px 14px">
+        <label style="color:#1a6b9e"><i class="fas fa-wand-magic-sparkles"></i> AI 產生草稿（Gemini）</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input id="ai-topic" placeholder="輸入主題，例：澎湖夜釣小管怎麼玩" style="flex:1;min-width:200px" />
+          <button type="button" class="btn btn-sm btn-primary" id="ai-draft-btn" onclick="aiDraftPost()">
+            <i class="fas fa-robot"></i> 產生草稿
+          </button>
+        </div>
+        <p id="ai-draft-status" style="font-size:.78rem;color:#718096;margin:6px 0 0">
+          會自動填入標題、slug、摘要、內文、標籤與文末 FAQ；產生後請務必人工審稿再發布。</p>
+      </div>
       <div class="form-group full">
         <label>標題 *</label>
         <input id="p-title" placeholder="例：澎湖三天兩夜這樣玩最順" oninput="autoSlug()" />
@@ -1444,9 +1457,57 @@ function loadContacts() {
           <div class="contact-field"><label>備註</label><span>${c.notes||'—'}</span></div>
           <div class="contact-field"><label>送出時間</label>
             <span style="font-size:.78rem">${c.created_at}</span></div>
+          <div class="contact-field" style="grid-column:1/-1">
+            <button class="btn btn-sm btn-ghost" onclick="aiReplySuggest(${c.id})" id="ai-reply-btn-${c.id}"
+                    style="color:#1a6b9e;border:1px solid #cfe3f7">
+              <i class="fas fa-wand-magic-sparkles"></i> AI 建議回覆
+            </button>
+            <div id="ai-reply-box-${c.id}" style="display:none;margin-top:8px">
+              <textarea id="ai-reply-text-${c.id}" rows="6"
+                        style="width:100%;font-size:.86rem;line-height:1.7;border:1px solid #cfe3f7;border-radius:8px;padding:10px"></textarea>
+              <button class="btn btn-sm btn-primary" style="margin-top:6px" onclick="copyAiReply(${c.id})">
+                <i class="fas fa-copy"></i> 複製回覆（貼到 LINE）
+              </button>
+            </div>
+          </div>
         </div>`;
       }).join('');
     });
+}
+
+// ── AI 建議回覆（Gemini）──
+function aiReplySuggest(cid) {
+  const c = (window._contacts || []).find(x => x.id === cid);
+  if (!c) { showToast('找不到這筆諮詢', 'error'); return; }
+  const btn = document.getElementById(`ai-reply-btn-${cid}`);
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 草擬中…';
+  fetch(`/api/admin/gemini/reply-suggest?key=${encodeURIComponent(ADMIN_KEY)}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contact: {
+      name: c.name, travel_date: c.travel_date, travel_date_end: c.travel_date_end,
+      people: c.people, transport: c.transport, departure_city: c.departure_city,
+      budget: c.budget, tour_interest: c.tour_interest, notes: c.notes,
+    } }),
+  }).then(r => r.json()).then(d => {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> AI 建議回覆';
+    if (!d.ok) { showToast('產生失敗：' + (d.error || ''), 'error'); return; }
+    document.getElementById(`ai-reply-box-${cid}`).style.display = 'block';
+    document.getElementById(`ai-reply-text-${cid}`).value = d.reply || '';
+  }).catch(() => {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> AI 建議回覆';
+    showToast('連線失敗，請再試一次', 'error');
+  });
+}
+
+function copyAiReply(cid) {
+  const t = document.getElementById(`ai-reply-text-${cid}`);
+  t.select();
+  navigator.clipboard.writeText(t.value).then(
+    () => showToast('已複製，貼上前請再確認內容 ✅', 'success'),
+    () => document.execCommand('copy'));
 }
 
 
@@ -2492,7 +2553,7 @@ function autoSlug() {
 
 function openPostForm() {
   document.getElementById('post-modal-title').textContent = '寫新文章';
-  ['p-id','p-title','p-slug','p-summary','p-cover','p-content','p-tags'].forEach(i=>document.getElementById(i).value='');
+  ['p-id','p-title','p-slug','p-summary','p-cover','p-content','p-tags','p-faq','ai-topic'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('p-pub').value = 'false';
   document.getElementById('p-slug').dataset.touched = '';
   if (typeof clearCover === 'function') clearCover();
@@ -2512,6 +2573,7 @@ function editPost(id) {
   document.getElementById('p-content').value = p.content || '';
   document.getElementById('p-tags').value = p.tags || '';
   document.getElementById('p-pub').value = String(!!p.is_published);
+  document.getElementById('p-faq').value = '';   // 編輯既有文章不帶 faq，儲存時不覆蓋原值
   document.getElementById('cover-status').textContent = '';
   syncCoverPreview();
   document.getElementById('post-modal').classList.add('open');
@@ -2591,6 +2653,9 @@ function savePost() {
     is_published: document.getElementById('p-pub').value === 'true',
     _key: ADMIN_KEY,
   };
+  // AI 草稿帶入的 FAQ（有值才傳，後端只在有傳時寫入）
+  const faqRaw = document.getElementById('p-faq').value;
+  if (faqRaw) { try { payload.faq = JSON.parse(faqRaw); } catch (_) {} }
   const url    = id ? `/api/admin/posts/${id}` : '/api/admin/posts';
   const method = id ? 'PUT' : 'POST';
   fetch(`${url}?key=${encodeURIComponent(ADMIN_KEY)}`, {
@@ -2598,6 +2663,40 @@ function savePost() {
   }).then(r => r.json()).then(d => {
     if (d.ok) { showToast(id ? '文章已更新 ✅' : '文章已建立 ✅', 'success'); closePostModal(); loadPosts(); }
     else showToast('儲存失敗：' + (d.error||''), 'error');
+  });
+}
+
+// ── AI 產生草稿（Gemini）──
+function aiDraftPost() {
+  const topic = document.getElementById('ai-topic').value.trim();
+  if (!topic) { showToast('請先輸入文章主題', 'error'); return; }
+  const btn = document.getElementById('ai-draft-btn');
+  const status = document.getElementById('ai-draft-status');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 產生中（約 10–30 秒）…';
+  status.textContent = 'Gemini 撰寫草稿中，請稍候…';
+  fetch(`/api/admin/gemini/blog-draft?key=${encodeURIComponent(ADMIN_KEY)}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ topic }),
+  }).then(r => r.json()).then(d => {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-robot"></i> 產生草稿';
+    if (!d.ok) { status.textContent = '❌ ' + (d.error || '產生失敗，請再試一次'); return; }
+    const dr = d.draft;
+    document.getElementById('p-title').value = dr.title || '';
+    document.getElementById('p-slug').value = dr.slug || '';
+    document.getElementById('p-slug').dataset.touched = '1';
+    document.getElementById('p-summary').value = dr.summary || '';
+    document.getElementById('p-content').value = dr.content || '';
+    document.getElementById('p-tags').value = dr.tags || '';
+    document.getElementById('p-faq').value = (dr.faq && dr.faq.length) ? JSON.stringify(dr.faq) : '';
+    document.getElementById('p-pub').value = 'false';   // AI 草稿一律先存草稿
+    status.textContent = `✅ 草稿已填入${dr.faq && dr.faq.length ? `（含 ${dr.faq.length} 題文末 FAQ，儲存時一併寫入）` : ''}——請逐段審稿、確認沒有捏造內容後再發布。`;
+    showToast('AI 草稿已產生，請審稿', 'success');
+  }).catch(() => {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-robot"></i> 產生草稿';
+    status.textContent = '❌ 連線失敗，請再試一次';
   });
 }
 

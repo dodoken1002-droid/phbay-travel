@@ -177,3 +177,13 @@
 - 追風音樂節文章 → `/penghu-2026-festival-guide`
 - 每篇至少：1 個 pillar page 內鏈＋2 個相關文章內鏈＋1 個首頁或 LINE CTA。
 - 另外文章頁模板會依 tag 自動在文末加一條「延伸攻略」連結（app.py `_pillar_link_for_tags()`），內文的內鏈仍建議照上面規則寫，兩者不衝突。
+
+## Gemini AI 功能（2026-07-20，分支 codex/gemini-features）
+
+環境變數 `GEMINI_API_KEY` 已設在 Railway 網站服務。共用模組 `gemini_helper.py`（urllib REST 打 gemini-2.5-flash，零新依賴）。
+
+1. **後台文章「AI 產生草稿」**：`POST /api/admin/gemini/blog-draft`（editor 權限）→ 填入標題/slug/摘要/內文/標籤/FAQ；一律先存草稿、人工審稿。admin posts API 現在接受選填 `faq` list（只在有傳時寫入）。
+2. **諮詢「AI 建議回覆」**：`POST /api/admin/gemini/reply-suggest`（orders 權限）→ LINE 回覆草稿，不承諾價格名額。
+3. **行程診斷個人化建議**：公開 `POST /api/quiz-ai`（每 IP 10 分鐘 5 次限流），前端結果頁顯示「給你的小建議」，失敗靜默略過；GA4 事件 `quiz_ai_note_shown`。
+4. 診斷端點：`/api/admin/gemini-test`（owner）。
+5. **提示詞紅線**（改 prompt 時保留）：不得捏造店名、地址、價格、名額、船班、活動細節。
