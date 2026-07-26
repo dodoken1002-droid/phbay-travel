@@ -2558,21 +2558,28 @@ def admin_line_users():
 
 
 # ─── Gemini AI 輔助（部落格草稿／諮詢回覆建議／診斷個人化）───
-from gemini_helper import gemini_generate, gemini_available
+from gemini_helper import gemini_generate, gemini_available, resolve_model, list_models
 
 @app.route('/api/admin/gemini-test', methods=['GET', 'POST'])
 def admin_gemini_test():
-    """診斷 Gemini 設定：檢查金鑰並實際打一次 API。"""
+    """診斷 Gemini 設定：檢查金鑰、回報自動選用的模型並實際打一次 API。"""
     if not is_admin():
         return jsonify(ok=False, error='未授權'), 401
     if not gemini_available():
         return jsonify(ok=False, configured=False, error='GEMINI_API_KEY 未設定')
     try:
+        model = resolve_model()
         text = gemini_generate('請只回覆兩個字：正常', temperature=0)
-        return jsonify(ok=True, configured=True, model='gemini-2.5-flash',
+        return jsonify(ok=True, configured=True, model=model,
                        reply=(text or '').strip()[:50])
     except Exception as e:
-        return jsonify(ok=False, configured=True, error=str(e)), 502
+        models = []
+        try:
+            models = list_models()[:20]
+        except Exception:
+            pass
+        return jsonify(ok=False, configured=True, error=str(e),
+                       available_models=models), 502
 
 
 @app.route('/api/admin/gemini/blog-draft', methods=['POST'])
