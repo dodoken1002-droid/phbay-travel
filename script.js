@@ -775,9 +775,11 @@ const QUIZ_RESULTS = {
 };
 
 let quizAnswers = [];
+let quizAnswerTexts = [];   // 保留題目與選項文字，供 AI 個人化建議使用
 
 function initQuiz() {
   quizAnswers = [];
+  quizAnswerTexts = [];
   const sharedResult = new URLSearchParams(window.location.search).get('quiz');
   if (sharedResult && QUIZ_RESULTS[sharedResult]) {
     renderQuizResult(sharedResult, true);
@@ -814,6 +816,7 @@ function renderQuizQuestion(idx) {
 
 window.quizAnswer = function(qIdx, optIdx) {
   quizAnswers.push(QUIZ_QUESTIONS[qIdx].options[optIdx].scores);
+  quizAnswerTexts.push({ q: QUIZ_QUESTIONS[qIdx].q, a: QUIZ_QUESTIONS[qIdx].options[optIdx].text });
   const next = qIdx + 1;
   if (next < QUIZ_QUESTIONS.length) {
     renderQuizQuestion(next);
@@ -849,6 +852,7 @@ function renderQuizResult(forcedKey, fromShare = false) {
       <span class="quiz-result-badge">你的旅遊類型</span>
       <div class="quiz-result-type">${r.type}</div>
       <p class="quiz-result-desc">${r.desc}</p>
+      <div id="quiz-ai-note" style="display:none;background:#f0f7ff;border-left:3px solid var(--blue-main);border-radius:8px;padding:12px 16px;margin:0 0 14px;text-align:left;font-size:.94rem;line-height:1.8;color:var(--text-dark)"></div>
       <div class="quiz-result-tour">
         <img src="${r.tour.img}" alt="${r.tour.name}" />
         <div class="quiz-result-tour-info">
@@ -887,6 +891,22 @@ function renderQuizResult(forcedKey, fromShare = false) {
       <div class="quiz-copy-toast" id="quiz-copy-toast">已複製分享連結！</div>
     </div>`;
   if (fromShare && location.hash !== '#quiz') location.hash = 'quiz';
+  if (!fromShare && quizAnswerTexts.length) loadQuizAiNote(best);
+}
+
+// AI 個人化建議（失敗就靜默略過，不影響原結果）
+function loadQuizAiNote(resultKey) {
+  fetch('/api/quiz-ai', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ result: resultKey, answers: quizAnswerTexts }),
+  }).then(r => r.json()).then(d => {
+    if (!d.ok || !d.text) return;
+    const box = document.getElementById('quiz-ai-note');
+    if (!box) return;
+    box.innerHTML = `<strong style="color:var(--blue-main)">✦ 給你的小建議</strong><br>${d.text.replace(/</g,'&lt;')}`;
+    box.style.display = 'block';
+    if (typeof gtag === 'function') gtag('event', 'quiz_ai_note_shown', { result_type: resultKey });
+  }).catch(() => {});
 }
 
 async function shareQuizResult(key) {

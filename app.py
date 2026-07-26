@@ -42,7 +42,7 @@ app.permanent_session_lifetime = timedelta(hours=12)
 # ─── 靜態資源快取 ──────────────────────────────────────────
 # CSS/JS/圖片長快取；改動 css/js 時必須同步調整各 HTML 引用的 ?v= 版本字串，
 # 否則使用者會拿到快取的舊資源（版本字串統一用 ASSET_VERSION）。
-ASSET_VERSION = '20260719'
+ASSET_VERSION = '20260720'
 _LONG_CACHE_EXT = ('.css', '.js', '.png', '.jpg', '.jpeg', '.webp', '.avif',
                    '.gif', '.svg', '.ico', '.woff', '.woff2')
 
@@ -2557,6 +2557,154 @@ def admin_line_users():
         return jsonify(ok=False, error=str(e)), 500
 
 
+# ─── Gemini AI 輔助（部落格草稿／諮詢回覆建議／診斷個人化）───
+from gemini_helper import gemini_generate, gemini_available
+
+@app.route('/api/admin/gemini-test', methods=['GET', 'POST'])
+def admin_gemini_test():
+    """診斷 Gemini 設定：檢查金鑰並實際打一次 API。"""
+    if not is_admin():
+        return jsonify(ok=False, error='未授權'), 401
+    if not gemini_available():
+        return jsonify(ok=False, configured=False, error='GEMINI_API_KEY 未設定')
+    try:
+        text = gemini_generate('請只回覆兩個字：正常', temperature=0)
+        return jsonify(ok=True, configured=True, model='gemini-2.5-flash',
+                       reply=(text or '').strip()[:50])
+    except Exception as e:
+        return jsonify(ok=False, configured=True, error=str(e)), 502
+
+
+@app.route('/api/admin/gemini/blog-draft', methods=['POST'])
+def admin_gemini_blog_draft():
+    """後台文章編輯器「AI 產生草稿」：給主題，回整篇草稿欄位。"""
+    if not has_role('editor'):
+        return jsonify(ok=False, error='未授權'), 401
+    d = request.get_json(force=True, silent=True) or {}
+    topic = (d.get('topic') or '').strip()[:120]
+    notes = (d.get('notes') or '').strip()[:300]
+    if not topic:
+        return jsonify(ok=False, error='請先輸入文章主題'), 400
+    prompt = f"""你是澎湖在地旅行社「潮旅國際旅行社」的部落格編輯，為官網 https://www.phbay.info/blog 寫文章草稿。
+
+文章主題：{topic}
+{('補充要求：' + notes) if notes else ''}
+
+寫作規範（務必遵守）：
+1. 繁體中文（台灣用語），親切、在地、實用，不浮誇。全文約 900–1300 字。
+2. content 為 HTML：只用 <h2> <h3> <p> <strong> <ul> <li> <a> 標籤；2–4 個 <h2> 段落。
+3. summary 寫成 2–3 句「先講結論」式摘要（會顯示在文章開頭的結論框），不要釣魚式開頭。
+4. 內文自然放入 1 個相關主題攻略頁連結（美食主題連 /penghu-food-guide、親子連 /penghu-family-travel、行程景點連 /penghu-3days-itinerary、音樂節連 /penghu-2026-festival-guide），
+   以及文末 1 句 CTA 引導加官方 LINE @phbay2018 或造訪 https://www.phbay.info/。
+5. 絕對不可捏造：具體店名、地址、價格、營業時間、船班時刻、活動細節。不確定的就用通稱（例如「馬公市區的老字號店家」）。
+6. tags 為 4–6 個逗號分隔標籤，第一個必須是「澎湖美食」「澎湖景點」或「澎湖旅遊」其中之一。
+7. slug 為小寫英數與連字號（不含日期），例如 penghu-xxx-guide。
+8. faq 為 3–5 題文末常見問題（q 是使用者真的會搜尋的問題、a 為 2–4 句回答）。
+
+請回傳 JSON 物件，鍵為：title, slug, summary, content, tags, faq（faq 為 [{{"q":"...","a":"..."}}] 陣列）。"""
+    try:
+        draft = gemini_generate(prompt, json_mode=True, timeout=90)
+        if not isinstance(draft, dict) or not draft.get('title'):
+            return jsonify(ok=False, error='AI 回傳格式異常，請再試一次'), 502
+        return jsonify(ok=True, draft={
+            'title': str(draft.get('title', ''))[:200],
+            'slug': re.sub(r'[^a-z0-9-]', '', str(draft.get('slug', '')).lower())[:120],
+            'summary': str(draft.get('summary', ''))[:500],
+            'content': str(draft.get('content', '')),
+            'tags': str(draft.get('tags', ''))[:200],
+            'faq': draft.get('faq') if isinstance(draft.get('faq'), list) else [],
+        })
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 502
+
+
+@app.route('/api/admin/gemini/reply-suggest', methods=['POST'])
+def admin_gemini_reply_suggest():
+    """諮詢紀錄「AI 建議回覆」：依旅客表單內容草擬 LINE 回覆。"""
+    if not has_role('orders'):
+        return jsonify(ok=False, error='未授權'), 401
+    d = request.get_json(force=True, silent=True) or {}
+    c = d.get('contact') or {}
+    fields = []
+    for label, key in (('姓名', 'name'), ('旅遊日期', 'travel_date'), ('回程日', 'travel_date_end'),
+                       ('人數', 'people'), ('交通方式', 'transport'), ('出發地', 'departure_city'),
+                       ('預算', 'budget'), ('有興趣的行程', 'tour_interest'), ('備註', 'notes')):
+        v = str(c.get(key) or '').strip()[:120]
+        if v:
+            fields.append(f'{label}：{v}')
+    if not fields:
+        return jsonify(ok=False, error='缺少旅客資料'), 400
+    prompt = f"""你是澎湖在地旅行社「潮旅國際旅行社」的訂位人員，要用 LINE 回覆一位剛送出線上諮詢的旅客。
+
+旅客資料：
+{chr(10).join(fields)}
+
+請草擬一則 LINE 回覆訊息（純文字，不用 markdown）：
+1. 繁體中文（台灣用語），親切專業，150–250 字。
+2. 開頭稱呼旅客姓名，感謝諮詢；針對旅客的日期、人數、預算與需求給 1–2 個具體的安排方向建議。
+3. 結尾提出 1 個推進問題（例如確認日期彈性或想玩的重點），並附上聯絡資訊：電話 06-9271288（週一至週五 08:30–17:30）。
+4. 絕對不可承諾或編造：具體價格、名額、船班、優惠。價格一律說「依日期與住宿等級專人報價」。
+5. 署名「潮旅國際旅行社」。"""
+    try:
+        reply = gemini_generate(prompt, timeout=60)
+        return jsonify(ok=True, reply=(reply or '').strip()[:1500])
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 502
+
+
+# 行程診斷個人化說明：公開端點 → 需節流（記憶體內簡易限流，每 IP 10 分鐘 5 次）
+_QUIZ_AI_HITS = {}
+
+def _quiz_ai_rate_ok(ip):
+    import time as _t
+    now = _t.time()
+    hits = [t for t in _QUIZ_AI_HITS.get(ip, []) if now - t < 600]
+    if len(hits) >= 5:
+        _QUIZ_AI_HITS[ip] = hits
+        return False
+    hits.append(now)
+    _QUIZ_AI_HITS[ip] = hits
+    if len(_QUIZ_AI_HITS) > 5000:  # 防記憶體無限成長
+        _QUIZ_AI_HITS.clear()
+    return True
+
+_QUIZ_AI_RESULTS = {'neihai': '內海慢遊', 'festival': '追風音樂節', 'family': '親子海島',
+                    'island': '望安七美跳島', 'tides': '潮汐秘境'}
+
+@app.route('/api/quiz-ai', methods=['POST'])
+def quiz_ai_note():
+    """行程診斷結果的個人化補充說明（失敗時前端靜默略過，不影響原結果）。"""
+    if not gemini_available():
+        return jsonify(ok=False, error='未設定'), 200
+    if not _quiz_ai_rate_ok(_client_ip()):
+        return jsonify(ok=False, error='rate limited'), 200
+    d = request.get_json(force=True, silent=True) or {}
+    result = str(d.get('result') or '')
+    if result not in _QUIZ_AI_RESULTS:
+        return jsonify(ok=False, error='bad result'), 200
+    answers = d.get('answers') or []
+    lines = []
+    for a in answers[:6]:
+        q = str((a or {}).get('q') or '').strip()[:60]
+        v = str((a or {}).get('a') or '').strip()[:60]
+        if q and v:
+            lines.append(f'{q}：{v}')
+    prompt = f"""你是澎湖在地旅行社「潮旅國際旅行社」的行程顧問。旅客剛完成 30 秒行程診斷，
+測出的旅遊類型是「{_QUIZ_AI_RESULTS[result]}」路線。
+
+旅客的作答：
+{chr(10).join(lines) if lines else '（無詳細作答）'}
+
+請用繁體中文寫 2–3 句（80 字內）給這位旅客的個人化建議，依作答中的月份、同行對象、
+天數與預算，說明這條路線對他最值得注意的 1–2 個安排重點。口吻親切像在地朋友。
+不可提及具體價格、名額或店名；不用打招呼與署名，直接講重點。"""
+    try:
+        text = gemini_generate(prompt, timeout=25, temperature=0.8)
+        return jsonify(ok=True, text=(text or '').strip()[:300])
+    except Exception:
+        return jsonify(ok=False, error='ai unavailable'), 200
+
+
 # ─── 通用預購系統（音樂節等；每個行程一筆 preorder_products）───
 PREORDER_VALID_STATUSES = {'pending_departure', 'confirmed_departure', 'confirmed', 'cancelled'}
 
@@ -3440,12 +3588,14 @@ def admin_create_post():
     d = request.get_json(force=True, silent=True) or {}
     try:
         pub = bool(d.get('is_published'))
+        faq = d.get('faq') if isinstance(d.get('faq'), list) else None
         conn = get_db(); cur = conn.cursor()
-        cur.execute("""INSERT INTO posts (slug,title,summary,content,cover_image,tags,author,is_published,published_at)
-                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+        cur.execute("""INSERT INTO posts (slug,title,summary,content,cover_image,tags,author,is_published,published_at,faq)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
                     (d.get('slug','').strip(), d.get('title','未命名'), d.get('summary',''),
                      d.get('content',''), d.get('cover_image',''), d.get('tags',''),
-                     d.get('author','潮旅國際旅行社'), pub, _dt.now() if pub else None))
+                     d.get('author','潮旅國際旅行社'), pub, _dt.now() if pub else None,
+                     Json(faq) if faq else None))
         nid = cur.fetchone()['id']; conn.commit(); cur.close(); conn.close()
         return jsonify(ok=True, id=nid)
     except Exception as e:
@@ -3469,6 +3619,10 @@ def admin_update_post(pid):
                     (d.get('slug','').strip(), d.get('title',''), d.get('summary',''),
                      d.get('content',''), d.get('cover_image',''), d.get('tags',''),
                      d.get('author','潮旅國際旅行社'), pub, pub_at, pid))
+        # faq 僅在有傳（list）時更新，否則保留原值（AI 草稿帶入用）
+        if isinstance(d.get('faq'), list):
+            cur.execute("UPDATE posts SET faq=%s WHERE id=%s",
+                        (Json(d['faq']) if d['faq'] else None, pid))
         conn.commit(); cur.close(); conn.close()
         return jsonify(ok=True)
     except Exception as e:
