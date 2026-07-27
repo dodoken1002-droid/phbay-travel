@@ -27,13 +27,34 @@ SITE = "https://www.phbay.info"
 SITEMAP_URL = f"{SITE}/sitemap.xml"
 
 # 重點頁：商業價值最高、最需要確認收錄的網址
+# （固定清單＋自動加上 content/posts 最新 3 篇，避免清單過期）
 KEY_URLS = [
+    f"{SITE}/",
     f"{SITE}/preorder/festival",
     f"{SITE}/neihai-preorder.html",
-    f"{SITE}/blog/2026-07-07-penghu-fenggui-cave-sound-guide",
-    f"{SITE}/blog/2026-07-08-penghu-tongliang-banyan-north-ring-guide",
-    f"{SITE}/blog/2026-07-09-penghu-summer-chat-survival-guide",
+    f"{SITE}/penghu-3days-itinerary",
+    f"{SITE}/penghu-family-travel",
+    f"{SITE}/penghu-food-guide",
+    f"{SITE}/penghu-2026-festival-guide",
 ]
+
+
+def _latest_post_urls(n: int = 3) -> list:
+    """從 content/posts/*.json 取最新 n 篇文章網址（檔名含日期，排序即時序）。"""
+    import glob
+    import json as _json
+
+    posts_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                             "content", "posts")
+    urls = []
+    for path in sorted(glob.glob(os.path.join(posts_dir, "*.json")), reverse=True)[:n]:
+        try:
+            slug = _json.load(open(path, encoding="utf-8")).get("slug", "")
+            if slug:
+                urls.append(f"{SITE}/blog/{slug}")
+        except Exception:
+            continue
+    return urls
 
 BRAND_TERMS = ["潮旅", "phbay"]
 
@@ -64,19 +85,20 @@ def report_sitemaps(svc) -> None:
         entries = svc.sitemaps().list(siteUrl=PROPERTY).execute().get("sitemap", [])
     for s in entries:
         counts = s.get("contents", [{}])[0]
+        pending = "｜⏳ 提交排隊中" if s.get("isPending") else ""
         print(
             f"  {s.get('path')}\n"
             f"    最後下載：{s.get('lastDownloaded', '（尚未）')}"
             f"｜提交 {counts.get('submitted', '?')} 筆"
             f"｜已收錄 {counts.get('indexed', '?')} 筆"
-            f"｜錯誤 {s.get('errors', 0)}｜警告 {s.get('warnings', 0)}"
+            f"｜錯誤 {s.get('errors', 0)}｜警告 {s.get('warnings', 0)}{pending}"
         )
 
 
 def report_inspect(svc) -> None:
     print("== 重點頁收錄狀態 ==")
     need_manual = []
-    for url in KEY_URLS:
+    for url in KEY_URLS + _latest_post_urls():
         resp = (
             svc.urlInspection()
             .index()
