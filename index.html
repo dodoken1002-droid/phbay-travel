@@ -49,6 +49,8 @@
   <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
   <link rel="dns-prefetch" href="https://connect.facebook.net" />
   <link rel="dns-prefetch" href="https://images.unsplash.com" />
+  <!-- 預載首屏輪播 LCP 圖（WebP），加速最大內容繪製 -->
+  <link rel="preload" as="image" href="/images/summer-festival-hero-2026.webp" type="image/webp" fetchpriority="high" />
 
   <link rel="stylesheet" href="style.css?v=20260720" />
   <!-- Font Awesome：非阻塞載入（先以 print 媒體載入，完成後切回 all），避免拖慢首屏渲染 -->
@@ -295,7 +297,10 @@
 
         <!-- ─ 活動促銷：夏日樂購節（07/01-08/25，16:9 滿版）─ -->
         <div class="carousel-slide slide-cover" style="background:#bfe3f7">
-          <img src="/images/summer-festival-hero-2026.jpg" alt="2026 澎湖夏日樂購節 好禮三重送 每週二抽萬元現金、立榮航空來回機票（活動期間 07/01-08/25）" width="1672" height="941" fetchpriority="high" decoding="async" />
+          <picture>
+            <source srcset="/images/summer-festival-hero-2026.webp" type="image/webp" />
+            <img src="/images/summer-festival-hero-2026.jpg" alt="2026 澎湖夏日樂購節 好禮三重送 每週二抽萬元現金、立榮航空來回機票（活動期間 07/01-08/25）" width="1672" height="941" fetchpriority="high" decoding="async" />
+          </picture>
           <div class="slide-overlay">
             <a href="#contact" class="btn btn-primary slide-cta">
               <i class="fas fa-comment-dots"></i> 詢問活動詳情
@@ -305,7 +310,10 @@
 
         <!-- ─ 小城故事・內海巡禮（16:9 滿版，點擊前往預購）─ -->
         <div class="carousel-slide slide-cover" style="background:#0b5e9e">
-          <img src="/images/neihai-cruise-hero-2026.jpg" alt="小城故事・內海巡禮 6人成行最多13人 出航時間09:00、11:00、16:30 七八月每週二20:30花火專船 2026年試航價1000元" width="1672" height="941" loading="lazy" decoding="async" />
+          <picture>
+            <source srcset="/images/neihai-cruise-hero-2026.webp" type="image/webp" />
+            <img src="/images/neihai-cruise-hero-2026.jpg" alt="小城故事・內海巡禮 6人成行最多13人 出航時間09:00、11:00、16:30 七八月每週二20:30花火專船 2026年試航價1000元" width="1672" height="941" loading="lazy" decoding="async" />
+          </picture>
           <div class="slide-overlay">
             <a href="/neihai-preorder.html" class="btn btn-primary slide-cta">
               <i class="fas fa-ship"></i> 立即預購訂位
@@ -315,7 +323,10 @@
 
         <!-- ─ 第 1 格：音樂節直式海報 ─ -->
         <div class="carousel-slide slide-poster">
-          <img src="/images/festival-poster.jpg" alt="2026 澎湖追風音樂燈光節" width="2250" height="2813" loading="lazy" decoding="async" />
+          <picture>
+            <source srcset="/images/festival-poster.webp" type="image/webp" />
+            <img src="/images/festival-poster.jpg" alt="2026 澎湖追風音樂燈光節" width="2250" height="2813" loading="lazy" decoding="async" />
+          </picture>
           <div class="slide-overlay">
             <a href="/preorder/festival" class="btn btn-primary slide-cta">
               <i class="fas fa-music"></i> 查看音樂節預購
