@@ -413,6 +413,8 @@ def init_db():
     # AEO 選填欄位：faq=[{q,a},…] 文末常見問題；info_box={標籤:值,…} 文章資訊盒
     cur.execute("ALTER TABLE posts ADD COLUMN IF NOT EXISTS faq JSONB")
     cur.execute("ALTER TABLE posts ADD COLUMN IF NOT EXISTS info_box JSONB")
+    # 多語系翻譯：{lang:{title,summary,content,faq,info_box}}，缺欄位回退中文（zh-tw）
+    cur.execute("ALTER TABLE posts ADD COLUMN IF NOT EXISTS i18n JSONB DEFAULT '{}'")
     conn.commit()
 
     # 若 tours 資料表是空的，寫入預設行程
@@ -3647,13 +3649,97 @@ def admin_delete_post(pid):
         return jsonify(ok=False, error=str(e)), 500
 
 # ── 伺服器渲染：共用外殼 ──
-def _render_blog(title, desc, canonical, body, head_extra='', image=None):
+# ─── 部落格多語系 ─────────────────────────────────────────
+BLOG_LANGS = ('en', 'ja', 'ko', 'zh-cn')  # zh-tw 為預設，不列入
+BLOG_HTML_LANG = {'zh-tw': 'zh-TW', 'en': 'en', 'ja': 'ja', 'ko': 'ko', 'zh-cn': 'zh-Hans'}
+BLOG_OG_LOCALE = {'zh-tw': 'zh_TW', 'en': 'en_US', 'ja': 'ja_JP', 'ko': 'ko_KR', 'zh-cn': 'zh_CN'}
+BLOG_HREFLANG = {'zh-tw': 'zh-Hant', 'en': 'en', 'ja': 'ja', 'ko': 'ko', 'zh-cn': 'zh-Hans'}
+BLOG_LANG_NAME = {'zh-tw': '中文', 'en': 'English', 'ja': '日本語', 'ko': '한국어', 'zh-cn': '简体中文'}
+# 文章頁固定介面字串（依語言）
+BLOG_UI = {
+    'zh-tw': {'back': '← 回部落格', 'tldr': '先講結論', 'faq': '常見問題',
+              'cta_h': '想規劃澎湖行程？', 'consult': '線上諮詢', 'neihai': '內海巡禮預購',
+              'festival': '音樂節行程預購', 'quiz': '30 秒測你的澎湖玩法', 'pillar': '延伸攻略：'},
+    'en': {'back': '← Back to blog', 'tldr': 'In short', 'faq': 'FAQ',
+           'cta_h': 'Planning a Penghu trip?', 'consult': 'Enquire online', 'neihai': 'Inner-Sea Cruise pre-order',
+           'festival': 'Music Festival pre-order', 'quiz': 'Find your Penghu style (30s)', 'pillar': 'Related guide: '},
+    'ja': {'back': '← ブログに戻る', 'tldr': '結論から', 'faq': 'よくある質問',
+           'cta_h': '澎湖旅行を計画しませんか？', 'consult': 'オンライン相談', 'neihai': '内海クルーズ予約',
+           'festival': '音楽祭ツアー予約', 'quiz': '30秒であなたの澎湖旅診断', 'pillar': '関連ガイド：'},
+    'ko': {'back': '← 블로그로', 'tldr': '요약', 'faq': '자주 묻는 질문',
+           'cta_h': '펑후 여행을 계획 중이신가요?', 'consult': '온라인 문의', 'neihai': '내해 크루즈 예약',
+           'festival': '뮤직 페스티벌 예약', 'quiz': '30초 펑후 여행 진단', 'pillar': '관련 가이드: '},
+    'zh-cn': {'back': '← 回博客', 'tldr': '先讲结论', 'faq': '常见问题',
+              'cta_h': '想规划澎湖行程？', 'consult': '在线咨询', 'neihai': '内海巡礼预购',
+              'festival': '音乐节行程预购', 'quiz': '30 秒测你的澎湖玩法', 'pillar': '延伸攻略：'},
+}
+
+
+def _req_lang():
+    """讀取 ?lang=，僅接受支援語言，否則回傳預設 zh-tw。"""
+    l = (request.args.get('lang') or '').strip().lower()
+    return l if l in BLOG_LANGS else 'zh-tw'
+
+
+def _localize_post(p, lang):
+    """回傳指定語言的欄位；缺哪個欄位就回退中文（逐欄位）。"""
+    out = dict(p)
+    if lang in BLOG_LANGS:
+        tr = p.get('i18n') if isinstance(p.get('i18n'), dict) else {}
+        tr = tr.get(lang) if isinstance(tr, dict) else None
+        tr = tr if isinstance(tr, dict) else {}
+        for k in ('title', 'summary', 'content'):
+            if str(tr.get(k) or '').strip():
+                out[k] = tr[k]
+        if isinstance(tr.get('faq'), list) and tr['faq']:
+            out['faq'] = tr['faq']
+        if isinstance(tr.get('info_box'), dict) and tr['info_box']:
+            out['info_box'] = tr['info_box']
+    return out
+
+
+def _post_avail_langs(p):
+    """該文章實際有翻譯（至少有標題或內文）的語言清單。"""
+    tr = p.get('i18n') if isinstance(p.get('i18n'), dict) else {}
+    return [l for l in BLOG_LANGS
+            if isinstance(tr.get(l), dict) and (str(tr[l].get('title') or '').strip()
+                                                or str(tr[l].get('content') or '').strip())]
+
+
+def _blog_hreflang(path_no_lang, avail):
+    """產生 hreflang 交替連結：中文（含 x-default）＋各已翻譯語言。"""
+    from urllib.parse import urlencode
+    links = [f'<link rel="alternate" hreflang="zh-Hant" href="{SITE}{path_no_lang}"/>',
+             f'<link rel="alternate" hreflang="x-default" href="{SITE}{path_no_lang}"/>']
+    for l in avail:
+        sep = '&' if '?' in path_no_lang else '?'
+        links.append(f'<link rel="alternate" hreflang="{BLOG_HREFLANG[l]}" href="{SITE}{path_no_lang}{sep}lang={l}"/>')
+    return ''.join(links)
+
+
+def _render_blog(title, desc, canonical, body, head_extra='', image=None, lang='zh-tw', alt_links=''):
     img = image or f'{SITE}/images/festival-poster.jpg'
     nav = '''<div class="top-banner"><div class="banner-static"><span>潮旅國際旅行社</span><span class="banner-sep">｜</span><span>2026 澎湖追風音樂燈光節 官方合作旅行社</span><span class="banner-sep">｜</span><span>電話：06-9271288</span></div></div>
 <nav class="navbar" id="navbar"><div class="nav-container"><a href="/" class="nav-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a><button class="nav-toggle" id="nav-toggle" aria-label="選單"><span></span><span></span><span></span></button><ul class="nav-links" id="nav-links"><li><a href="/">首頁</a></li><li><a href="/#tours">行程介紹</a></li><li class="nav-item has-submenu"><a href="/neihai-preorder.html">預購行程 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/neihai-preorder.html">小城故事內海巡禮</a></li><li><a href="/preorder/festival">追風音樂節</a></li></ul></li><li class="nav-item has-submenu"><a href="/blog">旅遊大小事 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/tides">潮汐查詢系統</a></li><li><a href="/blog">旅遊文章分享</a></li><li><a href="/reviews">旅客評價</a></li></ul></li><li class="nav-item has-submenu"><a href="/#about">關於我們 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/#contact">聯絡資訊</a></li></ul></li></ul></div></nav>'''
     footer = '''<footer class="footer"><div class="container"><div class="footer-bottom"><p>© 2026 潮旅國際旅行社 All Rights Reserved.｜<a href="/" style="color:inherit">官網</a>｜<a href="/blog" style="color:inherit">部落格</a>｜<a href="/reviews" style="color:inherit">旅客評價</a></p></div></div></footer>
-<script>(function(){var t=document.getElementById('nav-toggle'),l=document.getElementById('nav-links');if(t)t.addEventListener('click',function(){l.classList.toggle('open')});})();</script>'''
-    return ('<!DOCTYPE html><html lang="zh-TW"><head>'
+<script>(function(){var t=document.getElementById('nav-toggle'),l=document.getElementById('nav-links');if(t)t.addEventListener('click',function(){l.classList.toggle('open')});var lb=document.getElementById('lang-btn'),lm=document.getElementById('lang-menu');if(lb)lb.addEventListener('click',function(e){e.stopPropagation();lm.classList.toggle('open')});document.addEventListener('click',function(){if(lm)lm.classList.remove('open')});})();</script>'''
+    # 部落格頁語言切換鈕（只在 /blog 路徑顯示；連到同頁 ?lang=，保留 tag/page）
+    if request.path.startswith('/blog'):
+        from urllib.parse import urlencode
+        _other = {k: v for k, v in request.args.items() if k != 'lang'}
+        _menu = ''
+        for _code in ('zh-tw',) + BLOG_LANGS:
+            _a = dict(_other)
+            if _code != 'zh-tw':
+                _a['lang'] = _code
+            _qs = ('?' + urlencode(_a)) if _a else ''
+            _menu += f'<li><a href="{request.path}{_qs}">{BLOG_LANG_NAME[_code]}</a></li>'
+        _ls = (f'<li class="lang-switch"><button class="lang-btn" id="lang-btn" aria-label="Language">🌐 '
+               f'<span id="lang-current">{BLOG_LANG_NAME.get(lang, "中文")}</span> '
+               f'<i class="fas fa-chevron-down" style="font-size:.7em"></i></button>'
+               f'<ul class="lang-menu" id="lang-menu">{_menu}</ul></li>')
+        nav = nav.replace('</ul></div></nav>', _ls + '</ul></div></nav>')
+    return (f'<!DOCTYPE html><html lang="{BLOG_HTML_LANG.get(lang, "zh-TW")}"><head>'
         '<meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>'
         '<script async src="https://www.googletagmanager.com/gtag/js?id=G-47DV1VPF9J"></script>'
         '<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());gtag("config","G-47DV1VPF9J");</script>'
@@ -3661,10 +3747,10 @@ def _render_blog(title, desc, canonical, body, head_extra='', image=None):
         '<noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=25643845041980148&ev=PageView&noscript=1"/></noscript>'
         f'<title>{_html.escape(title)}</title>'
         f'<meta name="description" content="{_html.escape(desc)}"/>'
-        f'<link rel="canonical" href="{canonical}"/>'
+        f'<link rel="canonical" href="{canonical}"/>{alt_links}'
         f'<meta property="og:type" content="article"/><meta property="og:title" content="{_html.escape(title)}"/>'
         f'<meta property="og:description" content="{_html.escape(desc)}"/><meta property="og:url" content="{canonical}"/>'
-        '<meta property="og:site_name" content="潮旅國際旅行社"/><meta property="og:locale" content="zh_TW"/>'
+        f'<meta property="og:site_name" content="潮旅國際旅行社"/><meta property="og:locale" content="{BLOG_OG_LOCALE.get(lang, "zh_TW")}"/>'
         f'<meta property="og:image" content="{_html.escape(img)}"/>'
         '<meta name="twitter:card" content="summary_large_image"/>'
         f'<meta name="twitter:title" content="{_html.escape(title)}"/>'
@@ -3685,11 +3771,13 @@ def _render_blog(title, desc, canonical, body, head_extra='', image=None):
 def blog_index():
     try:
         conn = get_db(); cur = conn.cursor()
-        cur.execute("""SELECT slug,title,summary,cover_image,tags,published_at FROM posts
+        cur.execute("""SELECT slug,title,summary,cover_image,tags,published_at,i18n FROM posts
                        WHERE is_published=TRUE ORDER BY COALESCE(published_at,created_at) DESC""")
         posts = cur.fetchall(); cur.close(); conn.close()
     except Exception:
         posts = []
+    lang = _req_lang()
+    _langp = f'lang={lang}' if lang != 'zh-tw' else ''
     all_posts = list(posts)
     sel = (request.args.get('tag') or '').strip()
     if sel:
@@ -3714,15 +3802,20 @@ def blog_index():
             parts.append(f'tag={sel}')
         if n > 1:
             parts.append(f'page={n}')
+        if _langp:
+            parts.append(_langp)
         return '/blog' + ('?' + '&'.join(parts) if parts else '')
 
+    _langq = f'?lang={lang}' if lang != 'zh-tw' else ''
+    _tagq = f'&lang={lang}' if lang != 'zh-tw' else ''
     cards = ''
     for p in page_posts:
-        img = f'<img src="{_html.escape(p["cover_image"])}" alt="{_html.escape(p["title"])}" loading="lazy"/>' if p.get('cover_image') else ''
-        tags = ''.join(f'<a class="post-tag" href="/blog?tag={_html.escape(t.strip())}">{_html.escape(t.strip())}</a>' for t in (p.get('tags') or '').split(',') if t.strip())
-        cards += (f'<a class="post-card" href="/blog/{_html.escape(p["slug"])}">{img}'
-                  f'<div class="post-card-body"><h2>{_html.escape(p["title"])}</h2>'
-                  f'<p>{_html.escape((p.get("summary") or "")[:80])}</p>'
+        lp = _localize_post(p, lang)
+        img = f'<img src="{_html.escape(lp["cover_image"])}" alt="{_html.escape(lp["title"])}" loading="lazy"/>' if lp.get('cover_image') else ''
+        tags = ''.join(f'<a class="post-tag" href="/blog?tag={_html.escape(t.strip())}{_tagq}">{_html.escape(t.strip())}</a>' for t in (lp.get('tags') or '').split(',') if t.strip())
+        cards += (f'<a class="post-card" href="/blog/{_html.escape(lp["slug"])}{_langq}">{img}'
+                  f'<div class="post-card-body"><h2>{_html.escape(lp["title"])}</h2>'
+                  f'<p>{_html.escape((lp.get("summary") or "")[:80])}</p>'
                   f'<div class="post-tags">{tags}</div></div></a>')
     if not cards:
         cards = '<p style="color:#888;text-align:center;padding:40px">部落格文章準備中，敬請期待！</p>'
@@ -3736,7 +3829,7 @@ def blog_index():
             if t:
                 freq[t] += 1
     cat_links = ''.join(
-        f'<a class="post-tag{" active" if t == sel else ""}" href="/blog?tag={_html.escape(t)}">{_html.escape(t)}</a>'
+        f'<a class="post-tag{" active" if t == sel else ""}" href="/blog?tag={_html.escape(t)}{_tagq}">{_html.escape(t)}</a>'
         for t, _c in freq.most_common(8))
     cat_bar = f'<div class="blog-cats">{cat_links}</div>' if cat_links else ''
 
@@ -3774,7 +3867,7 @@ def blog_index():
         "@context": "https://schema.org", "@type": "ItemList",
         "itemListElement": [
             {"@type": "ListItem", "position": offset + i + 1,
-             "url": f'{SITE}/blog/{p["slug"]}', "name": p["title"]}
+             "url": f'{SITE}/blog/{p["slug"]}{_langq}', "name": _localize_post(p, lang)["title"]}
             for i, p in enumerate(page_posts)
         ]
     }
@@ -3783,10 +3876,18 @@ def blog_index():
         rel_links += f'<link rel="prev" href="{SITE}{_blog_url(page - 1)}"/>'
     if page < pages:
         rel_links += f'<link rel="next" href="{SITE}{_blog_url(page + 1)}"/>'
+    # 列表頁可用任何語言呈現，hreflang 列出全部語言（去掉 lang 參數的乾淨路徑）
+    _pnl_parts = []
+    if sel:
+        _pnl_parts.append(f'tag={sel}')
+    if page > 1:
+        _pnl_parts.append(f'page={page}')
+    _path_no_lang = '/blog' + ('?' + '&'.join(_pnl_parts) if _pnl_parts else '')
+    alt_links = _blog_hreflang(_path_no_lang, list(BLOG_LANGS))
     head_extra = (rel_links
                   + '<script type="application/ld+json">' + json.dumps(_breadcrumb_ld(trail), ensure_ascii=False) + '</script>'
                   + '<script type="application/ld+json">' + json.dumps(item_list, ensure_ascii=False) + '</script>')
-    return _render_blog(title, desc, canonical, body, head_extra)
+    return _render_blog(title, desc, canonical, body, head_extra, lang=lang, alt_links=alt_links)
 
 def _pillar_link_for_tags(tags):
     """依文章 tag 自動對應主題攻略頁（pillar page）內鏈；對不到回 None。"""
@@ -3812,11 +3913,15 @@ def blog_post(slug):
     if not p:
         return _render_blog('找不到文章 - 潮旅國際旅行社', '找不到這篇文章。', f'{SITE}/blog',
                             '<div class="blog-wrap"><a class="blog-back" href="/blog">← 回部落格</a><h1>找不到這篇文章</h1><p>它可能已被移除或尚未發布。</p></div>'), 404
+    lang = _req_lang()
+    avail = _post_avail_langs(p)
+    alt_links = _blog_hreflang(f'/blog/{slug}', avail)
+    p = _localize_post(p, lang)          # 逐欄位翻譯，缺者回退中文
     desc = (p.get('summary') or _html.unescape(re.sub('<[^>]+>', '', p.get('content') or ''))[:140])
     pub = str(p.get('published_at') or p.get('created_at') or '')[:10]
     cover = f'<img class="blog-cover" src="{_html.escape(p["cover_image"])}" alt="{_html.escape(p["title"])}"/>' if p.get('cover_image') else ''
     tags = ''.join(f'<span class="post-tag">{_html.escape(t.strip())}</span>' for t in (p.get('tags') or '').split(',') if t.strip())
-    canonical = f'{SITE}/blog/{slug}'
+    canonical = f'{SITE}/blog/{slug}' + (f'?lang={lang}' if lang != 'zh-tw' else '')
     ld = {
         "@context": "https://schema.org", "@type": "Article",
         "headline": p['title'], "description": desc,
@@ -3826,7 +3931,7 @@ def blog_post(slug):
         "publisher": {"@type": "Organization", "name": "潮旅國際旅行社",
                       "logo": {"@type": "ImageObject", "url": f"{SITE}/images/festival-poster.jpg"}},
         "mainEntityOfPage": canonical, "url": canonical,
-        "inLanguage": "zh-TW"
+        "inLanguage": BLOG_HTML_LANG.get(lang, "zh-TW")
     }
     imgs = []
     if p.get('cover_image'):
@@ -3841,10 +3946,11 @@ def blog_post(slug):
     head_extra = ('<script type="application/ld+json">' + json.dumps(ld, ensure_ascii=False) + '</script>'
                   '<script type="application/ld+json">' + json.dumps(breadcrumb, ensure_ascii=False) + '</script>')
 
+    ui = BLOG_UI.get(lang, BLOG_UI['zh-tw'])
     # 先講結論（AEO）：用 summary 產生，所有文章都有
     tldr = ''
     if p.get('summary'):
-        tldr = (f'<div class="post-tldr"><span class="post-tldr-label">先講結論</span>'
+        tldr = (f'<div class="post-tldr"><span class="post-tldr-label">{ui["tldr"]}</span>'
                 f'<p>{_html.escape(p["summary"])}</p></div>')
 
     # 資訊盒（選填欄位 info_box：{標籤:值}）
@@ -3862,7 +3968,7 @@ def blog_post(slug):
     if faq_items:
         qa = ''.join(f'<details><summary>{_html.escape(str(x["q"]))}</summary>'
                      f'<p>{_html.escape(str(x["a"]))}</p></details>' for x in faq_items)
-        faq_html = f'<section class="post-faq"><h2>常見問題</h2>{qa}</section>'
+        faq_html = f'<section class="post-faq"><h2>{ui["faq"]}</h2>{qa}</section>'
         faq_ld = {"@context": "https://schema.org", "@type": "FAQPage",
                   "mainEntity": [{"@type": "Question", "name": str(x["q"]),
                                   "acceptedAnswer": {"@type": "Answer", "text": str(x["a"])}}
@@ -3874,22 +3980,22 @@ def blog_post(slug):
     pl = _pillar_link_for_tags(p.get('tags'))
     if pl:
         pillar_html = (f'<p style="margin-top:28px;padding:14px 18px;background:var(--blue-pale);border-radius:12px">'
-                       f'<strong>延伸攻略：</strong><a href="{pl[0]}">{pl[1]}</a>｜'
-                       f'把這篇的玩法放進完整行程。</p>')
+                       f'<strong>{ui["pillar"]}</strong><a href="{pl[0]}">{pl[1]}</a></p>')
+    _langq = f'?lang={lang}' if lang != 'zh-tw' else ''
 
-    body = (f'<article class="blog-wrap"><a class="blog-back" href="/blog">← 回部落格</a>'
+    body = (f'<article class="blog-wrap"><a class="blog-back" href="/blog{_langq}">{ui["back"]}</a>'
             f'<h1>{_html.escape(p["title"])}</h1>'
             f'<div class="blog-meta">{pub}｜{_html.escape(p.get("author") or "潮旅國際旅行社")}　{tags}</div>'
             f'{tldr}{infobox}'
             f'{cover}<div class="blog-body">{p.get("content") or ""}</div>{faq_html}{pillar_html}'
-            f'<div class="blog-cta"><h3 style="color:var(--blue-dark);margin-bottom:10px">想規劃澎湖行程？</h3>'
-            f'<a href="/#contact" class="btn btn-primary"><i class="fas fa-comment-dots"></i> 線上諮詢</a> '
-            f'<a href="/neihai-preorder.html" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-ship"></i> 內海巡禮預購</a> '
-            f'<a href="/preorder/festival" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-music"></i> 音樂節行程預購</a> '
-            f'<a href="/#quiz" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-compass"></i> 30 秒測你的澎湖玩法</a>'
+            f'<div class="blog-cta"><h3 style="color:var(--blue-dark);margin-bottom:10px">{ui["cta_h"]}</h3>'
+            f'<a href="/#contact" class="btn btn-primary"><i class="fas fa-comment-dots"></i> {ui["consult"]}</a> '
+            f'<a href="/neihai-preorder.html" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-ship"></i> {ui["neihai"]}</a> '
+            f'<a href="/preorder/festival" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-music"></i> {ui["festival"]}</a> '
+            f'<a href="/#quiz" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-compass"></i> {ui["quiz"]}</a>'
             f'</div></article>')
     return _render_blog(f'{p["title"]} - 潮旅國際旅行社部落格', desc, canonical, body, head_extra,
-                        image=(imgs[0] if imgs else None))
+                        image=(imgs[0] if imgs else None), lang=lang, alt_links=alt_links)
 
 # ── 旅客評價（遊客心得）──
 # ── Pillar pages（主題攻略頁，內容在 pillar_pages.py）──

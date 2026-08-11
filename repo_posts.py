@@ -68,6 +68,19 @@ def load_repo_posts(posts_dir: Path | str = POSTS_DIR) -> list[dict]:
                 raise ValueError(
                     f"Invalid post file {path.name}: info_box must be a non-empty object of label:value")
 
+        # 多語系翻譯（選填）：{lang:{title?,summary?,content?,faq?,info_box?}}
+        i18n = post.get("i18n")
+        if i18n is not None:
+            if not isinstance(i18n, dict):
+                raise ValueError(f"Invalid post file {path.name}: i18n must be an object of lang:fields")
+            for lg, tr in i18n.items():
+                if lg not in ("en", "ja", "ko", "zh-cn"):
+                    raise ValueError(f"Invalid post file {path.name}: unsupported i18n lang {lg!r}")
+                if not isinstance(tr, dict):
+                    raise ValueError(f"Invalid post file {path.name}: i18n[{lg}] must be an object")
+                if "content" in tr and FORBIDDEN_HTML_RE.search(str(tr["content"])):
+                    raise ValueError(f"Invalid post file {path.name}: i18n[{lg}] unsafe HTML detected")
+
         post["slug"] = slug
         seen_slugs.add(slug)
         posts.append(post)
@@ -88,9 +101,9 @@ def sync_repo_posts(cursor, posts_dir: Path | str = POSTS_DIR) -> int:
         cursor.execute(
             """INSERT INTO posts
                (slug, title, summary, content, cover_image, tags, author,
-                is_published, published_at, faq, info_box)
+                is_published, published_at, faq, info_box, i18n)
                VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE,
-                       COALESCE(%s::timestamptz, NOW()), %s::jsonb, %s::jsonb)
+                       COALESCE(%s::timestamptz, NOW()), %s::jsonb, %s::jsonb, %s::jsonb)
                ON CONFLICT (slug) DO NOTHING""",
             (
                 post["slug"],
@@ -103,6 +116,7 @@ def sync_repo_posts(cursor, posts_dir: Path | str = POSTS_DIR) -> int:
                 (str(post["published_at"]).strip() or None) if post.get("published_at") else None,
                 json.dumps(post["faq"], ensure_ascii=False) if post.get("faq") else None,
                 json.dumps(post["info_box"], ensure_ascii=False) if post.get("info_box") else None,
+                json.dumps(post["i18n"], ensure_ascii=False) if post.get("i18n") else None,
             ),
         )
         inserted += max(cursor.rowcount, 0)
