@@ -173,7 +173,7 @@ function showWin(code) {
 
 function trackLineClaim() {
   if (typeof gtag === 'function') gtag('event', 'qigui_line_claim', {});
-  if (typeof fbq === 'function') fbq('track', 'Lead', { content_name: 'Qigui LINE Claim', content_category: 'Qigui Lucky Game' });
+  if (typeof fbq === 'function') fbq('track', 'Lead', { content_name: 'Qigui WhatsApp Claim', content_category: 'Qigui Lucky Game' });
 }
 
 /* ── 當日已鎖定的狀態 ── */
