@@ -44,6 +44,21 @@ body {
 }
 .qg-header-line:hover { transform: translateY(-1px); }
 .qg-header-line i { font-size: 1.15rem; }
+.qg-header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.qgui-lang-switch {
+  display: inline-flex; background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 217, 112, .3); border-radius: 30px;
+  padding: 3px; gap: 2px;
+}
+.qgui-lang-btn {
+  background: transparent; border: none; cursor: pointer;
+  color: rgba(255, 245, 230, .7); font-family: inherit;
+  font-size: .82rem; font-weight: 700;
+  padding: 6px 13px; border-radius: 24px;
+  transition: background .15s, color .15s;
+}
+.qgui-lang-btn:hover { color: #ffd970; }
+.qgui-lang-btn.active { background: #ffd970; color: #3a1f00; }
 .qg-footer {
   position: relative; z-index: 2;
   text-align: center; padding: 28px 16px 36px;
@@ -228,4 +243,7 @@ body {
   .qg-throw-btn { padding: 14px 44px; font-size: 1.15rem; }
   .qg-throw-row { flex-direction: column; gap: 10px; }
   .qg-throw-btn-auto { padding: 13px 34px; font-size: 1rem; }
+  .qg-header { justify-content: center; text-align: center; }
+  .qg-header-right { justify-content: center; width: 100%; }
+  .qgui-lang-btn { padding: 6px 10px; font-size: .78rem; }
 }

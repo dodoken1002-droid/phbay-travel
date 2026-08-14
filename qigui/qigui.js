@@ -1,11 +1,16 @@
-/* ═══ 澎湖乞龜擲筊小遊戲（夏季旅展限定）═══
-   規則：連續擲出 3 個聖筊即中獎。判定與每日禮物庫存（500份／4天，每日125份）
-   一律由後端 /api/qigui/throw 權威決定，前端只負責動畫呈現，避免竄改或超發。
+/* ═══ 澎湖乞龜幸運遊戲（秋季旅展限定）═══
+   規則：連續過關 3 次即中獎。判定與每日禮物庫存一律由後端 /api/qigui/throw
+   權威決定，前端只負責動畫呈現，避免竄改或超發。
+   文字全部走 qigui-i18n.js 的 QG_T()；後端回傳的 message 僅供除錯參考，
+   畫面一律改用本機三語字典渲染（見各 QG_T('game.xxx') 呼叫），確保切換
+   語言時文字一致，不會因為後端只回中文而破圖。
    localStorage 僅用於畫面體驗（重新整理仍看得到中獎畫面），非安全依據。 */
 
-var streak = 0;          // 目前連續聖筊數（畫面顯示用，實際判定在後端）
+var streak = 0;          // 目前連續過關數（畫面顯示用，實際判定在後端）
 var throwing = false;    // 動畫/請求進行中防連點
 var autoMode = false;    // 「一次擲3杯」：連續自動擲筊，直到中獎/鎖定/失敗為止
+var lastState = 'idle';  // 目前畫面狀態，供切換語言時重新渲染：idle/pass/win/fail/locked/soldOut/alreadyDone
+
 var STORE_WIN  = 'qigui_win';         // 中獎紀錄 JSON {code, date}（僅跨日自動失效）
 
 function setThrowButtonsDisabled(disabled) {
@@ -35,7 +40,7 @@ function throwJiao() {
 
   throwing = true;
   setThrowButtonsDisabled(true);
-  setResult(autoMode ? '筊杯連續擲出——' : '筊杯擲出——', '');
+  setResult(QG_T(autoMode ? 'game.throwingAuto' : 'game.throwing'), '');
   setLabels('', '');
 
   var bodyA = document.querySelector('#jiao-a .qg-jiao-body');
@@ -55,7 +60,8 @@ function throwJiao() {
       setTimeout(function () {
         bodyA.classList.remove('spin');
         bodyB.classList.remove('spin');
-        setResult('連線不穩，請稍後再試一次 🙏', 'fail');
+        lastState = 'fail';
+        setResult(QG_T('game.offline'), 'fail');
         throwing = false;
         autoMode = false;
         setThrowButtonsDisabled(false);
@@ -75,17 +81,19 @@ function handleThrowResult(bodyA, bodyB, d) {
   bodyB.classList.remove('spin');
 
   if (!d || !d.ok) {
-    setResult('連線不穩，請稍後再試一次 🙏', 'fail');
+    lastState = 'fail';
+    setResult(QG_T('game.offline'), 'fail');
     throwing = false;
     autoMode = false;
     setThrowButtonsDisabled(false);
     return;
   }
 
-  // 已在別的分頁/裝置乞得金龜過
+  // 已在別的分頁/裝置完成今日挑戰過
   if (d.already_won) {
     setLabels('', '');
-    setResult('您已乞得金龜！', 'holy');
+    lastState = 'alreadyDone';
+    setResult(QG_T('game.alreadyDone'), 'holy');
     try { localStorage.setItem(STORE_WIN, JSON.stringify({ code: d.code, date: todayStr() })); } catch (e) {}
     autoMode = false;
     showWin(d.code);
@@ -95,20 +103,21 @@ function handleThrowResult(bodyA, bodyB, d) {
   // 禮物名額已發完 / 今日挑戰已用完
   if (d.locked && !d.outcome) {
     setLabels('', '');
-    setResult(d.message || '今日挑戰已結束，請明日再來！', d.sold_out ? 'fail' : '');
+    lastState = d.sold_out ? 'soldOut' : 'playedOut';
+    setResult(QG_T(d.sold_out ? 'game.soldOut' : 'game.playedOut'), d.sold_out ? 'fail' : '');
     autoMode = false;
     lockToday();
     return;
   }
 
-  // 依伺服器判定的結果決定筊杯視覺（聖筊＝一平一凸，笑筊＝兩平，陰筊＝兩凸）
+  // 依伺服器判定的結果決定筊杯視覺（過關＝一正一反，其餘＝兩面同向）
   var aFlat, bFlat;
   if (d.outcome === 'holy') { aFlat = Math.random() < 0.5; bFlat = !aFlat; }
   else if (d.outcome === 'laugh') { aFlat = true; bFlat = true; }
   else { aFlat = false; bFlat = false; }
   if (aFlat) bodyA.classList.add('flat');
   if (bFlat) bodyB.classList.add('flat');
-  setLabels(aFlat ? '平面朝上' : '凸面朝上', bFlat ? '平面朝上' : '凸面朝上');
+  setLabels(QG_T(aFlat ? 'game.flat' : 'game.round'), QG_T(bFlat ? 'game.flat' : 'game.round'));
 
   if (typeof gtag === 'function') gtag('event', 'qigui_throw', { outcome: d.outcome, streak: d.streak, auto: autoMode });
 
@@ -123,7 +132,8 @@ function handleThrowResult(bodyA, bodyB, d) {
       win(d.code);
       return;
     }
-    setResult('🌓 聖筊！神明應允（' + streak + '／3）— 保持誠心，再擲！', 'holy');
+    lastState = 'pass';
+    setResult(QG_T('game.pass', { n: streak }), 'holy');
     throwing = false;
     if (autoMode) {
       setTimeout(function () { throwJiao(); }, 600);
@@ -131,10 +141,8 @@ function handleThrowResult(bodyA, bodyB, d) {
       setThrowButtonsDisabled(false);
     }
   } else {
-    var msg = d.outcome === 'laugh'
-      ? '🌕 笑筊——神明笑而不答，明日再來乞一次吧！'
-      : '🌑 陰筊——神明未允，明日誠心再來！';
-    setResult(msg, 'fail');
+    lastState = 'fail';
+    setResult(QG_T('game.fail'), 'fail');
     streak = 0;
     autoMode = false;
     lockToday(true);
@@ -145,9 +153,10 @@ function handleThrowResult(bodyA, bodyB, d) {
 /* ── 中獎 ── */
 function win(code) {
   try { localStorage.setItem(STORE_WIN, JSON.stringify({ code: code, date: todayStr() })); } catch (e) {}
-  setResult('🌓🌓🌓 三聖筊！', 'holy');
+  lastState = 'win';
+  setResult(QG_T('game.win'), 'holy');
   if (typeof gtag === 'function') gtag('event', 'qigui_win', { code: code });
-  if (typeof fbq === 'function') fbq('track', 'ViewContent', { content_name: '乞龜中獎', content_category: '乞龜擲筊遊戲' });
+  if (typeof fbq === 'function') fbq('track', 'ViewContent', { content_name: 'Qigui Win', content_category: 'Qigui Lucky Game' });
   setTimeout(function () { showWin(code); }, 700);
 }
 
@@ -156,22 +165,23 @@ function showWin(code) {
   var winEl = document.getElementById('qg-win');
   winEl.style.display = 'block';
   setThrowButtonsDisabled(true);
-  document.getElementById('qg-hint').textContent = '您已乞得金龜，請加 LINE 領取小禮物';
+  var hintEl = document.getElementById('qg-hint');
+  if (hintEl) hintEl.textContent = QG_T('win.hintDone');
   throwing = false;
   winEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function trackLineClaim() {
   if (typeof gtag === 'function') gtag('event', 'qigui_line_claim', {});
-  if (typeof fbq === 'function') fbq('track', 'Lead', { content_name: '乞龜領獎LINE', content_category: '乞龜擲筊遊戲' });
+  if (typeof fbq === 'function') fbq('track', 'Lead', { content_name: 'Qigui LINE Claim', content_category: 'Qigui Lucky Game' });
 }
 
 /* ── 當日已鎖定的狀態 ── */
 function lockToday() {
   setThrowButtonsDisabled(true);
   throwing = false;
-  document.getElementById('qg-hint').innerHTML =
-    '今日挑戰已結束，明天再來！或直接 <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" rel="noopener noreferrer" style="color:#7dd6ff;font-weight:800">加 LINE 找潮旅</a> 安排澎湖行程';
+  var hintEl = document.getElementById('qg-hint');
+  if (hintEl) hintEl.innerHTML = QG_T('game.lockedHint');
 }
 
 /* ── UI 小工具 ── */
@@ -193,6 +203,29 @@ function lightDots() {
   }
 }
 
+/* ── 切換語言時，重新渲染「目前狀態」對應的動態文字（不是靠 data-i18n 的靜態文字都要這裡處理）── */
+function qguiRefreshDynamicText() {
+  if (document.getElementById('qg-win') && document.getElementById('qg-win').style.display === 'block') {
+    var hintEl = document.getElementById('qg-hint');
+    if (hintEl) hintEl.textContent = QG_T('win.hintDone');
+  } else if (document.getElementById('qg-throw') && document.getElementById('qg-throw').disabled &&
+             lastState !== 'idle' && lastState !== 'pass') {
+    var hintEl2 = document.getElementById('qg-hint');
+    if (hintEl2 && (lastState === 'soldOut' || lastState === 'playedOut' || lastState === 'fail')) {
+      hintEl2.innerHTML = QG_T('game.lockedHint');
+    }
+  }
+  switch (lastState) {
+    case 'pass':      setResult(QG_T('game.pass', { n: streak }), 'holy'); break;
+    case 'win':        setResult(QG_T('game.win'), 'holy'); break;
+    case 'fail':       setResult(QG_T('game.fail'), 'fail'); break;
+    case 'soldOut':    setResult(QG_T('game.soldOut'), 'fail'); break;
+    case 'playedOut':  setResult(QG_T('game.playedOut'), ''); break;
+    case 'alreadyDone':setResult(QG_T('game.alreadyDone'), 'holy'); break;
+    default:            if (!throwing) setResult(QG_T('game.ready'), '');
+  }
+}
+
 /* ── 初始化：優先信任本機保存的中獎畫面，其餘一律由第一次擲筊時向後端確認 ── */
 (function init() {
   var w = getWin();
@@ -200,10 +233,12 @@ function lightDots() {
     streak = 3;
     lightDots();
     showWin(w.code);
-    setResult('您已乞得金龜！', 'holy');
+    lastState = 'alreadyDone';
+    setResult(QG_T('game.alreadyDone'), 'holy');
   }
 })();
 
 window.throwJiao = throwJiao;
 window.throwJiaoAuto = throwJiaoAuto;
 window.trackLineClaim = trackLineClaim;
+window.qguiRefreshDynamicText = qguiRefreshDynamicText;
