@@ -55,7 +55,16 @@ const DICT = {
     'tide.loc':'Location', 'tide.date':'Select date', 'tide.chartTitle':'Tide Height Chart',
     'tide.note':'・Datum: Taiwan Vertical Datum (TWVD2001), in centimeters; positive = above mean sea level.<br>・<span style="color:#c99700;font-weight:700">○ High tide</span> / <span style="color:#4e9a2e;font-weight:700">○ Low tide</span>; the curve is an estimated trend between points, not continuous measurements.<br>・<span style="background:rgba(126,217,140,.35);padding:1px 8px;border-radius:4px">Green zones</span> are estimated viewing windows of <strong>about 2 hours around low tide</strong> — <strong>NOT official walkway opening times</strong>; follow Penghu County Government and on-site control for Kuibishan access.<br>・Want tides built into your itinerary? <a href="/#contact" style="color:var(--blue-main)">Contact Phbay Travel</a> — local guides will find the best timing for you.',
     'tide.ctaTitle':'Want to plan around the tides at Kuibishan?', 'tide.ctaConsult':'Contact Us', 'tide.ctaBlog':'Travel Guides',
-    'tide.loc.magong':'Magong City', 'tide.loc.huxi':'Huxi (Kuibishan)', 'tide.loc.baisha':'Baisha', 'tide.loc.xiyu':'Xiyu', 'tide.loc.wangan':'Wang’an', 'tide.loc.qimei':'Qimei'
+    'tide.loc.magong':'Magong City', 'tide.loc.huxi':'Huxi (Kuibishan)', 'tide.loc.baisha':'Baisha', 'tide.loc.xiyu':'Xiyu', 'tide.loc.wangan':'Wang’an', 'tide.loc.qimei':'Qimei',
+    'events.kicker':'Penghu Events',
+    'events.title':'Penghu Events: Aug–Dec 2026',
+    'events.subtitle':'Beach festivals, light shows and a marathon — plan your trip around them and let Phbay handle lodging, transport and local fun.',
+    'events.e1.title':'Peng-Da-Hai Beach Music Festival | Aug 21–23',
+    'events.e1.desc':'<strong>Venue: Aimen Beach</strong> (near Penghu Airport). Free entry, two stages, 30 acts over three days: Accusefive, icyball, Sweet John, Amazing Show, Constant & Change, Fool and Idiot, plus IKE (Japan) and YourMOOD (Thailand). Show times: Aug 21–22 14:30–22:30, Aug 23 14:30–21:50.',
+    'events.e2.title':'Chasing-the-Wind Music & Light Festival | Sep 12–Oct 11',
+    'events.e2.desc':'<strong>Venue: Guanyinting Park</strong>, with light shows nightly Sep 12–Oct 11. Five concerts: <strong>Sep 12</strong> Kyuhyun (Super Junior), Crowd Lu, TRASH | <strong>Sep 13</strong> Bestards, Cosmos People, Pallas | <strong>Sep 19</strong> Amazing Show, Mango Jump, The Chairs, Who Cares | <strong>Sep 26</strong> Nine One One, OSN, PIZZALI | <strong>Oct 3</strong> NICKTHEREAL, Amber An, Papun Band. Phbay is an official partner agency — <a href="/preorder/festival">festival tour packages available</a>.',
+    'events.e3.title':'Penghu Cross-Sea Marathon | Nov 1',
+    'events.e3.desc':'Held <strong>Nov 1 (Sun)</strong> with full 42K, half 21K, 11K and 5K fun-run categories, crossing the Penghu Great Bridge with ocean views. Phbay can arrange lodging and post-race tours.'
   },
 
   /* ─────────── 日本語 ─────────── */
@@ -105,7 +114,16 @@ const DICT = {
     'tide.loc':'エリア', 'tide.date':'日付を選択', 'tide.chartTitle':'潮位変化グラフ',
     'tide.note':'・基準面：台湾高程基準（TWVD2001）、単位はセンチ；プラスは平均海面より上。<br>・<span style="color:#c99700;font-weight:700">○ 満潮</span>／<span style="color:#4e9a2e;font-weight:700">○ 干潮</span>；曲線は2点間の推定であり、実測の連続値ではありません。<br>・<span style="background:rgba(126,217,140,.35);padding:1px 8px;border-radius:4px">緑のゾーン</span>は<strong>干潮前後約2時間</strong>の推定観察時間帯で、<strong>公式の歩道開放時間ではありません</strong>。奎壁山の開放は澎湖県政府と現地の管理に従ってください。<br>・潮汐に合わせた旅程は<a href="/#contact" style="color:var(--blue-main)">潮旅へご相談</a>ください。地元ガイドがベストなタイミングをご提案します。',
     'tide.ctaTitle':'潮汐に合わせて奎壁山・潮間帯を楽しみたい？', 'tide.ctaConsult':'お問い合わせ', 'tide.ctaBlog':'旅行ガイド',
-    'tide.loc.magong':'馬公市', 'tide.loc.huxi':'湖西郷（奎壁山）', 'tide.loc.baisha':'白沙郷', 'tide.loc.xiyu':'西嶼郷', 'tide.loc.wangan':'望安郷', 'tide.loc.qimei':'七美郷'
+    'tide.loc.magong':'馬公市', 'tide.loc.huxi':'湖西郷（奎壁山）', 'tide.loc.baisha':'白沙郷', 'tide.loc.xiyu':'西嶼郷', 'tide.loc.wangan':'望安郷', 'tide.loc.qimei':'七美郷',
+    'events.kicker':'澎湖イベント情報',
+    'events.title':'2026年下半期 澎湖イベント一覧（8〜12月）',
+    'events.subtitle':'ビーチ音楽祭からライトショー、マラソンまで。イベントに合わせた旅の宿・交通・現地の楽しみ方は潮旅にお任せください。',
+    'events.e1.title':'澎大海ビーチ音楽祭｜8/21〜8/23',
+    'events.e1.desc':'<strong>会場：隘門（アイメン）ビーチ</strong>（澎湖空港近く）。入場無料・2ステージ、3日間で国内外30組が出演：告五人（Accusefive）、icyball、甜約翰（Sweet John）、美秀集團ほか、日本からIKE、タイからYourMOODも参加。開催時間は8/21・22が14:30〜22:30、8/23が14:30〜21:50。',
+    'events.e2.title':'澎湖追風音楽燈光祭｜9/12〜10/11',
+    'events.e2.desc':'<strong>会場：観音亭園区</strong>。ライトショーは9/12〜10/11毎晩開催。ライブは全5回：<strong>9/12</strong> キュヒョン（SUPER JUNIOR）、盧廣仲（クラウド・ルー）、TRASH｜<strong>9/13</strong> 理想混蛋、宇宙人、Pallas｜<strong>9/19</strong> 美秀集團、芒果醬、椅子樂團、Who Cares｜<strong>9/26</strong> 玖壹壹、OSN、PIZZALI｜<strong>10/3</strong> 周湯豪（NICKTHEREAL）、安心亞、怕胖團。潮旅は公式提携旅行社です。<a href="/preorder/festival">音楽祭テーマツアー予約受付中</a>。',
+    'events.e3.title':'菊島澎湖クロスシー・マラソン｜11/1',
+    'events.e3.desc':'<strong>11/1（日）</strong>開催。フル42K・ハーフ21K・体験11K・ファンラン5Kの4部門で、澎湖跨海大橋を渡る絶景コース。宿泊やレース後の観光手配も潮旅にご相談ください。'
   },
 
   /* ─────────── 한국어 ─────────── */
@@ -155,7 +173,16 @@ const DICT = {
     'tide.loc':'지역', 'tide.date':'날짜 선택', 'tide.chartTitle':'조위 변화 차트',
     'tide.note':'・기준면: 대만 수직 기준(TWVD2001), 단위 cm; 양수는 평균 해수면 위.<br>・<span style="color:#c99700;font-weight:700">○ 만조</span>／<span style="color:#4e9a2e;font-weight:700">○ 간조</span>; 곡선은 두 점 사이의 추정 추세이며 실측 연속값이 아닙니다.<br>・<span style="background:rgba(126,217,140,.35);padding:1px 8px;border-radius:4px">녹색 구간</span>은 <strong>간조 전후 약 2시간</strong>의 추정 관찰 시간대로, <strong>공식 보도 개방 시간이 아닙니다</strong>. 쿠이비산 개방 여부는 펑후현 정부와 현장 통제를 따르세요.<br>・조석에 맞춘 일정이 필요하면 <a href="/#contact" style="color:var(--blue-main)">차오뤼 여행사에 문의</a>하세요. 현지 가이드가 최적의 시간을 잡아 드립니다.',
     'tide.ctaTitle':'조석에 맞춰 쿠이비산·조간대를 즐기고 싶다면?', 'tide.ctaConsult':'문의하기', 'tide.ctaBlog':'여행 가이드',
-    'tide.loc.magong':'마공시', 'tide.loc.huxi':'후시향(쿠이비산)', 'tide.loc.baisha':'바이사향', 'tide.loc.xiyu':'시위향', 'tide.loc.wangan':'왕안향', 'tide.loc.qimei':'치메이향'
+    'tide.loc.magong':'마공시', 'tide.loc.huxi':'후시향(쿠이비산)', 'tide.loc.baisha':'바이사향', 'tide.loc.xiyu':'시위향', 'tide.loc.wangan':'왕안향', 'tide.loc.qimei':'치메이향',
+    'events.kicker':'펑후 이벤트 소식',
+    'events.title':'2026 하반기 펑후 이벤트 (8~12월)',
+    'events.subtitle':'비치 음악제부터 조명 축제, 마라톤까지. 이벤트에 맞춘 여행의 숙소·교통·현지 즐길 거리는 Phbay에 맡기세요.',
+    'events.e1.title':'펑다하이 비치 뮤직 페스티벌｜8/21~8/23',
+    'events.e1.desc':'<strong>장소: 아이먼(隘門) 해변</strong>(펑후공항 인근). 무료 입장, 2개 스테이지, 3일간 국내외 30팀 출연: Accusefive(告五人), icyball, Sweet John, Amazing Show 등과 일본 IKE, 태국 YourMOOD. 공연 시간은 8/21~22 14:30~22:30, 8/23 14:30~21:50.',
+    'events.e2.title':'펑후 추풍 음악조명축제｜9/12~10/11',
+    'events.e2.desc':'<strong>장소: 관음정 공원</strong>. 조명 쇼는 9/12~10/11 매일 밤 열립니다. 콘서트는 총 5회: <strong>9/12</strong> 규현(슈퍼주니어), 크라우드 루(盧廣仲), TRASH｜<strong>9/13</strong> Bestards(理想混蛋), Cosmos People(宇宙人), Pallas｜<strong>9/19</strong> Amazing Show, Mango Jump, The Chairs, Who Cares｜<strong>9/26</strong> Nine One One(玖壹壹), OSN, PIZZALI｜<strong>10/3</strong> NICKTHEREAL(周湯豪), Amber An(安心亞), 怕胖團. Phbay는 공식 제휴 여행사입니다. <a href="/preorder/festival">축제 테마 투어 예약 중</a>.',
+    'events.e3.title':'쥐다오 펑후 크로스씨 마라톤｜11/1',
+    'events.e3.desc':'<strong>11/1(일)</strong> 개최. 풀 42K·하프 21K·체험 11K·펀런 5K 부문으로, 펑후 대교를 건너는 바다 전망 코스입니다. 숙박과 레이스 후 일정도 Phbay가 도와드립니다.'
   },
 
   /* ─────────── 简体中文 ─────────── */
@@ -205,7 +232,16 @@ const DICT = {
     'tide.loc':'地点', 'tide.date':'选择日期', 'tide.chartTitle':'潮汐高度变化图表',
     'tide.note':'・潮高基准：台湾高程基准（TWVD2001），单位厘米；正值高于平均海平面。<br>・<span style="color:#c99700;font-weight:700">○ 满潮</span>／<span style="color:#4e9a2e;font-weight:700">○ 干潮</span>；曲线为两点间之估计走势，非实测连续值。<br>・<span style="background:rgba(126,217,140,.35);padding:1px 8px;border-radius:4px">绿色区块</span>为<strong>干潮前后约 2 小时</strong>之估计观察时段，<strong>非官方步道开放公告</strong>；奎壁山实际开放请以澎湖县政府与现场管制为准。<br>・想把潮汐排进行程？<a href="/#contact" style="color:var(--blue-main)">在线咨询潮旅</a>，本地向导帮你抓最好的时间。',
     'tide.ctaTitle':'想搭配潮汐玩奎壁山、潮间带？', 'tide.ctaConsult':'在线咨询', 'tide.ctaBlog':'看玩法攻略',
-    'tide.loc.magong':'马公市', 'tide.loc.huxi':'湖西乡（奎壁山）', 'tide.loc.baisha':'白沙乡', 'tide.loc.xiyu':'西屿乡', 'tide.loc.wangan':'望安乡', 'tide.loc.qimei':'七美乡'
+    'tide.loc.magong':'马公市', 'tide.loc.huxi':'湖西乡（奎壁山）', 'tide.loc.baisha':'白沙乡', 'tide.loc.xiyu':'西屿乡', 'tide.loc.wangan':'望安乡', 'tide.loc.qimei':'七美乡',
+    'events.kicker':'澎湖活动快讯',
+    'events.title':'2026 下半年澎湖活动一览（8–12 月）',
+    'events.subtitle':'音乐祭、灯光节到马拉松，跟着活动排行程，潮旅帮你搞定住宿交通与在地玩法',
+    'events.e1.title':'澎大海沙滩音乐祭｜8/21–8/23',
+    'events.e1.desc':'<strong>地点：隘门沙滩</strong>（近澎湖机场），免费入场、双舞台，三天共 30 组国内外卡司：告五人、icyball 冰球乐团、甜约翰、美秀集团、康士坦的变化球、傻子与白痴，以及日本 IKE、泰国 YourMOOD 跨海开唱。演出时间 8/21–22 为 14:30–22:30、8/23 为 14:30–21:50。',
+    'events.e2.title':'澎湖追风音乐灯光节｜9/12–10/11',
+    'events.e2.desc':'<strong>地点：观音亭园区</strong>，灯光艺术展演 9/12–10/11 每晚点灯。五场演唱会：<strong>9/12</strong> 圭贤（Super Junior）、卢广仲、TRASH｜<strong>9/13</strong> 理想混蛋、宇宙人、帕拉斯｜<strong>9/19</strong> 美秀集团、芒果酱、椅子乐团、胡凯儿｜<strong>9/26</strong> 玖壹壹、高尔宣、PIZZALI｜<strong>10/3</strong> 周汤豪、安心亚、怕胖团。潮旅为官方合作旅行社，<a href="/preorder/festival">音乐节主题行程预购中</a>。',
+    'events.e3.title':'菊岛澎湖跨海马拉松｜11/1',
+    'events.e3.desc':'<strong>11/1（日）</strong>开跑，设全马 42K、半马 21K、体验组 11K 与休闲组 5K，路线行经跨海大桥、饱览海景。想边跑边玩，潮旅可协助安排住宿与赛后行程。'
   }
 };
 
