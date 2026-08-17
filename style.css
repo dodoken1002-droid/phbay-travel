@@ -883,6 +883,18 @@ ul { list-style: none; }
 .contact-btn i { font-size: 1.5rem; }
 .contact-btn.line      { background: #06c755; color: var(--white); }
 .contact-btn.whatsapp  { background: #25d366; color: var(--white); }
+
+/* ── 全站浮動 WhatsApp 按鈕（右下角，避開底部 banner）── */
+.wa-float {
+  position: fixed; right: 20px; bottom: 84px; z-index: 1200;
+  width: 56px; height: 56px; border-radius: 50%;
+  background: #25d366; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.7rem; box-shadow: 0 6px 20px rgba(37,211,102,.45);
+  transition: transform .2s, box-shadow .2s;
+}
+.wa-float:hover { transform: scale(1.08); box-shadow: 0 8px 26px rgba(37,211,102,.6); color: #fff; }
+@media (max-width: 768px) { .wa-float { width: 52px; height: 52px; font-size: 1.5rem; bottom: 76px; } }
 .contact-btn.phone     { background: var(--blue-main); color: var(--white); }
 .contact-btn.email     { background: var(--blue-pale); color: var(--blue-dark); }
 .contact-btn.facebook  { background: #1877f2; color: var(--white); }

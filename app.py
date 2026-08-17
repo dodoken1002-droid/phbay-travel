@@ -3765,7 +3765,9 @@ def _render_blog(title, desc, canonical, body, head_extra='', image=None, lang='
         '.post-tldr{background:var(--blue-pale);border-left:4px solid var(--blue-main);border-radius:10px;padding:16px 20px;margin:0 0 18px}.post-tldr-label{display:inline-block;font-weight:800;color:var(--blue-dark);font-size:.85rem;background:#fff;border-radius:20px;padding:2px 12px;margin-bottom:8px}.post-tldr p{margin:6px 0 0;line-height:1.8;color:var(--text-dark)}'
         '.post-infobox{border:1px solid #e6edf3;border-radius:12px;padding:6px 18px;margin:0 0 20px;background:#fff}.post-info-row{display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #f0f4f7;font-size:.95rem}.post-info-row:last-child{border-bottom:none}.post-info-k{flex:0 0 auto;min-width:96px;font-weight:700;color:var(--blue-dark)}.post-info-v{color:var(--text-mid);line-height:1.7}'
         '.post-faq{margin-top:36px}.post-faq h2{font-size:1.4rem;color:var(--blue-dark);font-weight:800;margin-bottom:14px}.post-faq details{background:#fff;border:1px solid #e6edf3;border-radius:12px;margin-bottom:10px;padding:0 18px}.post-faq summary{cursor:pointer;font-weight:700;color:var(--blue-dark);padding:14px 0;list-style-position:inside}.post-faq details[open] summary{border-bottom:1px solid #eef2f5}.post-faq details p{padding:12px 0 16px;color:var(--text-mid);line-height:1.8}</style>'
-        f'{head_extra}</head><body>{nav}<main>{body}</main>{footer}</body></html>')
+        f'{head_extra}</head><body>{nav}<main>{body}</main>{footer}'
+        '<a href="https://wa.me/886912151788" class="wa-float" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp 諮詢" title="WhatsApp 諮詢"><i class="fab fa-whatsapp"></i></a>'
+        '</body></html>')
 
 @app.route('/blog')
 def blog_index():
