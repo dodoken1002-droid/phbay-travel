@@ -882,6 +882,7 @@ ul { list-style: none; }
 }
 .contact-btn i { font-size: 1.5rem; }
 .contact-btn.line      { background: #06c755; color: var(--white); }
+.contact-btn.whatsapp  { background: #25d366; color: var(--white); }
 .contact-btn.phone     { background: var(--blue-main); color: var(--white); }
 .contact-btn.email     { background: var(--blue-pale); color: var(--blue-dark); }
 .contact-btn.facebook  { background: #1877f2; color: var(--white); }
