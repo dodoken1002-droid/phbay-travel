@@ -505,11 +505,16 @@ window.onLangChange = function () { renderAllTours(); };
 
 // 行程卡片／彈窗的固定 UI 字串（依語言）
 const TOUR_UI = {
-  'zh-tw':{detail:'查看詳情',priceHdr:'出發地 × 價格',suitable:'適合',duration:'天數',notice:'注意事項',includes:'費用包含',notes:'備註',highlights:'行程亮點',dates:'出發日期'},
-  'en':{detail:'View Details',priceHdr:'Departure × Price',suitable:'For',duration:'Duration',notice:'Note',includes:'Includes',notes:'Notes',highlights:'Highlights',dates:'Departure Dates'},
-  'ja':{detail:'詳細を見る',priceHdr:'出発地 × 料金',suitable:'対象',duration:'日数',notice:'ご注意',includes:'料金に含む',notes:'備考',highlights:'ハイライト',dates:'出発日'},
-  'ko':{detail:'상세 보기',priceHdr:'출발지 × 요금',suitable:'대상',duration:'일수',notice:'유의사항',includes:'포함 사항',notes:'비고',highlights:'하이라이트',dates:'출발일'},
-  'zh-cn':{detail:'查看详情',priceHdr:'出发地 × 价格',suitable:'适合',duration:'天数',notice:'注意事项',includes:'费用包含',notes:'备注',highlights:'行程亮点',dates:'出发日期'}
+  'zh-tw':{detail:'查看詳情',priceHdr:'出發地 × 價格',suitable:'適合',duration:'天數',notice:'注意事項',includes:'費用包含',notes:'備註',highlights:'行程亮點',dates:'出發日期',
+           poster:'行程海報',posterHint:'點擊可看大圖',contact:'行程提供單位與聯絡方式',cAgency:'主辦旅行社',cPartner:'合作夥伴',cPhone:'電話',cLine:'LINE',cEmail:'Email',cWeb:'網站',cLicense:'證號',cNote:'也可直接洽潮旅國際旅行社協助報名'},
+  'en':{detail:'View Details',priceHdr:'Departure × Price',suitable:'For',duration:'Duration',notice:'Note',includes:'Includes',notes:'Notes',highlights:'Highlights',dates:'Departure Dates',
+        poster:'Itinerary Poster',posterHint:'Click to enlarge',contact:'Operator & Contact',cAgency:'Operating Agency',cPartner:'Partners',cPhone:'Phone',cLine:'LINE',cEmail:'Email',cWeb:'Website',cLicense:'License',cNote:'You may also book through Phbay Travel'},
+  'ja':{detail:'詳細を見る',priceHdr:'出発地 × 料金',suitable:'対象',duration:'日数',notice:'ご注意',includes:'料金に含む',notes:'備考',highlights:'ハイライト',dates:'出発日',
+        poster:'ツアーポスター',posterHint:'クリックで拡大',contact:'主催会社とお問い合わせ',cAgency:'主催旅行会社',cPartner:'協力',cPhone:'電話',cLine:'LINE',cEmail:'メール',cWeb:'ウェブ',cLicense:'許可番号',cNote:'潮旅国際旅行社経由でのお申し込みも可能です'},
+  'ko':{detail:'상세 보기',priceHdr:'출발지 × 요금',suitable:'대상',duration:'일수',notice:'유의사항',includes:'포함 사항',notes:'비고',highlights:'하이라이트',dates:'출발일',
+        poster:'여행 포스터',posterHint:'클릭하면 확대',contact:'주최사 및 연락처',cAgency:'주최 여행사',cPartner:'협력사',cPhone:'전화',cLine:'LINE',cEmail:'이메일',cWeb:'웹사이트',cLicense:'등록번호',cNote:'Phbay 여행사를 통해서도 예약하실 수 있습니다'},
+  'zh-cn':{detail:'查看详情',priceHdr:'出发地 × 价格',suitable:'适合',duration:'天数',notice:'注意事项',includes:'费用包含',notes:'备注',highlights:'行程亮点',dates:'出发日期',
+           poster:'行程海报',posterHint:'点击可看大图',contact:'行程提供单位与联络方式',cAgency:'主办旅行社',cPartner:'合作伙伴',cPhone:'电话',cLine:'LINE',cEmail:'Email',cWeb:'网站',cLicense:'证号',cNote:'也可直接洽潮旅国际旅行社协助报名'}
 };
 function tourUI(k){ return (TOUR_UI[window.__lang || 'zh-tw'] || TOUR_UI['zh-tw'])[k]; }
 
@@ -655,6 +660,34 @@ function renderTourModal(tour) {
   const includesHtml = md.includes ? `<h4><i class="fas fa-check-circle"></i> ${tourUI('includes')}</h4><p>${md.includes}</p>` : '';
   const notesHtml    = md.notes   ? `<h4><i class="fas fa-exclamation-circle"></i> ${tourUI('notes')}</h4><p>${md.notes}</p>` : '';
 
+  // 完整行程海報（modal_data.posters：圖片路徑陣列；點擊開新分頁看原圖）
+  const posters = Array.isArray(md.posters) ? md.posters : [];
+  const posterHtml = posters.length
+    ? `<h4><i class="fas fa-image"></i> ${tourUI('poster')}
+         <span class="poster-hint">${tourUI('posterHint')}</span></h4>
+       <div class="tour-posters">
+         ${posters.map((p, i) => `
+           <a href="${p}" target="_blank" rel="noopener noreferrer" class="poster-thumb">
+             <img src="${p}" alt="${title}｜${tourUI('poster')} ${i + 1}" loading="lazy" decoding="async" />
+           </a>`).join('')}
+       </div>` : '';
+
+  // 行程提供單位與聯絡方式（modal_data.contact）
+  const c = md.contact || {};
+  const cRows = [
+    c.agency  ? `<tr><td>${tourUI('cAgency')}</td><td>${c.agency}</td></tr>` : '',
+    c.partner ? `<tr><td>${tourUI('cPartner')}</td><td>${c.partner}</td></tr>` : '',
+    c.phone   ? `<tr><td>${tourUI('cPhone')}</td><td><a href="tel:${String(c.phone).split(/[／/、（(]/)[0].replace(/[^\d+]/g, '')}">${c.phone}</a></td></tr>` : '',
+    c.line    ? `<tr><td>${tourUI('cLine')}</td><td>${c.line}</td></tr>` : '',
+    c.email   ? `<tr><td>${tourUI('cEmail')}</td><td><a href="mailto:${c.email}">${c.email}</a></td></tr>` : '',
+    c.website ? `<tr><td>${tourUI('cWeb')}</td><td><a href="${/^https?:/.test(c.website) ? c.website : 'https://' + c.website}" target="_blank" rel="noopener noreferrer">${c.website}</a></td></tr>` : '',
+    c.license ? `<tr><td>${tourUI('cLicense')}</td><td>${c.license}</td></tr>` : '',
+  ].filter(Boolean).join('');
+  const contactHtml = cRows
+    ? `<h4><i class="fas fa-address-card"></i> ${tourUI('contact')}</h4>
+       <table class="contact-table">${cRows}</table>
+       <p class="contact-note"><i class="fas fa-circle-info"></i> ${tourUI('cNote')}</p>` : '';
+
   const headerClass = tour.is_hero ? 'modal-header modal-header--turtle' : 'modal-header';
   const headerInner = tour.is_hero
     ? `<div class="modal-header-content">
@@ -682,6 +715,8 @@ function renderTourModal(tour) {
       ${hlHtml}
       ${daysHtml}
       ${includesHtml}
+      ${posterHtml}
+      ${contactHtml}
       ${notesHtml}
       ${neihaiModalCta}
     </div>`;

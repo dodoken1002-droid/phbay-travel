@@ -1127,6 +1127,54 @@ ul { list-style: none; }
 .price-table tr:last-child { border-bottom: none; }
 .price-highlight { font-weight: 700; color: #e85c3a; text-align: right; }
 
+/* ─── 行程海報（彈窗內，點擊開新分頁看原圖）─── */
+.poster-hint {
+  font-size: .78rem;
+  font-weight: 500;
+  color: var(--text-mid);
+  margin-left: 8px;
+}
+.tour-posters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.poster-thumb {
+  display: block;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--sand-dark);
+  background: var(--sand);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.poster-thumb:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,.16); }
+.poster-thumb img { width: 100%; height: auto; display: block; }
+
+/* ─── 行程提供單位與聯絡方式 ─── */
+.contact-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+  margin-bottom: 6px;
+}
+.contact-table tr { border-bottom: 1px solid var(--sand-dark); }
+.contact-table tr:last-child { border-bottom: none; }
+.contact-table td { padding: 8px 12px; vertical-align: top; }
+.contact-table td:first-child {
+  width: 108px;
+  color: var(--text-mid);
+  white-space: nowrap;
+}
+.contact-table td:last-child { font-weight: 600; }
+.contact-table a { color: var(--blue-main); text-decoration: none; }
+.contact-table a:hover { text-decoration: underline; }
+.contact-note {
+  font-size: .84rem;
+  color: var(--text-mid);
+  margin: 0 0 4px;
+}
+
 /* 出發日期 chips */
 .date-chips {
   display: flex;
