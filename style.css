@@ -694,6 +694,20 @@ ul { list-style: none; }
 .tour-badge.family    { background: #e87d2a; }
 .tour-badge.eco       { background: #2ea86e; }
 .tour-badge.adventure { background: #7c3aed; }
+.tour-badge.guild     { background: #1a6b9e; }
+/* 主題遊程徵選獲選行程：金色獎項徽章（文字較長，放寬字級與換行） */
+.tour-badge.award {
+  background: linear-gradient(135deg, #b8860b, #d4a017);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .28);
+  max-width: calc(100% - 28px);
+  line-height: 1.35;
+}
+.tour-badge.award::before {
+  content: "\f091";                 /* fa-trophy */
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  margin-right: 5px;
+}
 
 /* 卡片圖片 */
 .tour-image {
