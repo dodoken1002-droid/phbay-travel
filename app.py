@@ -51,6 +51,11 @@ def _set_cache_headers(resp):
     path = request.path.lower()
     if path.startswith('/api/'):
         return resp
+    # 只有成功回應才長快取。錯誤回應（例如檔案尚未部署完成時的 404）若也標成
+    # immutable，瀏覽器會把「這個檔案不存在」快取一年，之後檔案補上了也不會重抓。
+    if resp.status_code >= 400:
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp
     if path.endswith(_LONG_CACHE_EXT):
         resp.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
     elif resp.mimetype == 'text/html':

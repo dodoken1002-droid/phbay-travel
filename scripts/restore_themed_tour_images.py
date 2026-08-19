@@ -34,7 +34,7 @@ def main():
         cur.execute(
             "UPDATE tours SET image_url=%s, updated_at=NOW() "
             "WHERE sort_order=%s AND badge_text='主題遊程徵選獲選行程'",
-            (f"/images/tours/t{s}.jpg", s),
+            (f"/images/tours/t{s}.jpg?v=20260819", s),
         )
         n += cur.rowcount
     conn.commit()
