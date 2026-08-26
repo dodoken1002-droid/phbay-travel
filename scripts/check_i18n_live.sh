@@ -42,7 +42,10 @@ OVERALL_OK=1
 
 for lang in "${LANGS[@]}"; do
   URL="${BASE_URL}?lang=${lang}"
-  CODE=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+  # `|| CODE="000"` keeps a transient curl failure (SSL blip, timeout, reset)
+  # from killing the whole script under `set -e` — it's recorded as a failed
+  # check for this one language and the loop moves on.
+  CODE=$(curl -s -o /dev/null -w "%{http_code}" "$URL") || CODE="000"
 
   SNIPPET=$(PYTHONIOENCODING=utf-8 python3 -c "
 import json
@@ -62,7 +65,7 @@ print(title[:10])
   # curl straight into `grep -q`): grep -q exits as soon as it finds a match,
   # which can SIGPIPE a still-writing curl. With `pipefail` active that turns
   # into a false-negative "MISMATCH" even though the content was there.
-  BODY=$(curl -s "$URL")
+  BODY=$(curl -s "$URL") || BODY=""
   if printf '%s' "$BODY" | grep -qF "$SNIPPET"; then
     CONTENT_CHECK="OK"
   else
