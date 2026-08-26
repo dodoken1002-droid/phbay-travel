@@ -219,6 +219,16 @@ function initContactForm() {
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 傳送中...';
 
+    // 送出前先記一筆 attempt：與 generate_lead 相比即可看出失敗率，
+    // 表單一壞當天就會在 GA4 顯示落差（2026-07 曾整月無聲失敗而未被發現）。
+    if (typeof gtag === 'function') {
+      gtag('event', 'contact_submit_attempt', {
+        tour_interest: data.tour_interest || '(未選)',
+        transport:     data.transport || '',
+        people:        data.people || '',
+      });
+    }
+
     try {
       const res = await fetch('/api/contact', {
         method: 'POST',
@@ -226,10 +236,13 @@ function initContactForm() {
         body: JSON.stringify(data)
       });
 
-      const result = await res.json();
+      let result = {};
+      try { result = await res.json(); } catch (_) { /* 非 JSON 回應（如 502） */ }
 
       if (!res.ok || !result.ok) {
-        throw new Error(result.error || '伺服器錯誤');
+        const e = new Error(result.error || `伺服器錯誤（HTTP ${res.status}）`);
+        e.httpStatus = res.status;
+        throw e;
       }
 
       // 更新成功訊息（正團 vs 候補）
@@ -266,10 +279,64 @@ function initContactForm() {
     } catch (err) {
       submitBtn.disabled = false;
       submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> 送出諮詢';
-      showFormError(err.message || '送出失敗，請直接 LINE 或電話聯繫我們。');
+
+      // 失敗一定要記事件，讓表單故障在 GA4 當天就看得出來
+      if (typeof gtag === 'function') {
+        gtag('event', 'contact_submit_failed', {
+          failure_type:  err.httpStatus ? 'server' : 'network',
+          http_status:   err.httpStatus || 0,
+          error_message: String(err.message || '').slice(0, 100),
+          tour_interest: data.tour_interest || '(未選)',
+        });
+      }
+
+      // 不要只丟一句錯誤讓客人離開——同時給出備援聯絡管道，把名單留住
+      showFormFallback(err.message);
     }
   });
 }
+
+/* 送出失敗時顯示備援聯絡管道（常駐，不自動消失）。
+   2026-07 諮詢表單無聲失敗一個多月，客人只看到一句錯誤就離開，名單直接流失。 */
+function showFormFallback(reason) {
+  const form = document.getElementById('contact-form');
+  if (!form) return;
+  document.querySelector('.form-fallback')?.remove();
+  document.querySelector('.form-error-msg')?.remove();
+
+  const t = (window.__lang && FORM_FALLBACK_TXT[window.__lang]) || FORM_FALLBACK_TXT['zh-tw'];
+  const box = document.createElement('div');
+  box.className = 'form-fallback';
+  box.innerHTML = `
+    <p class="form-fallback-title"><i class="fas fa-triangle-exclamation"></i> ${t.title}</p>
+    <p class="form-fallback-desc">${t.desc}</p>
+    <div class="form-fallback-btns">
+      <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" rel="noopener noreferrer"
+         onclick="trackFallbackClick('line')"><i class="fab fa-line"></i> LINE</a>
+      <a href="https://wa.me/886912151788" target="_blank" rel="noopener noreferrer"
+         onclick="trackFallbackClick('whatsapp')"><i class="fab fa-whatsapp"></i> WhatsApp</a>
+      <a href="tel:06-9271288" onclick="trackFallbackClick('phone')"><i class="fas fa-phone"></i> 06-9271288</a>
+      <a href="mailto:dodoken1002@phbay.net" onclick="trackFallbackClick('email')"><i class="fas fa-envelope"></i> Email</a>
+    </div>
+    <p class="form-fallback-reason">${t.reason}${reason ? '：' + reason : ''}</p>`;
+  form.prepend(box);
+  box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function trackFallbackClick(channel) {
+  if (typeof gtag === 'function') {
+    gtag('event', 'contact_fallback_click', { channel: channel });
+  }
+}
+window.trackFallbackClick = trackFallbackClick;
+
+const FORM_FALLBACK_TXT = {
+  'zh-tw': { title:'表單送出失敗，但別讓行程等待', desc:'系統暫時無法接收，請直接用以下任一方式聯繫我們，一樣會由專人為你安排。', reason:'錯誤訊息' },
+  'en':    { title:'Submission failed — let\'s not keep your trip waiting', desc:'Our form is temporarily unavailable. Please reach us through any channel below and our team will help you directly.', reason:'Error' },
+  'ja':    { title:'送信に失敗しました。ご旅行の相談はこちらから', desc:'フォームが一時的にご利用いただけません。以下のいずれかの方法でご連絡ください。担当者が直接ご対応いたします。', reason:'エラー' },
+  'ko':    { title:'전송에 실패했습니다 — 여행 상담은 이쪽으로', desc:'양식이 일시적으로 작동하지 않습니다. 아래 방법 중 하나로 연락 주시면 담당자가 직접 도와드립니다.', reason:'오류' },
+  'zh-cn': { title:'表单送出失败，但别让行程等待', desc:'系统暂时无法接收，请直接用以下任一方式联系我们，一样会由专人为你安排。', reason:'错误信息' },
+};
 
 // ─── 梯次名額：依行程載入 ────────────────────────────────
 let _slotsCache = {};   // { tourId: [slot, ...] }

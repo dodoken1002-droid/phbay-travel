@@ -1175,6 +1175,57 @@ ul { list-style: none; }
   margin: 0 0 4px;
 }
 
+/* ─── 表單送出失敗：備援聯絡管道（常駐顯示，不自動消失）─── */
+.form-fallback {
+  background: #fff8f4;
+  border: 1px solid #f3c4ad;
+  border-left: 4px solid #e85c3a;
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 18px;
+}
+.form-fallback-title {
+  margin: 0 0 6px;
+  font-weight: 800;
+  color: #c2410c;
+  font-size: .98rem;
+}
+.form-fallback-desc {
+  margin: 0 0 12px;
+  font-size: .9rem;
+  color: var(--text-mid);
+  line-height: 1.7;
+}
+.form-fallback-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.form-fallback-btns a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: var(--white);
+  border: 1px solid #f3c4ad;
+  color: #c2410c;
+  font-weight: 700;
+  font-size: .9rem;
+  text-decoration: none;
+  transition: background .15s ease, transform .15s ease;
+}
+.form-fallback-btns a:hover {
+  background: #ffe9df;
+  transform: translateY(-1px);
+}
+.form-fallback-reason {
+  margin: 12px 0 0;
+  font-size: .78rem;
+  color: #9a6b56;
+  word-break: break-word;
+}
+
 /* 出發日期 chips */
 .date-chips {
   display: flex;
