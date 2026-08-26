@@ -1454,6 +1454,12 @@ function loadContacts() {
           <div class="contact-field"><label>行程</label>
             <span>${legacyMap[c.tour_interest]||c.tour_interest||'—'}</span></div>
           <div class="contact-field"><label>梯次狀態</label><span>${wl}</span></div>
+          <div class="contact-field"><label>澎湖旅次</label><span>${c.visit_count||'—'}</span></div>
+          <div class="contact-field"><label>百旅會員</label><span>${
+            c.member_status === '已是會員'
+              ? `<span style="color:#b8860b;font-weight:700">會員${c.member_no ? '｜'+c.member_no : ''}</span>`
+              : (c.member_status === '想了解' ? '<span style="color:#1a6b9e">想了解百旅</span>' : '—')
+          }</span></div>
           <div class="contact-field"><label>備註</label><span>${c.notes||'—'}</span></div>
           <div class="contact-field"><label>送出時間</label>
             <span style="font-size:.78rem">${c.created_at}</span></div>
@@ -2067,11 +2073,14 @@ function exportPreorderCsv() {
 function exportContactsCsv() {
   const contacts = window._contacts || [];
   if (!contacts.length) { showToast('目前沒有可匯出的諮詢紀錄', 'error'); return; }
-  const header = ['姓名','電話','旅遊日期','結束日期','人數','交通','出發地','預算','行程','候補','備註','送出時間'];
+  const header = ['姓名','電話','旅遊日期','結束日期','人數','交通','出發地','預算','行程','候補',
+                  '澎湖旅次','百旅會員','會員編號','備註','送出時間'];
   const rows = [header];
   contacts.forEach(c => rows.push([c.name||'', c.phone||'', c.travel_date||'', c.travel_date_end||'',
     c.people||'', c.transport||'', c.departure_city||'', c.budget||'', c.tour_interest||'',
-    c.is_waitlist ? '候補' : (c.slot_id ? '正團' : ''), c.notes||'', c.created_at||'']));
+    c.is_waitlist ? '候補' : (c.slot_id ? '正團' : ''),
+    c.visit_count||'', c.member_status||'', c.member_no||'',
+    c.notes||'', c.created_at||'']));
   downloadCsv(rows, `諮詢紀錄_${new Date().toISOString().slice(0,10)}.csv`);
   recordAudit({ action:'export', category:'諮詢名單', scope:new Date().toISOString().slice(0,10), record_count:contacts.length, pax_count:contacts.length });
 }

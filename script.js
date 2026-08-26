@@ -163,6 +163,19 @@ function toggleDeparture(transport) {
 }
 window.toggleDeparture = toggleDeparture;
 
+/* 澎湖百旅會員：選「我已是潮旅會員」才顯示會員編號欄位 */
+function toggleMemberNo(status) {
+  const g = document.getElementById('member-no-group');
+  if (!g) return;
+  const show = status === '已是會員';
+  g.style.display = show ? '' : 'none';
+  if (!show) {
+    const input = document.getElementById('member-no');
+    if (input) input.value = '';
+  }
+}
+window.toggleMemberNo = toggleMemberNo;
+
 function initContactForm() {
   const form    = document.getElementById('contact-form');
   const success = document.getElementById('form-success');

@@ -52,7 +52,7 @@
   <!-- 預載首屏輪播 LCP 圖（WebP），加速最大內容繪製 -->
   <link rel="preload" as="image" href="/images/summer-festival-hero-2026.webp" type="image/webp" fetchpriority="high" />
 
-  <link rel="stylesheet" href="style.css?v=20260819" />
+  <link rel="stylesheet" href="style.css?v=20260819b" />
   <!-- Font Awesome：非阻塞載入（先以 print 媒體載入，完成後切回 all），避免拖慢首屏渲染 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" media="print" onload="this.media='all'" />
   <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" /></noscript>
@@ -799,6 +799,32 @@
                 </div>
               </div>
             </div>
+            <!-- 澎湖百旅會員計畫：回訪次數與會員狀態（皆選填） -->
+            <div class="form-row">
+              <div class="form-group">
+                <label for="visit-count"><i class="fas fa-water"></i> <span data-i18n="form.visitCount">這是您第幾次澎湖旅程？</span></label>
+                <select id="visit-count" name="visit_count">
+                  <option value="" data-i18n="form.visitCountPh">請選擇（可不填）</option>
+                  <option value="第一次" data-i18n="form.visit1">第一次</option>
+                  <option value="第2-3次" data-i18n="form.visit2">第 2–3 次</option>
+                  <option value="第4-9次" data-i18n="form.visit3">第 4–9 次</option>
+                  <option value="第10次以上" data-i18n="form.visit4">第 10 次以上</option>
+                  <option value="不確定" data-i18n="form.visit5">不確定</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="member-status"><i class="fas fa-id-card"></i> <span data-i18n="form.memberStatus">澎湖百旅會員</span></label>
+                <select id="member-status" name="member_status" onchange="toggleMemberNo(this.value)">
+                  <option value="" data-i18n="form.memberPh">請選擇（可不填）</option>
+                  <option value="已是會員" data-i18n="form.memberYes">我已是潮旅會員</option>
+                  <option value="想了解" data-i18n="form.memberNo">尚未加入，我想了解澎湖百旅</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group" id="member-no-group" style="display:none">
+              <label for="member-no"><i class="fas fa-hashtag"></i> <span data-i18n="form.memberNoLabel">會員編號</span></label>
+              <input type="text" id="member-no" name="member_no" maxlength="40" data-i18n-ph="form.memberNoPh" placeholder="請輸入您的會員編號（可不填）" />
+            </div>
             <!-- 補充旅遊細節（選填，收合以降低填寫負擔） -->
             <details class="form-more">
               <summary><i class="fas fa-sliders"></i> <span data-i18n="form.more">補充旅遊細節（選填）— 填越詳細，越快幫你安排</span></summary>
@@ -949,7 +975,7 @@
   </button>
 
   <script src="i18n.js?v=20260815"></script>
-  <script src="script.js?v=20260819"></script>
+  <script src="script.js?v=20260819b"></script>
   <a href="https://wa.me/886912151788" class="wa-float" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp 諮詢" title="WhatsApp 諮詢"><i class="fab fa-whatsapp"></i></a>
 </body>
 </html>

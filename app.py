@@ -156,6 +156,10 @@ def init_db():
     for col, defn in [
         ('slot_id',     'INT'),
         ('is_waitlist', 'BOOLEAN DEFAULT FALSE'),
+        # 澎湖百旅會員計畫：蒐集回訪次數與會員狀態（皆選填）
+        ('visit_count',   'VARCHAR(20)'),
+        ('member_status', 'VARCHAR(30)'),
+        ('member_no',     'VARCHAR(40)'),
     ]:
         try:
             cur.execute(f"ALTER TABLE contacts ADD COLUMN IF NOT EXISTS {col} {defn}")
@@ -4165,12 +4169,16 @@ def submit_contact():
         cur.execute("""
             INSERT INTO contacts
               (name,phone,travel_date,travel_date_end,people,budget,transport,
-               departure_city,tour_interest,slot_id,is_waitlist,notes)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id, created_at
+               departure_city,tour_interest,slot_id,is_waitlist,notes,
+               visit_count,member_status,member_no)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id, created_at
         """, (data['name'], data['phone'], data['travel_date'], data['travel_date_end'],
               data['people'], data.get('budget',''), data['transport'],
               data.get('departure_city',''), data.get('tour_interest',''),
-              slot_id, is_waitlist, data.get('notes','')))
+              slot_id, is_waitlist, data.get('notes',''),
+              (data.get('visit_count') or '')[:20],
+              (data.get('member_status') or '')[:30],
+              (data.get('member_no') or '')[:40]))
         row = cur.fetchone()
         conn.commit(); cur.close(); conn.close()
 
