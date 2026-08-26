@@ -153,9 +153,17 @@ def init_db():
         )
     """)
     # 舊資料庫補欄位（不影響已有欄位）
+    # ⚠️ 這份清單必須涵蓋 CREATE TABLE 裡「初版之後才加入」的每一個欄位。
+    # CREATE TABLE IF NOT EXISTS 不會修改已存在的表，漏列的欄位在正式站永遠不會被建立，
+    # 之後 INSERT 就會整筆失敗。（2026-08-26 事故：travel_date_end／budget／transport／
+    # departure_city 漏列，導致線上諮詢表單自 7/19 起每一筆送出都失敗。）
     for col, defn in [
         ('slot_id',     'INT'),
         ('is_waitlist', 'BOOLEAN DEFAULT FALSE'),
+        ('travel_date_end', 'DATE'),
+        ('budget',          'VARCHAR(30)'),
+        ('transport',       'VARCHAR(20)'),
+        ('departure_city',  'VARCHAR(50)'),
         # 澎湖百旅會員計畫：蒐集回訪次數與會員狀態（皆選填）
         ('visit_count',   'VARCHAR(20)'),
         ('member_status', 'VARCHAR(30)'),
@@ -4189,6 +4197,10 @@ def submit_contact():
                        is_waitlist=is_waitlist,
                        message='已登記候補，我們將優先通知您' if is_waitlist else '報名成功')
     except Exception as e:
+        # 一定要留下 log：這裡曾因例外被靜默吞掉，導致諮詢表單壞了一個月才被發現。
+        import traceback
+        print(f'[CONTACT ERROR] {type(e).__name__}: {e}')
+        traceback.print_exc()
         return jsonify(ok=False, error='伺服器錯誤，請稍後再試'), 500
 
 
