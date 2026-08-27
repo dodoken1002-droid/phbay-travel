@@ -62,6 +62,27 @@ def _set_cache_headers(resp):
         resp.headers['Cache-Control'] = 'no-cache'
     return resp
 
+
+@app.errorhandler(404)
+def _page_not_found(_error):
+    """讓一般網頁 404 可在 GA4 統計；API 仍維持機器可讀 JSON。"""
+    if request.path.startswith('/api/'):
+        return jsonify(ok=False, error='not found'), 404
+    path_json = json.dumps(request.path, ensure_ascii=False)
+    html = f'''<!doctype html><html lang="zh-Hant"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex"><title>找不到頁面｜潮旅國際旅行社</title>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-47DV1VPF9J"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){{dataLayer.push(arguments);}}
+gtag('js',new Date());gtag('config','G-47DV1VPF9J');
+gtag('event','page_not_found',{{page_path:{path_json}}});</script>
+<style>body{{font-family:system-ui,sans-serif;margin:0;background:#f4fbff;color:#17384d}}
+main{{max-width:640px;margin:12vh auto;padding:32px;text-align:center}}a{{color:#087ca7}}</style>
+</head><body><main><h1>找不到這個頁面</h1>
+<p>網址可能已變更，請回首頁繼續查看澎湖行程。</p><p><a href="/">回潮旅首頁</a></p>
+</main></body></html>'''
+    return html, 404
+
 _db_initialized = False
 
 # ─── 資料庫連線 ────────────────────────────────────────────
@@ -1106,10 +1127,13 @@ def health():
         except Exception as e:
             db_error = str(e)
             db_status = 'error'
-    return jsonify(ok=True, db_url_set=bool(db_url),
-                   db_url_prefix=db_url[:25] + '...' if db_url else '',
-                   db_status=db_status, db_error=db_error,
-                   table_contacts=table_exists)
+    release_sha = (os.environ.get('RAILWAY_GIT_COMMIT_SHA')
+                   or os.environ.get('SOURCE_VERSION') or '').strip()
+    return jsonify(ok=db_status == 'connected' and table_exists,
+                   db_url_set=bool(db_url), db_status=db_status,
+                   db_error=db_error, table_contacts=table_exists,
+                   release_sha=release_sha[:40],
+                   environment=os.environ.get('RAILWAY_ENVIRONMENT_NAME', '').strip())
 
 
 # ─── 公開行程 API ──────────────────────────────────────────
@@ -3931,7 +3955,9 @@ def blog_post(slug):
         p = None
     if not p:
         return _render_blog('找不到文章 - 潮旅國際旅行社', '找不到這篇文章。', f'{SITE}/blog',
-                            '<div class="blog-wrap"><a class="blog-back" href="/blog">← 回部落格</a><h1>找不到這篇文章</h1><p>它可能已被移除或尚未發布。</p></div>'), 404
+                            '<div class="blog-wrap"><a class="blog-back" href="/blog">← 回部落格</a><h1>找不到這篇文章</h1><p>它可能已被移除或尚未發布。</p></div>',
+                            '<meta name="robots" content="noindex">'
+                            '<script>gtag("event","page_not_found",{page_path:location.pathname});</script>'), 404
     lang = _req_lang()
     avail = _post_avail_langs(p)
     alt_links = _blog_hreflang(f'/blog/{slug}', avail)

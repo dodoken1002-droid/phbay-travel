@@ -1,0 +1,87 @@
+name: P0 daily website health
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "15 23 * * *" # 台灣時間每天 07:15
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: p0-daily-health
+  cancel-in-progress: false
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install monitoring dependencies
+        run: pip install "google-api-python-client>=2,<3" "google-auth>=2,<3"
+
+      - name: Run daily health checks
+        id: health
+        continue-on-error: true
+        env:
+          EXPECTED_DEPLOY_SHA: ${{ github.sha }}
+          LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
+          GA4_PROPERTY_ID: ${{ vars.GA4_PROPERTY_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GSC_SERVICE_ACCOUNT_JSON: ${{ secrets.GSC_SERVICE_ACCOUNT_JSON }}
+          GSC_SITE_URL: ${{ vars.GSC_SITE_URL }}
+          GSC_SITEMAP_URL: ${{ vars.GSC_SITEMAP_URL }}
+          GSC_INDEXED_BASELINE: ${{ vars.GSC_INDEXED_BASELINE }}
+        run: python scripts/daily_health_check.py --output health-report.json --markdown health-report.md
+
+      - name: Publish run summary
+        if: always()
+        run: cat health-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p0-health-${{ github.run_id }}
+          path: |
+            health-report.json
+            health-report.md
+          retention-days: 30
+
+      - name: Open or close the P0 Critical gate
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('health-report.json', 'utf8'));
+            const title = '[P0 Critical] 暫停 P3 新功能開發';
+            const { owner, repo } = context.repo;
+            const found = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: 'open', per_page: 100
+            });
+            const gate = found.find(issue => !issue.pull_request && issue.title === title);
+            const body = fs.readFileSync('health-report.md', 'utf8') +
+              `\n[查看本次執行](${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId})\n`;
+            if (report.p3_blocked && gate) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: gate.number, body });
+            } else if (report.p3_blocked) {
+              await github.rest.issues.create({ owner, repo, title, body });
+            } else if (gate) {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: gate.number,
+                body: 'P0 健康檢查已恢復，解除 P3 開發暫停。\n\n' + body
+              });
+              await github.rest.issues.update({ owner, repo, issue_number: gate.number, state: 'closed' });
+            }
+
+      - name: Enforce P0 gate
+        if: steps.health.outcome == 'failure'
+        run: exit 1
