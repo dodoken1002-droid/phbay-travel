@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from app import app
-from scripts.daily_health_check import Check, render_markdown
+from scripts.daily_health_check import Check, render_markdown, send_line_critical_alert
 
 
 class DailyHealthTests(unittest.TestCase):
@@ -41,6 +41,15 @@ class DailyHealthTests(unittest.TestCase):
         rendered = render_markdown(report)
         self.assertIn("P3 新功能：**暫停**", rendered)
         self.assertIn("HTTP 500", rendered)
+
+    def test_line_alert_is_safe_without_credentials(self):
+        report = {"p3_blocked": True, "checks": [
+            Check("homepage", "首頁", "critical", "HTTP 500", None).__dict__
+        ]}
+        with patch.dict(os.environ, {"LINE_CHANNEL_ACCESS_TOKEN": "",
+                                     "LINE_OWNER_USER_ID": ""}, clear=False):
+            result = send_line_critical_alert(report)
+        self.assertEqual(result["status"], "skipped")
 
 
 if __name__ == "__main__":

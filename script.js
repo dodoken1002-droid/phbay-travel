@@ -5,6 +5,7 @@
 
 // ─── 等 DOM 載入完成後執行 ───
 document.addEventListener('DOMContentLoaded', () => {
+  captureAttribution();
   initNavbar();
   initTabs();
   initContactForm();
@@ -12,10 +13,53 @@ document.addEventListener('DOMContentLoaded', () => {
   loadTours();
   initQuiz();
   initCarousel();
+  initMemberHome();
   // Footer 版權年份自動更新
   const yr = document.getElementById('footer-year');
   if (yr) yr.textContent = new Date().getFullYear();
 });
+
+async function initMemberHome() {
+  const box = document.getElementById('member-home-status');
+  if (!box) return;
+  try {
+    const response = await fetch('/api/member/me');
+    if (!response.ok) return;
+    const data = await response.json();
+    if (!data.ok) return;
+    box.textContent = '';
+    const card = document.createElement('div');
+    card.style.cssText = 'background:#fff;border-radius:16px;padding:18px 24px;box-shadow:0 8px 24px #0b537219';
+    const title = document.createElement('strong');
+    title.style.cssText = 'display:block;font-size:1.35rem;color:#1a6b9e';
+    title.textContent = `${data.member.name}｜第 ${data.member.trip_count} 次・${data.member.level}`;
+    const progress = document.createElement('span');
+    progress.textContent = data.member.next_level
+      ? `距「${data.member.next_level.name}」還差 ${data.member.next_level.remaining} 次`
+      : '你已抵達百澎傳奇';
+    card.append(title, progress); box.append(card);
+  } catch (_) { /* 未登入或網路瞬斷時保留訪客版 */ }
+}
+
+/* P1 轉換歸因：同一次瀏覽保留首次 UTM 與入口，表單送出時一併存後台。 */
+const ATTRIBUTION_KEY = 'phbay_attribution_v1';
+function captureAttribution() {
+  try {
+    if (sessionStorage.getItem(ATTRIBUTION_KEY)) return;
+    const q = new URLSearchParams(location.search);
+    const data = {
+      utm_source: q.get('utm_source') || '', utm_medium: q.get('utm_medium') || '',
+      utm_campaign: q.get('utm_campaign') || '', utm_content: q.get('utm_content') || '',
+      utm_term: q.get('utm_term') || '', landing_page: location.pathname + location.search,
+      referrer: document.referrer || ''
+    };
+    sessionStorage.setItem(ATTRIBUTION_KEY, JSON.stringify(data));
+  } catch (_) { /* 瀏覽器禁用 storage 時不影響主要流程 */ }
+}
+function getAttribution() {
+  try { return JSON.parse(sessionStorage.getItem(ATTRIBUTION_KEY) || '{}'); }
+  catch (_) { return {}; }
+}
 
 /* ═══════════════════════════════════════════════
    導覽列：捲動陰影 + 手機漢堡選單
@@ -196,6 +240,7 @@ function initContactForm() {
 
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
+    data.utm = getAttribution();
 
     if (!data.name || !data.phone || !data.travel_date || !data.travel_date_end || !data.people || !data.transport) {
       showFormError('請填寫所有必填欄位（標示 * 的欄位）');
@@ -223,6 +268,7 @@ function initContactForm() {
     // 表單一壞當天就會在 GA4 顯示落差（2026-07 曾整月無聲失敗而未被發現）。
     if (typeof gtag === 'function') {
       gtag('event', 'contact_submit_attempt', {
+        method:        'contact_form',
         tour_interest: data.tour_interest || '(未選)',
         transport:     data.transport || '',
         people:        data.people || '',
@@ -260,6 +306,7 @@ function initContactForm() {
       // GA4 / Meta Pixel 轉換事件：送出成功後才記錄一筆諮詢成立
       if (typeof gtag === 'function') {
         gtag('event', 'generate_lead', {
+          method:        'contact_form',
           tour_interest: data.tour_interest || '(未選)',
           transport:     data.transport || '',
           people:        data.people || '',
@@ -282,7 +329,8 @@ function initContactForm() {
 
       // 失敗一定要記事件，讓表單故障在 GA4 當天就看得出來
       if (typeof gtag === 'function') {
-        gtag('event', 'contact_submit_failed', {
+      gtag('event', 'contact_submit_failed', {
+          method:         'contact_form',
           failure_type:  err.httpStatus ? 'server' : 'network',
           http_status:   err.httpStatus || 0,
           error_message: String(err.message || '').slice(0, 100),
@@ -586,15 +634,15 @@ window.onLangChange = function () { renderAllTours(); };
 // 行程卡片／彈窗的固定 UI 字串（依語言）
 const TOUR_UI = {
   'zh-tw':{detail:'查看詳情',priceHdr:'出發地 × 價格',suitable:'適合',duration:'天數',notice:'注意事項',includes:'費用包含',notes:'備註',highlights:'行程亮點',dates:'出發日期',
-           poster:'行程海報',posterHint:'點擊可看大圖',contact:'行程提供單位與聯絡方式',cAgency:'主辦旅行社',cPartner:'合作夥伴',cPhone:'電話',cLine:'LINE',cEmail:'Email',cWeb:'網站',cLicense:'證號',cNote:'也可直接洽潮旅國際旅行社協助報名'},
+           poster:'行程海報',posterHint:'點擊可看大圖',contact:'行程提供單位與聯絡方式',cAgency:'主辦旅行社',cPartner:'合作夥伴',cPhone:'電話',cLine:'LINE',cEmail:'Email',cWeb:'網站',cLicense:'證號',cNote:'也可直接洽潮旅國際旅行社協助報名',memberBadge:'經潮旅報名完成後可累積澎湖旅次'},
   'en':{detail:'View Details',priceHdr:'Departure × Price',suitable:'For',duration:'Duration',notice:'Note',includes:'Includes',notes:'Notes',highlights:'Highlights',dates:'Departure Dates',
-        poster:'Itinerary Poster',posterHint:'Click to enlarge',contact:'Operator & Contact',cAgency:'Operating Agency',cPartner:'Partners',cPhone:'Phone',cLine:'LINE',cEmail:'Email',cWeb:'Website',cLicense:'License',cNote:'You may also book through Phbay Travel'},
+        poster:'Itinerary Poster',posterHint:'Click to enlarge',contact:'Operator & Contact',cAgency:'Operating Agency',cPartner:'Partners',cPhone:'Phone',cLine:'LINE',cEmail:'Email',cWeb:'Website',cLicense:'License',cNote:'You may also book through Phbay Travel',memberBadge:'Completed bookings through Phbay count toward Penghu journeys'},
   'ja':{detail:'詳細を見る',priceHdr:'出発地 × 料金',suitable:'対象',duration:'日数',notice:'ご注意',includes:'料金に含む',notes:'備考',highlights:'ハイライト',dates:'出発日',
-        poster:'ツアーポスター',posterHint:'クリックで拡大',contact:'主催会社とお問い合わせ',cAgency:'主催旅行会社',cPartner:'協力',cPhone:'電話',cLine:'LINE',cEmail:'メール',cWeb:'ウェブ',cLicense:'許可番号',cNote:'潮旅国際旅行社経由でのお申し込みも可能です'},
+        poster:'ツアーポスター',posterHint:'クリックで拡大',contact:'主催会社とお問い合わせ',cAgency:'主催旅行会社',cPartner:'協力',cPhone:'電話',cLine:'LINE',cEmail:'メール',cWeb:'ウェブ',cLicense:'許可番号',cNote:'潮旅国際旅行社経由でのお申し込みも可能です',memberBadge:'潮旅経由で予約・完了すると旅回数に加算'},
   'ko':{detail:'상세 보기',priceHdr:'출발지 × 요금',suitable:'대상',duration:'일수',notice:'유의사항',includes:'포함 사항',notes:'비고',highlights:'하이라이트',dates:'출발일',
-        poster:'여행 포스터',posterHint:'클릭하면 확대',contact:'주최사 및 연락처',cAgency:'주최 여행사',cPartner:'협력사',cPhone:'전화',cLine:'LINE',cEmail:'이메일',cWeb:'웹사이트',cLicense:'등록번호',cNote:'Phbay 여행사를 통해서도 예약하실 수 있습니다'},
+        poster:'여행 포스터',posterHint:'클릭하면 확대',contact:'주최사 및 연락처',cAgency:'주최 여행사',cPartner:'협력사',cPhone:'전화',cLine:'LINE',cEmail:'이메일',cWeb:'웹사이트',cLicense:'등록번호',cNote:'Phbay 여행사를 통해서도 예약하실 수 있습니다',memberBadge:'차오뤼를 통해 예약·완료하면 펑후 여행 횟수 적립'},
   'zh-cn':{detail:'查看详情',priceHdr:'出发地 × 价格',suitable:'适合',duration:'天数',notice:'注意事项',includes:'费用包含',notes:'备注',highlights:'行程亮点',dates:'出发日期',
-           poster:'行程海报',posterHint:'点击可看大图',contact:'行程提供单位与联络方式',cAgency:'主办旅行社',cPartner:'合作伙伴',cPhone:'电话',cLine:'LINE',cEmail:'Email',cWeb:'网站',cLicense:'证号',cNote:'也可直接洽潮旅国际旅行社协助报名'}
+           poster:'行程海报',posterHint:'点击可看大图',contact:'行程提供单位与联络方式',cAgency:'主办旅行社',cPartner:'合作伙伴',cPhone:'电话',cLine:'LINE',cEmail:'Email',cWeb:'网站',cLicense:'证号',cNote:'也可直接洽潮旅国际旅行社协助报名',memberBadge:'经潮旅报名完成后可累积澎湖旅次'}
 };
 function tourUI(k){ return (TOUR_UI[window.__lang || 'zh-tw'] || TOUR_UI['zh-tw'])[k]; }
 
@@ -673,6 +721,7 @@ function renderTourCard(tour) {
       ${isHero ? '<div class="tour-year-badge">2026</div>' : ''}
       <h3 class="tour-title">${L.title}</h3>
       <p class="tour-desc">${L.description || ''}</p>
+      <p style="font-size:.78rem;color:#9a6b16;font-weight:700"><i class="fas fa-passport"></i> ${tourUI('memberBadge')}</p>
       ${slotHtml}
       ${pricesHtml}
       <div class="tour-meta">
@@ -798,6 +847,7 @@ function renderTourModal(tour) {
       ${posterHtml}
       ${contactHtml}
       ${notesHtml}
+      <div style="background:#fff7df;border-left:4px solid #c99535;padding:12px 14px;margin:16px 0"><i class="fas fa-passport"></i> <strong>${tourUI('memberBadge')}</strong></div>
       ${neihaiModalCta}
     </div>`;
 

@@ -145,6 +145,11 @@
 
   <script>
     const SLUG = location.pathname.split('/').filter(Boolean).pop();
+    const q = new URLSearchParams(location.search);
+    const attribution = {utm_source:q.get('utm_source')||'',utm_medium:q.get('utm_medium')||'',
+      utm_campaign:q.get('utm_campaign')||'',utm_content:q.get('utm_content')||'',
+      utm_term:q.get('utm_term')||'',landing_page:location.pathname+location.search,
+      referrer:document.referrer||''};
     const grid = document.getElementById('sailing-grid');
     const monthInput = document.getElementById('month-input');
     const selectedBox = document.getElementById('selected-sailing');
@@ -264,6 +269,7 @@
       const btn = e.submitter;
       btn.disabled = true;
       btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 送出中...';
+      if (typeof gtag === 'function') gtag('event','preorder_submit_attempt',{method:'preorder',product_slug:SLUG});
       try {
         const res = await fetch(`/api/preorder/${encodeURIComponent(SLUG)}/orders`, {
           method:'POST',
@@ -274,6 +280,7 @@
             agency_name: document.getElementById('agency-name').value,
             contact_email: document.getElementById('contact-email').value.trim(),
             notes: document.getElementById('notes').value,
+            utm: attribution,
             passengers,
           })
         });
@@ -294,11 +301,17 @@
             content_type: 'product'
           });
         }
+        if (typeof gtag === 'function') gtag('event','generate_lead',{
+          method:'preorder',product_slug:SLUG,booking_ref:json.booking_ref
+        });
         e.target.reset();
         passengerCount.value = 1;
         renderPassengers();
         await loadSlots();
       } catch (err) {
+        if (typeof gtag === 'function') gtag('event','preorder_submit_failed',{
+          method:'preorder',product_slug:SLUG,error_message:String(err.message||'').slice(0,100)
+        });
         resultBox.className = 'result err';
         resultBox.textContent = err.message || '送出失敗，請稍後再試或改用 LINE 聯繫。';
       } finally {

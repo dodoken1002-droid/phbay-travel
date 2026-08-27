@@ -11,7 +11,8 @@ const DICT = {
   /* ─────────── English ─────────── */
   en: {
     'nav.home':'Home', 'nav.tours':'Tours', 'nav.quiz':'Trip Quiz', 'nav.about':'About', 'nav.faq':'FAQ', 'nav.blog':'Blog', 'nav.contact':'Contact',
-    'nav.preorder':'Pre-order', 'nav.neihai':'Small Town Story Inner Sea Cruise', 'nav.festival':'Music Festival', 'nav.travel':'Travel Info', 'nav.tides':'Tide Forecast', 'nav.articles':'Travel Articles', 'nav.reviews':'Reviews', 'nav.contactInfo':'Contact Info',
+    'nav.preorder':'Pre-order', 'nav.neihai':'Small Town Story Inner Sea Cruise', 'nav.festival':'Music Festival', 'nav.travel':'Travel Info', 'nav.tides':'Tide Forecast', 'nav.articles':'Travel Articles', 'nav.reviews':'Reviews', 'nav.contactInfo':'Contact Info', 'nav.member':'100 Journeys',
+    'member.kicker':'Penghu 100 Journeys', 'member.title':'Which Penghu journey is this for you?', 'member.desc':'Every trip booked through and completed with Phbay becomes a stamp in your travel passport.', 'member.join':'Join Penghu 100 Journeys', 'member.dashboard':'View my Penghu journeys',
     'slide.cta':'Ask About Tours',
     'partner.title':'Official Partner · 2026 Penghu Chasing-the-Wind Music & Light Festival','partner.subtitle':'Phbay Travel is on the official partner list alongside ezTravel, Lion Travel, Cola Tour, SET Tour, Starsunny, kkday and EverFun.',
     'hero.title':'Phbay Travel', 'hero.subtitle':'Discover a different side of Penghu',
@@ -75,7 +76,8 @@ const DICT = {
   /* ─────────── 日本語 ─────────── */
   ja: {
     'nav.home':'ホーム', 'nav.tours':'ツアー', 'nav.quiz':'旅行診断', 'nav.about':'会社紹介', 'nav.faq':'よくある質問', 'nav.blog':'ブログ', 'nav.contact':'お問い合わせ',
-    'nav.preorder':'事前予約', 'nav.neihai':'小城故事・内海クルーズ', 'nav.festival':'音楽祭', 'nav.travel':'旅の情報', 'nav.tides':'潮汐予報', 'nav.articles':'旅行記事', 'nav.reviews':'お客様の声', 'nav.contactInfo':'連絡先',
+    'nav.preorder':'事前予約', 'nav.neihai':'小城故事・内海クルーズ', 'nav.festival':'音楽祭', 'nav.travel':'旅の情報', 'nav.tides':'潮汐予報', 'nav.articles':'旅行記事', 'nav.reviews':'お客様の声', 'nav.contactInfo':'連絡先', 'nav.member':'澎湖百旅会員',
+    'member.kicker':'澎湖百旅プログラム', 'member.title':'今回で何回目の澎湖旅行ですか？', 'member.desc':'潮旅を通じて予約し完了した旅は、旅行パスポートに記録されます。', 'member.join':'会員になる', 'member.dashboard':'私の澎湖旅行を見る',
     'slide.cta':'ツアーを相談する',
     'partner.title':'2026 澎湖追風音楽燈光祭 公式提携旅行社','partner.subtitle':'Phbay Travel は易遊網・雄獅・可楽・東南・星晴・佳期・kkday・長汎とともに公式提携リストに掲載されています。',
     'hero.title':'Phbay Travel', 'hero.subtitle':'いつもと違う澎湖（ポンフー）の旅へ',
@@ -139,7 +141,8 @@ const DICT = {
   /* ─────────── 한국어 ─────────── */
   ko: {
     'nav.home':'홈', 'nav.tours':'투어', 'nav.quiz':'여행 진단', 'nav.about':'회사 소개', 'nav.faq':'자주 묻는 질문', 'nav.blog':'블로그', 'nav.contact':'문의하기',
-    'nav.preorder':'사전 예약', 'nav.neihai':'스몰타운 스토리 내해 크루즈', 'nav.festival':'음악 축제', 'nav.travel':'여행 정보', 'nav.tides':'조석 예보', 'nav.articles':'여행 아티클', 'nav.reviews':'여행 후기', 'nav.contactInfo':'연락처',
+    'nav.preorder':'사전 예약', 'nav.neihai':'스몰타운 스토리 내해 크루즈', 'nav.festival':'음악 축제', 'nav.travel':'여행 정보', 'nav.tides':'조석 예보', 'nav.articles':'여행 아티클', 'nav.reviews':'여행 후기', 'nav.contactInfo':'연락처', 'nav.member':'펑후 백여행',
+    'member.kicker':'펑후 백여행 프로그램', 'member.title':'이번이 몇 번째 펑후 여행인가요?', 'member.desc':'차오뤼를 통해 예약하고 완료한 모든 여행이 여행 여권에 기록됩니다.', 'member.join':'회원 가입', 'member.dashboard':'내 펑후 여행 보기',
     'slide.cta':'투어 문의하기',
     'partner.title':'2026 펑후 추풍 음악조명축제 공식 제휴 여행사','partner.subtitle':'Phbay Travel은 ezTravel·라이언트래블·콜라투어·SET투어 등과 함께 공식 제휴 명단에 등재되어 있습니다.',
     'hero.title':'Phbay Travel', 'hero.subtitle':'색다른 펑후 여행을 만나보세요',
@@ -203,7 +206,8 @@ const DICT = {
   /* ─────────── 简体中文 ─────────── */
   'zh-cn': {
     'nav.home':'首页', 'nav.tours':'行程介绍', 'nav.quiz':'行程测验', 'nav.about':'关于我们', 'nav.faq':'常见问题', 'nav.blog':'博客', 'nav.contact':'联系我们',
-    'nav.preorder':'预购行程', 'nav.neihai':'小城故事内海巡礼', 'nav.festival':'追风音乐节', 'nav.travel':'旅游大小事', 'nav.tides':'潮汐查询系统', 'nav.articles':'旅游文章分享', 'nav.reviews':'旅客评价', 'nav.contactInfo':'联系资讯',
+    'nav.preorder':'预购行程', 'nav.neihai':'小城故事内海巡礼', 'nav.festival':'追风音乐节', 'nav.travel':'旅游大小事', 'nav.tides':'潮汐查询系统', 'nav.articles':'旅游文章分享', 'nav.reviews':'旅客评价', 'nav.contactInfo':'联系资讯', 'nav.member':'澎湖百旅会员',
+    'member.kicker':'澎湖百旅计划', 'member.title':'这是你的第几次澎湖旅程？', 'member.desc':'经潮旅报名完成的每一趟，都会成为旅行护照里的一次记录。', 'member.join':'加入澎湖百旅', 'member.dashboard':'查看我的澎湖旅程',
     'slide.cta':'咨询搭配行程',
     'partner.title':'2026 澎湖追风音乐灯光节 官方合作旅行社','partner.subtitle':'潮旅国际与易游网、雄狮、可乐、东南、星晴、佳期、kkday、长汎并列官方授权名单',
     'hero.title':'潮旅国际旅行社', 'hero.subtitle':'带你玩出不一样的澎湖旅行',

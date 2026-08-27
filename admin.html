@@ -227,6 +227,9 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
     <button id="tabbtn-contacts" onclick="switchTab('contacts',this)">
       <i class="fas fa-envelope"></i> 諮詢紀錄
     </button>
+    <button id="tabbtn-members" onclick="switchTab('members',this)">
+      <i class="fas fa-passport"></i> 百旅會員
+    </button>
     <button id="tabbtn-users" onclick="switchTab('users',this)">
       <i class="fas fa-users-gear"></i> 使用者管理
     </button>
@@ -377,7 +380,34 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
           </button>
         </div>
       </div>
+      <div id="conversion-summary" class="stats-row"></div>
       <div id="contacts-list">載入中…</div>
+    </div>
+
+    <div class="tab-content" id="tab-members">
+      <div class="toolbar"><h2>澎湖百旅會員</h2><div class="toolbar-right">
+        <input id="member-search" class="search-input" placeholder="會員編號／姓名／手機／Email" oninput="filterMemberCards()">
+        <button class="btn btn-primary" onclick="createMember()"><i class="fas fa-user-plus"></i> 建立會員</button>
+        <button class="btn btn-ghost" onclick="location.href='/api/admin/members/export.csv?key='+encodeURIComponent(ADMIN_KEY)"><i class="fas fa-file-csv"></i> 匯出 CSV</button>
+      </div></div>
+      <div id="member-stats" class="stats-row"></div>
+
+      <!-- 旅次認列政策：代售行程一律不得認列，否則會員等級會灌水 -->
+      <div class="contact-card" style="margin-bottom:18px">
+        <div style="grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <h4 style="margin:0"><i class="fas fa-route"></i> 預購行程・旅次認列設定</h4>
+          <button class="btn btn-sm btn-ghost" onclick="loadTripPolicy()"><i class="fas fa-rotate"></i> 重新整理</button>
+        </div>
+        <p style="grid-column:1/-1;margin:6px 0 0;font-size:.82rem;color:#718096;line-height:1.7">
+          只有勾選「可認列」的行程，訂單標記完成後才會計入會員旅次與點數。
+          <strong style="color:#c05621">代售行程請一律取消勾選</strong>，否則會員等級會灌水。
+          切換時會一併校正該行程既有的旅次；已給的點數以沖銷紀錄處理，不會竄改歷史。
+          此設定僅管理者可變更。
+        </p>
+        <div id="trip-policy-list" style="grid-column:1/-1;margin-top:10px">載入中…</div>
+      </div>
+
+      <div id="members-list">載入中…</div>
     </div>
 
     <!-- ── 使用者管理（僅 owner）── -->
@@ -837,8 +867,8 @@ let ME = null;  // 目前登入者 {name, role, ...}
 
 /* 角色 → 可見分頁（owner 全開） */
 const ROLE_TABS = {
-  owner:  ['tours','slots','posts','neihai','preorder','contacts','users','audit','qigui'],
-  orders: ['neihai','preorder'],
+  owner:  ['tours','slots','posts','neihai','preorder','contacts','members','users','audit','qigui'],
+  orders: ['neihai','preorder','contacts','members'],
   editor: ['posts'],
 };
 function loginFail(msg) {
@@ -888,7 +918,7 @@ function showAdmin() {
   const roleLabel = { owner:'管理者', orders:'訂位人員', editor:'小編' }[role] || role;
   document.getElementById('me-badge').textContent = `${(ME && ME.name) || ''}（${roleLabel}）`;
   // 只顯示有權限的分頁，並切到第一個
-  ['tours','slots','posts','neihai','preorder','contacts','users','audit','qigui'].forEach(t => {
+  ['tours','slots','posts','neihai','preorder','contacts','members','users','audit','qigui'].forEach(t => {
     const btn = document.getElementById('tabbtn-' + t);
     if (btn) btn.style.display = allowed.includes(t) ? '' : 'none';
   });
@@ -1129,6 +1159,7 @@ function switchTab(name, btn) {
   document.getElementById(`tab-${name}`).classList.add('active');
   btn.classList.add('active');
   if (name === 'contacts') loadContacts();
+  if (name === 'members')  { loadMembers(); loadTripPolicy(); }
   if (name === 'slots')    loadSlots();
   if (name === 'posts')    loadPosts();
   if (name === 'neihai')   loadNeihaiOrders();
@@ -1419,10 +1450,89 @@ function previewImg() {
 }
 
 /* ══════════════════════════════════════
+   澎湖百旅會員
+══════════════════════════════════════ */
+function memberEsc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function loadMembers(){
+  document.getElementById('members-list').innerHTML='載入中…';
+  fetch(`/api/admin/members?key=${encodeURIComponent(ADMIN_KEY)}`).then(r=>r.json()).then(d=>{
+    if(!d.ok){document.getElementById('members-list').textContent=d.error||'載入失敗';return;}
+    window._members=d.members||[];
+    const total=d.members.length,bound=d.members.filter(x=>x.line_bound).length,trips=d.members.reduce((n,x)=>n+(x.trip_count||0),0);
+    document.getElementById('member-stats').innerHTML=`<div class="stat-card"><strong>${total}</strong><span>會員</span></div><div class="stat-card"><strong>${bound}</strong><span>已綁 LINE</span></div><div class="stat-card"><strong>${trips}</strong><span>累積旅次</span></div>`;
+    renderMemberCards(d.members);
+  }).catch(()=>document.getElementById('members-list').textContent='連線失敗');
+}
+function renderMemberCards(rows){
+  document.getElementById('members-list').innerHTML=rows.map(m=>`<div class="contact-card member-card" data-search="${memberEsc([m.member_no,m.name,m.phone,m.email].join(' ').toLowerCase())}">
+    <div class="contact-field"><label>會員編號</label><strong>${memberEsc(m.member_no)}</strong></div><div class="contact-field"><label>姓名</label><span>${memberEsc(m.name)}</span></div>
+    <div class="contact-field"><label>等級</label><span>${memberEsc(m.level)}</span></div><div class="contact-field"><label>旅次／點數</label><span>${m.trip_count} 次／${m.points_balance} 點</span></div>
+    <div class="contact-field"><label>聯絡</label><span>${memberEsc(m.phone)}<br>${memberEsc(m.email)}</span></div><div class="contact-field"><label>LINE</label><span>${m.line_bound?'✅ 已綁定':'—'}</span></div>
+    <div class="contact-field" style="grid-column:1/-1"><button class="btn btn-sm btn-primary" onclick="openMember(${m.id})">旅次／點數管理</button></div><div id="member-detail-${m.id}" style="grid-column:1/-1"></div></div>`).join('')||'<p style="text-align:center">尚無會員</p>';
+}
+function loadTripPolicy(){
+  const box=document.getElementById('trip-policy-list');
+  if(!box)return;
+  box.textContent='載入中…';
+  fetch(`/api/admin/preorder/products?key=${encodeURIComponent(ADMIN_KEY)}`).then(r=>r.json()).then(d=>{
+    if(!d.ok){box.textContent=d.error||'載入失敗';return;}
+    if(!(d.products||[]).length){box.textContent='尚無預購行程';return;}
+    box.innerHTML=d.products.map(p=>`
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:9px 0;border-top:1px solid #edf2f7">
+        <label style="display:flex;align-items:center;gap:7px;font-weight:600;min-width:250px;cursor:pointer">
+          <input type="checkbox" style="width:auto" ${p.counts_as_trip?'checked':''}
+                 onchange="saveTripPolicy(${p.id},this)" />
+          ${memberEsc(p.name)}
+        </label>
+        <span style="font-size:.8rem;color:#718096">${memberEsc(p.slug)}${p.is_active?'':'（已停用）'}</span>
+        <span style="font-size:.8rem;color:#718096">完成訂單 ${p.completed_orders} 筆・已認列 ${p.counted_trips} 筆</span>
+        <span style="font-size:.8rem;font-weight:700;color:${p.counts_as_trip?'#38a169':'#dd6b20'}">
+          ${p.counts_as_trip?`可認列（每趟 ${d.points_per_trip} 點）`:'不認列'}</span>
+      </div>`).join('');
+  }).catch(()=>box.textContent='連線失敗');
+}
+function saveTripPolicy(productId,el){
+  const counts=el.checked;
+  const warn=counts
+    ? '設為「可認列」？\n\n該行程既有的已完成旅次會一併計入會員旅次，並補發點數。'
+    : '設為「不認列」？\n\n該行程既有的旅次會退出旅次計算，已發出的點數會產生沖銷紀錄。';
+  if(!confirm(warn)){el.checked=!counts;return;}
+  el.disabled=true;
+  fetch(`/api/admin/preorder/products/${productId}/counts-as-trip?key=${encodeURIComponent(ADMIN_KEY)}`,
+        {method:'PATCH',headers:{'Content-Type':'application/json'},
+         body:JSON.stringify({counts_as_trip:counts,apply_to_existing:true})})
+    .then(r=>r.json()).then(d=>{
+      el.disabled=false;
+      if(!d.ok){el.checked=!counts;showToast(d.error||'更新失敗','error');return;}
+      showToast(`已更新；校正既有旅次 ${d.affected_trips} 筆／${d.affected_members} 位會員`,'success');
+      loadTripPolicy();loadMembers();
+    }).catch(()=>{el.disabled=false;el.checked=!counts;showToast('連線失敗','error');});
+}
+function filterMemberCards(){const q=document.getElementById('member-search').value.trim().toLowerCase();document.querySelectorAll('.member-card').forEach(x=>x.style.display=(x.dataset.search||'').includes(q)?'':'none');}
+function createMember(){
+  const name=prompt('會員姓名');if(!name)return;const phone=prompt('手機');if(!phone)return;const email=prompt('Email');if(!email)return;
+  fetch(`/api/admin/members?key=${encodeURIComponent(ADMIN_KEY)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,phone,email})}).then(r=>r.json()).then(d=>{if(!d.ok){showToast(d.error,'error');return;}showToast(`已建立 ${d.member.member_no}`,'success');loadMembers()});
+}
+function openMember(id){fetch(`/api/admin/members/${id}?key=${encodeURIComponent(ADMIN_KEY)}`).then(r=>r.json()).then(d=>{if(!d.ok)return;const box=document.getElementById(`member-detail-${id}`);box.innerHTML=`<hr><h4>旅行護照</h4>${(d.trips||[]).map(t=>`<p>${memberEsc(t.departure_date||'日期未定')}｜${memberEsc(t.tour_name)}｜${memberEsc(t.status)} <button class="btn btn-sm btn-ghost" onclick="completeMemberTrip(${t.id},${id})">標記完成</button></p>`).join('')||'<p>尚無旅次</p>'}<p><button class="btn btn-sm btn-primary" onclick="addMemberTrip(${id})">＋新增旅次</button> <button class="btn btn-sm btn-ghost" onclick="adjustMemberPoints(${id})">調整點數</button></p><h4>點數紀錄</h4>${(d.points||[]).slice(0,10).map(p=>`<p>${p.delta>0?'+':''}${p.delta}｜${memberEsc(p.source)}｜${memberEsc(p.created_at)}</p>`).join('')||'<p>尚無點數</p>'}`;});}
+function addMemberTrip(id){const tour_name=prompt('行程名稱');if(!tour_name)return;const departure_date=prompt('出發日 YYYY-MM-DD（可留空）')||'';const completed=confirm('這趟已完成並可認列嗎？');fetch(`/api/admin/members/${id}/trips?key=${encodeURIComponent(ADMIN_KEY)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tour_name,departure_date:departure_date||null,status:completed?'completed':'planned',counts_trip:true})}).then(r=>r.json()).then(d=>{if(!d.ok){showToast(d.error,'error');return;}showToast('旅次已新增','success');loadMembers()});}
+function completeMemberTrip(tripId,memberId){fetch(`/api/admin/member-trips/${tripId}?key=${encodeURIComponent(ADMIN_KEY)}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'completed',counts_trip:true})}).then(r=>r.json()).then(d=>{if(!d.ok){showToast(d.error,'error');return;}showToast(`已認列，目前 ${d.trip_count} 次`,'success');loadMembers()});}
+function adjustMemberPoints(id){const delta=prompt('點數增減（例如 100 或 -50）');if(delta===null)return;const source=prompt('調整原因');if(!source)return;fetch(`/api/admin/members/${id}/points?key=${encodeURIComponent(ADMIN_KEY)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({delta,source})}).then(r=>r.json()).then(d=>{if(!d.ok){showToast(d.error,'error');return;}showToast(`點數餘額 ${d.points_balance}`,'success');loadMembers()});}
+
+/* ══════════════════════════════════════
    諮詢紀錄
 ══════════════════════════════════════ */
 function loadContacts() {
   document.getElementById('contacts-list').innerHTML = '載入中…';
+  fetch(`/api/admin/conversion-summary?key=${encodeURIComponent(ADMIN_KEY)}`)
+    .then(r=>r.json()).then(d=>{
+      if(!d.ok)return;
+      const stage=d.stages||{};
+      document.getElementById('conversion-summary').innerHTML = `
+        <div class="stat-card"><strong>${d.total||0}</strong><span>近 30 天諮詢</span></div>
+        <div class="stat-card"><strong>${(stage.contacted||{}).count||0}</strong><span>已聯繫</span></div>
+        <div class="stat-card"><strong>${(stage.converted||{}).count||0}</strong><span>已成交</span></div>
+        <div class="stat-card"><strong>${((d.conversion_rate||0)*100).toFixed(1)}%</strong><span>成交率</span></div>`;
+    });
   fetch(`/api/contacts?key=${encodeURIComponent(ADMIN_KEY)}`)
     .then(r => r.json())
     .then(d => {
@@ -1445,24 +1555,38 @@ function loadContacts() {
           : (c.slot_id ? '<span style="color:#38a169;font-weight:700">🟢 正團</span>' : '—');
         return `
         <div class="contact-card">
-          <div class="contact-field"><label>姓名</label><span>${c.name}</span></div>
-          <div class="contact-field"><label>電話</label><span>${c.phone}</span></div>
-          <div class="contact-field"><label>旅遊日期</label><span>${c.travel_date||'—'}${c.travel_date_end?' ~ '+c.travel_date_end:''}</span></div>
-          <div class="contact-field"><label>人數</label><span>${c.people||'—'}</span></div>
-          <div class="contact-field"><label>交通／出發地</label><span>${c.transport||'—'}${c.departure_city?'｜'+c.departure_city:''}</span></div>
-          <div class="contact-field"><label>預算</label><span>${c.budget||'—'}</span></div>
+          <div class="contact-field"><label>姓名</label><span>${memberEsc(c.name)}</span></div>
+          <div class="contact-field"><label>電話</label><span>${memberEsc(c.phone)}</span></div>
+          <div class="contact-field"><label>旅遊日期</label><span>${memberEsc(c.travel_date||'—')}${c.travel_date_end?' ~ '+memberEsc(c.travel_date_end):''}</span></div>
+          <div class="contact-field"><label>人數</label><span>${memberEsc(c.people||'—')}</span></div>
+          <div class="contact-field"><label>交通／出發地</label><span>${memberEsc(c.transport||'—')}${c.departure_city?'｜'+memberEsc(c.departure_city):''}</span></div>
+          <div class="contact-field"><label>預算</label><span>${memberEsc(c.budget||'—')}</span></div>
           <div class="contact-field"><label>行程</label>
-            <span>${legacyMap[c.tour_interest]||c.tour_interest||'—'}</span></div>
+            <span>${memberEsc(legacyMap[c.tour_interest]||c.tour_interest||'—')}</span></div>
           <div class="contact-field"><label>梯次狀態</label><span>${wl}</span></div>
-          <div class="contact-field"><label>澎湖旅次</label><span>${c.visit_count||'—'}</span></div>
+          <div class="contact-field"><label>澎湖旅次</label><span>${memberEsc(c.visit_count||'—')}</span></div>
           <div class="contact-field"><label>百旅會員</label><span>${
             c.member_status === '已是會員'
-              ? `<span style="color:#b8860b;font-weight:700">會員${c.member_no ? '｜'+c.member_no : ''}</span>`
+              ? `<span style="color:#b8860b;font-weight:700">會員${c.member_no ? '｜'+memberEsc(c.member_no) : ''}</span>`
               : (c.member_status === '想了解' ? '<span style="color:#1a6b9e">想了解百旅</span>' : '—')
           }</span></div>
-          <div class="contact-field"><label>備註</label><span>${c.notes||'—'}</span></div>
+          <div class="contact-field"><label>備註</label><span>${memberEsc(c.notes||'—')}</span></div>
           <div class="contact-field"><label>送出時間</label>
-            <span style="font-size:.78rem">${c.created_at}</span></div>
+            <span style="font-size:.78rem">${memberEsc(c.created_at)}</span></div>
+          <div class="contact-field" style="grid-column:1/-1;display:flex;gap:8px;align-items:end;flex-wrap:wrap">
+            <label style="display:flex;flex-direction:column;gap:4px">諮詢進度
+              <select id="lead-status-${c.id}" class="search-input" style="width:145px">
+                ${[['new','新進'],['contacted','已聯繫'],['qualified','有效需求'],['converted','已成交'],['lost','未成交']]
+                  .map(([v,t])=>`<option value="${v}" ${(c.lead_status||'new')===v?'selected':''}>${t}</option>`).join('')}
+              </select>
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px">成交金額
+              <input id="lead-value-${c.id}" class="search-input" type="number" min="0" step="1"
+                     value="${memberEsc(c.conversion_value==null?'':c.conversion_value)}" style="width:140px" />
+            </label>
+            <button class="btn btn-sm btn-primary" onclick="saveLeadStatus(${c.id})">儲存進度</button>
+            <span style="font-size:.78rem;color:#718096">來源：${memberEsc(((c.utm||{}).utm_source)||'(direct)')}</span>
+          </div>
           <div class="contact-field" style="grid-column:1/-1">
             <button class="btn btn-sm btn-ghost" onclick="aiReplySuggest(${c.id})" id="ai-reply-btn-${c.id}"
                     style="color:#1a6b9e;border:1px solid #cfe3f7">
@@ -1479,6 +1603,18 @@ function loadContacts() {
         </div>`;
       }).join('');
     });
+}
+
+function saveLeadStatus(cid) {
+  const lead_status = document.getElementById(`lead-status-${cid}`).value;
+  const conversion_value = document.getElementById(`lead-value-${cid}`).value;
+  fetch(`/api/admin/contacts/${cid}?key=${encodeURIComponent(ADMIN_KEY)}`, {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({lead_status,conversion_value})
+  }).then(r=>r.json()).then(d=>{
+    if(!d.ok){showToast(d.error||'更新失敗','error');return;}
+    showToast('諮詢進度已更新','success'); loadContacts();
+  }).catch(()=>showToast('連線失敗','error'));
 }
 
 // ── AI 建議回覆（Gemini）──
@@ -1530,13 +1666,14 @@ function statusText(status) {
     pending_departure: '待成團',
     confirmed_departure: '已達發船門檻',
     confirmed: '人工確認',
+    completed: '旅程完成',
     cancelled: '已取消',
   }[status] || status || '—';
 }
 
 function orderStatusColor(status) {
   return status === 'cancelled' ? '#c53030'
-    : status === 'confirmed' || status === 'confirmed_departure' ? '#2f855a'
+    : ['confirmed','confirmed_departure','completed'].includes(status) ? '#2f855a'
     : '#b7791f';
 }
 
@@ -1695,7 +1832,7 @@ function renderNeihaiCard(o) {
         <div>
           <span style="font-weight:800;color:${orderStatusColor(o.status)}">${statusText(o.status)}</span>
           <select onchange="updateNeihaiOrderStatus(${o.id}, this.value)" style="margin-left:8px;padding:6px;border:1px solid #e2e8f0;border-radius:6px">
-            ${['pending_departure','confirmed_departure','confirmed','cancelled'].map(s => `<option value="${s}" ${o.status===s?'selected':''}>${statusText(s)}</option>`).join('')}
+            ${['pending_departure','confirmed_departure','confirmed','completed','cancelled'].map(s => `<option value="${s}" ${o.status===s?'selected':''}>${statusText(s)}</option>`).join('')}
           </select>
           <button class="btn" onclick="editNeihaiOrder(${o.id})" style="margin-left:6px;padding:6px 10px"><i class="fas fa-pen"></i> 編輯</button>
           <button class="btn" onclick="archiveNeihaiOrder(${o.id}, ${o.archived ? 'false' : 'true'})" style="margin-left:4px;padding:6px 10px" title="${o.archived ? '取消封存' : '封存（行程結束後隱藏）'}"><i class="fas fa-box-archive"></i> ${o.archived ? '取消封存' : '封存'}</button>
@@ -2197,7 +2334,7 @@ function renderPreorderCard(o) {
         <div>
           <span style="font-weight:800;color:${orderStatusColor(o.status)}">${statusText(o.status)}</span>
           <select onchange="updatePreorderStatus(${o.id}, this.value)" style="margin-left:8px;padding:6px;border:1px solid #e2e8f0;border-radius:6px">
-            ${['pending_departure','confirmed_departure','confirmed','cancelled'].map(s => `<option value="${s}" ${o.status===s?'selected':''}>${statusText(s)}</option>`).join('')}
+            ${['pending_departure','confirmed_departure','confirmed','completed','cancelled'].map(s => `<option value="${s}" ${o.status===s?'selected':''}>${statusText(s)}</option>`).join('')}
           </select>
           <button class="btn" onclick="editPreorderOrder(${o.id})" style="margin-left:6px;padding:6px 10px"><i class="fas fa-pen"></i> 編輯</button>
           <button class="btn" onclick="archivePreorderOrder(${o.id}, ${o.archived ? 'false' : 'true'})" style="margin-left:4px;padding:6px 10px" title="${o.archived ? '取消封存' : '封存（行程結束後隱藏）'}"><i class="fas fa-box-archive"></i> ${o.archived ? '取消封存' : '封存'}</button>

@@ -1,0 +1,48 @@
+name: P2 weekly SEO GEO AEO audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "45 23 * * 0" # 台灣時間週一 07:45
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "google-api-python-client>=2,<3" "google-auth>=2,<3" "python-dotenv>=1,<2"
+      - name: Audit production and repository content
+        id: audit
+        continue-on-error: true
+        run: python scripts/seo_audit.py --output seo-audit.json --markdown seo-audit.md
+      - name: Publish summary
+        if: always()
+        run: cat seo-audit.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Build GSC index and growth report
+        continue-on-error: true
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GSC_SERVICE_ACCOUNT_JSON: ${{ secrets.GSC_SERVICE_ACCOUNT_JSON }}
+        run: python scripts/gsc_report.py all > gsc-report.md
+      - name: Publish GSC summary
+        if: always()
+        run: cat gsc-report.md >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p2-seo-audit-${{ github.run_id }}
+          path: |
+            seo-audit.json
+            seo-audit.md
+            gsc-report.md
+          retention-days: 90
+      - name: Enforce technical SEO gate
+        if: steps.audit.outcome == 'failure'
+        run: exit 1

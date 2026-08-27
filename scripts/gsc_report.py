@@ -61,6 +61,13 @@ BRAND_TERMS = ["潮旅", "phbay"]
 
 def _service():
     load_dotenv()
+    raw_json = (os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON") or
+                os.environ.get("GSC_SERVICE_ACCOUNT_JSON") or "").strip()
+    if raw_json:
+        creds = service_account.Credentials.from_service_account_info(
+            __import__('json').loads(raw_json),
+            scopes=["https://www.googleapis.com/auth/webmasters"])
+        return build("searchconsole", "v1", credentials=creds, cache_discovery=False)
     key_file = os.environ.get("GSC_KEY_FILE", "")
     if not key_file or not os.path.exists(key_file):
         sys.exit(
@@ -149,6 +156,37 @@ def report_brand(svc, days: int = 28) -> None:
         print(f"  {q:<30}{r['impressions']:<8}{r['clicks']:<8}{r['position']:.1f}")
 
 
+def report_growth(svc, days: int = 28) -> None:
+    """查詢詞與頁面成效，並與前一個等長期間比較總量。"""
+    end = date.today() - timedelta(days=2)
+    cur_start = end - timedelta(days=days - 1)
+    prev_end = cur_start - timedelta(days=1)
+    prev_start = prev_end - timedelta(days=days - 1)
+
+    def query(start, finish, dimensions):
+        body = {
+            "startDate": start.isoformat(), "endDate": finish.isoformat(),
+            "rowLimit": 25,
+        }
+        if dimensions:
+            body["dimensions"] = dimensions
+        return svc.searchanalytics().query(siteUrl=PROPERTY, body=body).execute().get("rows", [])
+
+    current_total = query(cur_start, end, [])
+    previous_total = query(prev_start, prev_end, [])
+    cur = current_total[0] if current_total else {}
+    prev = previous_total[0] if previous_total else {}
+    print(f"== 搜尋成長（近 {days} 天 vs 前期）==")
+    print(f"  點擊：{cur.get('clicks', 0)}（前期 {prev.get('clicks', 0)}）")
+    print(f"  曝光：{cur.get('impressions', 0)}（前期 {prev.get('impressions', 0)}）")
+    print(f"  CTR：{cur.get('ctr', 0):.1%}（前期 {prev.get('ctr', 0):.1%}）")
+    print(f"  平均排名：{cur.get('position', 0):.1f}（前期 {prev.get('position', 0):.1f}）")
+    for dimension, label in (("query", "熱門查詢"), ("page", "熱門頁面")):
+        print(f"== {label} ==")
+        for row in query(cur_start, end, [dimension])[:15]:
+            print(f"  {row['keys'][0]}｜曝光 {row['impressions']}｜點擊 {row['clicks']}｜排名 {row['position']:.1f}")
+
+
 def main() -> None:
     cmd = sys.argv[1] if len(sys.argv) > 1 else "all"
     svc = _service()
@@ -158,6 +196,8 @@ def main() -> None:
         report_inspect(svc)
     if cmd in ("all", "brand"):
         report_brand(svc)
+    if cmd in ("all", "growth"):
+        report_growth(svc)
 
 
 if __name__ == "__main__":

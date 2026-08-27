@@ -31,24 +31,41 @@ import psycopg2
 import psycopg2.extras
 from psycopg2.extras import Json
 from dotenv import load_dotenv
+from member_program import (init_member_tables, level_for_trips, levels as member_levels,
+                            next_level, next_member_no, normalize_phone, points_per_trip,
+                            public_member, recalculate_member, sync_trip_points, valid_email)
 
 load_dotenv()
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 # session cookie 簽章金鑰（後台帳號登入用）；優先 FLASK_SECRET_KEY，退回 ADMIN_KEY
-app.secret_key = os.environ.get('FLASK_SECRET_KEY') or os.environ.get('ADMIN_KEY') or 'phbay-dev-secret'
+_SECRET_KEY_FALLBACK = 'phbay-dev-secret'
+app.secret_key = (os.environ.get('FLASK_SECRET_KEY') or os.environ.get('ADMIN_KEY')
+                  or _SECRET_KEY_FALLBACK)
+# 會員登入態（session['member_id']）與 Email OTP 的 HMAC 都繫於 secret_key。
+# 若正式環境用到這個寫在原始碼裡的預設值，任何人都能偽造 cookie 以任意會員身分登入，
+# 因此寧可拒絕啟動也不要靜默降級。（此情境下 ADMIN_KEY 亦未設，後台本來就是全開狀態。）
+if app.secret_key == _SECRET_KEY_FALLBACK and os.environ.get('RAILWAY_ENVIRONMENT_NAME', '').strip():
+    raise RuntimeError(
+        '正式環境未設定 FLASK_SECRET_KEY（亦無 ADMIN_KEY），拒絕以預設金鑰啟動。'
+        '請先到 Railway 設定 FLASK_SECRET_KEY。')
+if not os.environ.get('FLASK_SECRET_KEY', '').strip():
+    print('[警告] 未設定 FLASK_SECRET_KEY，目前沿用 ADMIN_KEY 當 session 金鑰；'
+          '兩者耦合，且輪換 ADMIN_KEY 會讓全部會員登出，建議獨立設定。')
 app.permanent_session_lifetime = timedelta(hours=12)
 
 # ─── 靜態資源快取 ──────────────────────────────────────────
 # CSS/JS/圖片長快取；改動 css/js 時必須同步調整各 HTML 引用的 ?v= 版本字串，
 # 否則使用者會拿到快取的舊資源（版本字串統一用 ASSET_VERSION）。
-ASSET_VERSION = '20260819'
+ASSET_VERSION = '20260827'
 _LONG_CACHE_EXT = ('.css', '.js', '.png', '.jpg', '.jpeg', '.webp', '.avif',
                    '.gif', '.svg', '.ico', '.woff', '.woff2')
 
 @app.after_request
 def _set_cache_headers(resp):
     path = request.path.lower()
+    if path.startswith('/member/'):
+        resp.headers['X-Robots-Tag'] = 'noindex, nofollow'
     if path.startswith('/api/'):
         return resp
     # 只有成功回應才長快取。錯誤回應（例如檔案尚未部署完成時的 404）若也標成
@@ -189,6 +206,12 @@ def init_db():
         ('visit_count',   'VARCHAR(20)'),
         ('member_status', 'VARCHAR(30)'),
         ('member_no',     'VARCHAR(40)'),
+        # P1 轉換漏斗：客服可追蹤諮詢 → 聯繫 → 成交／未成交
+        ('lead_status',      "VARCHAR(30) DEFAULT 'new'"),
+        ('contacted_at',     'TIMESTAMP'),
+        ('converted_at',     'TIMESTAMP'),
+        ('conversion_value', 'NUMERIC(12,2)'),
+        ('utm',              "JSONB DEFAULT '{}'"),
     ]:
         try:
             cur.execute(f"ALTER TABLE contacts ADD COLUMN IF NOT EXISTS {col} {defn}")
@@ -271,6 +294,7 @@ def init_db():
     """)
     # 訂位確認信用：代表人 Email（選填）
     cur.execute("ALTER TABLE neihai_preorders ADD COLUMN IF NOT EXISTS contact_email VARCHAR(200)")
+    cur.execute("ALTER TABLE neihai_preorders ADD COLUMN IF NOT EXISTS utm JSONB DEFAULT '{}'")
     # 行程結束後可封存（後台預設隱藏）
     cur.execute("ALTER TABLE neihai_preorders ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE")
     cur.execute("""
@@ -325,6 +349,18 @@ def init_db():
         )
     """)
     cur.execute("CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs (created_at DESC)")
+
+    # 澎湖百旅會員、旅次、點數與一次性登入／LINE 綁定碼
+    # 以 SAVEPOINT 隔離：這段若失敗，後面的 qigui_daily_quota 等資料表仍須照常建立，
+    # 否則一個新功能的建表錯誤會連帶拖垮整個 init_db。
+    cur.execute("SAVEPOINT member_tables")
+    try:
+        init_member_tables(cur)
+        cur.execute("RELEASE SAVEPOINT member_tables")
+    except Exception as _member_exc:
+        cur.execute("ROLLBACK TO SAVEPOINT member_tables")
+        cur.execute("RELEASE SAVEPOINT member_tables")
+        print(f'[DB INIT] 會員資料表初始化失敗（其餘資料表不受影響）：{_member_exc}')
 
     # 乞龜擲筊活動：每日禮物庫存（旅展現場限定，實體禮物有限，需硬性上限避免超發）
     cur.execute("""
@@ -396,7 +432,11 @@ def init_db():
             updated_at      TIMESTAMP DEFAULT NOW()
         )
     """)
+    # 澎湖百旅會員：是否可認列為潮旅旅次。潮旅自營行程為 TRUE；
+    # 若日後把代售產品加進 preorder_products，務必設為 FALSE，避免代售行程灌水會員等級。
+    cur.execute("ALTER TABLE preorder_products ADD COLUMN IF NOT EXISTS counts_as_trip BOOLEAN NOT NULL DEFAULT TRUE")
     cur.execute("ALTER TABLE preorder_orders ADD COLUMN IF NOT EXISTS contact_email VARCHAR(200)")
+    cur.execute("ALTER TABLE preorder_orders ADD COLUMN IF NOT EXISTS utm JSONB DEFAULT '{}'")
     cur.execute("ALTER TABLE preorder_orders ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE")
     cur.execute("""
         CREATE TABLE IF NOT EXISTS preorder_passengers (
@@ -700,6 +740,12 @@ def ensure_db():
 @app.route('/')
 def index():
     return send_from_directory('.', 'index.html')
+
+
+@app.route('/penghu-100')
+@app.route('/member/dashboard')
+def member_pages():
+    return send_from_directory('.', 'member.html')
 
 
 @app.route('/lottery/')
@@ -1396,6 +1442,489 @@ def _line_get_profile(user_id):
         return ''
 
 
+# ─── 澎湖百旅會員：註冊、一次性登入、LINE 綁定與會員中心 ────────
+def _member_code_hash(member_id, purpose, code):
+    secret = str(app.secret_key).encode('utf-8')
+    raw = f'{member_id}:{purpose}:{code}'.encode('utf-8')
+    return hmac.new(secret, raw, hashlib.sha256).hexdigest()
+
+
+def _send_member_code_email(member, code):
+    sender = os.environ.get('EMAIL_USER', '').strip()
+    if not sender:
+        return False, 'EMAIL_USER 未設定'
+    msg = MIMEMultipart()
+    msg['From'] = f'潮旅國際旅行社 <{sender}>'
+    msg['To'] = member['email']
+    msg['Subject'] = '潮旅・澎湖百旅會員登入驗證碼'
+    msg.attach(MIMEText(
+        f"{member['name']} 您好：\n\n您的澎湖百旅會員登入驗證碼是：{code}\n"
+        "驗證碼 10 分鐘內有效。若非本人操作，請忽略此信。\n\n潮旅國際旅行社",
+        'plain', 'utf-8'))
+    return _deliver(sender, member['email'], msg)
+
+
+def _member_row(member_id):
+    if not member_id:
+        return None
+    conn = get_db(); cur = conn.cursor()
+    cur.execute("SELECT * FROM members WHERE id=%s AND is_active=TRUE", (member_id,))
+    row = cur.fetchone(); cur.close(); conn.close()
+    return row
+
+
+@app.route('/api/member/register', methods=['POST'])
+def member_register():
+    data = request.get_json(force=True, silent=True) or {}
+    name = (data.get('name') or '').strip()[:100]
+    phone = (data.get('phone') or '').strip()[:30]
+    normalized = normalize_phone(phone)
+    email = (data.get('email') or '').strip().lower()[:200]
+    if not data.get('consent'):
+        return jsonify(ok=False, error='請先閱讀並同意會員個資告知事項'), 400
+    if not name or len(normalized) < 8 or not valid_email(email):
+        return jsonify(ok=False, error='請填寫姓名、有效手機與 Email'), 400
+    birth_month = data.get('birth_month')
+    try:
+        birth_month = int(birth_month) if birth_month not in (None, '') else None
+        if birth_month is not None and not 1 <= birth_month <= 12:
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify(ok=False, error='生日月份需為 1–12'), 400
+    try:
+        conn = get_db(); cur = conn.cursor()
+        member_id, member_no = next_member_no(cur)
+        cur.execute("""
+            INSERT INTO members
+              (id,member_no,name,phone,phone_normalized,email,birth_month,consent_at)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,NOW()) RETURNING *
+        """, (member_id, member_no, name, phone, normalized, email, birth_month))
+        member = cur.fetchone()
+        write_audit(cur, 'create', '會員', member_no, 1, 0, '前台會員註冊')
+        conn.commit(); cur.close(); conn.close()
+        session['member_id'] = member_id
+        return jsonify(ok=True, member=public_member(member)), 201
+    except psycopg2.errors.UniqueViolation:
+        try: conn.rollback(); cur.close(); conn.close()
+        except Exception: pass
+        return jsonify(ok=False, error='此手機或 Email 已加入，請使用驗證碼登入'), 409
+    except Exception as exc:
+        print(f'[MEMBER REGISTER] {exc}')
+        return jsonify(ok=False, error='註冊失敗，請稍後再試'), 500
+
+
+@app.route('/api/member/login/request', methods=['POST'])
+def member_login_request():
+    data = request.get_json(force=True, silent=True) or {}
+    email = (data.get('email') or '').strip().lower()
+    # 不論帳號是否存在都回相同訊息，避免枚舉會員 Email。
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT * FROM members WHERE LOWER(email)=%s AND is_active=TRUE", (email,))
+        member = cur.fetchone()
+        if member:
+            cur.execute("""SELECT COUNT(*) AS n FROM member_auth_codes
+                           WHERE member_id=%s AND purpose='login'
+                             AND created_at > NOW() - INTERVAL '1 hour'""", (member['id'],))
+            if int(cur.fetchone()['n'] or 0) < 5:
+                code = f'{random.SystemRandom().randrange(100000, 1000000)}'
+                cur.execute("""
+                    INSERT INTO member_auth_codes (member_id,purpose,code_hash,expires_at)
+                    VALUES (%s,'login',%s,NOW()+INTERVAL '10 minutes')
+                """, (member['id'], _member_code_hash(member['id'], 'login', code)))
+                conn.commit()
+                ok, detail = _send_member_code_email(member, code)
+                if not ok:
+                    print(f'[MEMBER LOGIN EMAIL] {detail}')
+        cur.close(); conn.close()
+    except Exception as exc:
+        print(f'[MEMBER LOGIN REQUEST] {exc}')
+    return jsonify(ok=True, message='如果此 Email 已加入，我們已寄出 10 分鐘有效的驗證碼')
+
+
+@app.route('/api/member/login/verify', methods=['POST'])
+def member_login_verify():
+    data = request.get_json(force=True, silent=True) or {}
+    email = (data.get('email') or '').strip().lower()
+    code = re.sub(r'\D', '', str(data.get('code') or ''))[:6]
+    if len(code) != 6:
+        return jsonify(ok=False, error='驗證碼格式錯誤'), 400
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT * FROM members WHERE LOWER(email)=%s AND is_active=TRUE", (email,))
+        member = cur.fetchone()
+        if not member:
+            cur.close(); conn.close()
+            return jsonify(ok=False, error='驗證碼錯誤或已過期'), 401
+        cur.execute("""
+            SELECT * FROM member_auth_codes WHERE member_id=%s AND purpose='login'
+              AND used_at IS NULL AND expires_at>NOW() AND attempts<5
+            ORDER BY created_at DESC LIMIT 1 FOR UPDATE
+        """, (member['id'],))
+        token = cur.fetchone()
+        if not token or not hmac.compare_digest(
+                token['code_hash'], _member_code_hash(member['id'], 'login', code)):
+            if token:
+                cur.execute("UPDATE member_auth_codes SET attempts=attempts+1 WHERE id=%s", (token['id'],))
+                conn.commit()
+            cur.close(); conn.close()
+            return jsonify(ok=False, error='驗證碼錯誤或已過期'), 401
+        cur.execute("UPDATE member_auth_codes SET used_at=NOW() WHERE id=%s", (token['id'],))
+        conn.commit(); cur.close(); conn.close()
+        session['member_id'] = member['id']
+        return jsonify(ok=True, member=public_member(member))
+    except Exception as exc:
+        print(f'[MEMBER LOGIN VERIFY] {exc}')
+        return jsonify(ok=False, error='登入失敗'), 500
+
+
+@app.route('/api/member/logout', methods=['POST'])
+def member_logout():
+    session.pop('member_id', None)
+    return jsonify(ok=True)
+
+
+@app.route('/api/member/me')
+def member_me():
+    member_id = session.get('member_id')
+    if not member_id:
+        return jsonify(ok=False, error='尚未登入'), 401
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT * FROM members WHERE id=%s AND is_active=TRUE", (member_id,))
+        member = cur.fetchone()
+        if not member:
+            cur.close(); conn.close()
+            return jsonify(ok=False, error='尚未登入'), 401
+        cur.execute("""SELECT id,tour_name,tour_category,departure_date,status,counts_trip,
+                              points_awarded,notes FROM member_trips WHERE member_id=%s
+                       ORDER BY departure_date DESC NULLS LAST,id DESC LIMIT 100""", (member_id,))
+        trips = []
+        for row in cur.fetchall():
+            row = dict(row)
+            if row.get('departure_date'): row['departure_date'] = str(row['departure_date'])
+            trips.append(row)
+        cur.execute("""SELECT delta,source,redemption,created_at FROM member_points
+                       WHERE member_id=%s ORDER BY created_at DESC LIMIT 100""", (member_id,))
+        points = []
+        for row in cur.fetchall():
+            row = dict(row); row['created_at'] = str(row.get('created_at') or '')
+            points.append(row)
+        past_names = [row['tour_name'] for row in trips]
+        cur.execute("""SELECT id,title,description,image_url,price_display FROM tours
+                       WHERE is_active=TRUE AND NOT (title=ANY(%s))
+                       ORDER BY is_hero DESC,sort_order,id LIMIT 3""", (past_names or [''],))
+        recommendations = [dict(row) for row in cur.fetchall()]
+        cur.close(); conn.close()
+        return jsonify(ok=True, member=public_member(member), trips=trips, points=points,
+                       recommendations=recommendations, points_per_trip=points_per_trip(),
+                       levels=[{'trips': t, 'name': n} for t, n in member_levels()])
+    except Exception as exc:
+        print(f'[MEMBER ME] {exc}')
+        return jsonify(ok=False, error='讀取會員資料失敗'), 500
+
+
+@app.route('/api/member/line-bind-code', methods=['POST'])
+def member_line_bind_code():
+    member = _member_row(session.get('member_id'))
+    if not member:
+        return jsonify(ok=False, error='尚未登入'), 401
+    try:
+        code = f'{random.SystemRandom().randrange(100000, 1000000)}'
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("""INSERT INTO member_auth_codes (member_id,purpose,code_hash,expires_at)
+                       VALUES (%s,'line_bind',%s,NOW()+INTERVAL '10 minutes')""",
+                    (member['id'], _member_code_hash(member['id'], 'line_bind', code)))
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True, code=code, expires_minutes=10,
+                       instruction=f'請到潮旅官方 LINE 傳送：綁定會員 {code}')
+    except Exception:
+        return jsonify(ok=False, error='無法建立綁定碼'), 500
+
+
+def _sync_completed_order_trip(cur, source_type, source_ref, phone, tour_name,
+                               departure_date, order_status, counts_trip=True):
+    """依訂單狀態同步會員旅次；只有 completed 且 counts_trip 為真才計入累積旅次。
+
+    整段以 SAVEPOINT 包住：會員同步是附加功能，任何失敗都只記 log，
+    絕不能讓「改訂單狀態」這個核心訂位作業失敗（2026-07 諮詢表單事故的教訓）。
+    注意 ON CONFLICT 不覆寫 counts_trip，客服在後台的人工判定優先於自動同步。"""
+    if not source_ref:
+        return None
+    normalized = normalize_phone(phone)
+    if not normalized:
+        return None
+    cur.execute("SAVEPOINT member_trip_sync")
+    try:
+        cur.execute("SELECT id FROM members WHERE phone_normalized=%s AND is_active=TRUE", (normalized,))
+        member = cur.fetchone()
+        if not member:
+            cur.execute("RELEASE SAVEPOINT member_trip_sync")
+            return None
+        trip_status = ('completed' if order_status == 'completed' else
+                       'cancelled' if order_status == 'cancelled' else 'planned')
+        cur.execute("""
+            INSERT INTO member_trips
+              (member_id,source_type,source_ref,tour_name,departure_date,status,counts_trip,notes)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,'由訂單狀態自動同步')
+            ON CONFLICT (source_type,source_ref) DO UPDATE SET
+              status=EXCLUDED.status,tour_name=EXCLUDED.tour_name,
+              departure_date=EXCLUDED.departure_date,updated_at=NOW()
+            RETURNING id
+        """, (member['id'], source_type, source_ref, tour_name, departure_date,
+              trip_status, bool(counts_trip)))
+        # 認列狀態變動後同步點數帳本（冪等），再由帳本重算餘額與旅次數
+        sync_trip_points(cur, cur.fetchone()['id'])
+        recalculate_member(cur, member['id'])
+        cur.execute("RELEASE SAVEPOINT member_trip_sync")
+        return member['id']
+    except Exception as exc:
+        cur.execute("ROLLBACK TO SAVEPOINT member_trip_sync")
+        cur.execute("RELEASE SAVEPOINT member_trip_sync")
+        print(f'[MEMBER TRIP SYNC] {source_type}/{source_ref} 同步失敗，訂單更新不受影響：{exc}')
+        return None
+
+
+@app.route('/api/admin/members', methods=['GET', 'POST'])
+def admin_members():
+    if not has_role('orders'):
+        return jsonify(ok=False, error='未授權'), 401
+    if request.method == 'GET':
+        query = (request.args.get('q') or '').strip()
+        try:
+            conn = get_db(); cur = conn.cursor()
+            like = f'%{query}%'
+            cur.execute("""SELECT * FROM members WHERE
+                           (%s='' OR member_no ILIKE %s OR name ILIKE %s OR phone ILIKE %s OR email ILIKE %s)
+                           ORDER BY joined_at DESC LIMIT 300""", (query, like, like, like, like))
+            members = []
+            for row in cur.fetchall():
+                public = public_member(row)
+                public.update({'phone': row['phone'], 'notes': row.get('notes') or '',
+                               'is_active': bool(row.get('is_active'))})
+                members.append(public)
+            cur.close(); conn.close()
+            return jsonify(ok=True, members=members)
+        except Exception as exc:
+            return jsonify(ok=False, error=str(exc)), 500
+    data = request.get_json(force=True, silent=True) or {}
+    name = (data.get('name') or '').strip()[:100]
+    phone = (data.get('phone') or '').strip()[:30]
+    normalized = normalize_phone(phone)
+    email = (data.get('email') or '').strip().lower()[:200]
+    if not name or len(normalized) < 8 or not valid_email(email):
+        return jsonify(ok=False, error='姓名、手機、Email 格式不完整'), 400
+    try:
+        conn = get_db(); cur = conn.cursor(); member_id, member_no = next_member_no(cur)
+        cur.execute("""INSERT INTO members
+          (id,member_no,name,phone,phone_normalized,email,birth_month,notes,consent_at)
+          VALUES (%s,%s,%s,%s,%s,%s,%s,%s,NOW()) RETURNING *""",
+                    (member_id, member_no, name, phone, normalized, email,
+                     data.get('birth_month') or None, (data.get('notes') or '')[:1000]))
+        member = cur.fetchone()
+        write_audit(cur, 'create', '會員', member_no, 1, 0, '後台建立會員')
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True, member=public_member(member)), 201
+    except psycopg2.errors.UniqueViolation:
+        try: conn.rollback(); cur.close(); conn.close()
+        except Exception: pass
+        return jsonify(ok=False, error='手機或 Email 已存在'), 409
+    except Exception as exc:
+        return jsonify(ok=False, error=str(exc)), 500
+
+
+@app.route('/api/admin/members/<int:member_id>')
+def admin_member_detail(member_id):
+    if not has_role('orders'):
+        return jsonify(ok=False, error='未授權'), 401
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT * FROM members WHERE id=%s", (member_id,)); member = cur.fetchone()
+        if not member:
+            cur.close(); conn.close(); return jsonify(ok=False, error='找不到會員'), 404
+        cur.execute("SELECT * FROM member_trips WHERE member_id=%s ORDER BY departure_date DESC NULLS LAST,id DESC",
+                    (member_id,))
+        trips = []
+        for row in cur.fetchall():
+            row = dict(row)
+            for key in ('departure_date', 'created_at', 'updated_at'):
+                if row.get(key): row[key] = str(row[key])
+            trips.append(row)
+        cur.execute("SELECT * FROM member_points WHERE member_id=%s ORDER BY created_at DESC", (member_id,))
+        points = []
+        for row in cur.fetchall():
+            row = dict(row); row['created_at'] = str(row.get('created_at') or '')
+            points.append(row)
+        detail = public_member(member)
+        detail.update({'phone': member['phone'], 'notes': member.get('notes') or '',
+                       'is_active': bool(member.get('is_active'))})
+        cur.close(); conn.close()
+        return jsonify(ok=True, member=detail, trips=trips, points=points)
+    except Exception as exc:
+        return jsonify(ok=False, error=str(exc)), 500
+
+
+@app.route('/api/admin/members/<int:member_id>/trips', methods=['POST'])
+def admin_member_add_trip(member_id):
+    if not has_role('orders'):
+        return jsonify(ok=False, error='未授權'), 401
+    data = request.get_json(force=True, silent=True) or {}
+    tour_name = (data.get('tour_name') or '').strip()[:180]
+    status = (data.get('status') or 'planned').strip()
+    if not tour_name or status not in {'planned', 'completed', 'cancelled'}:
+        return jsonify(ok=False, error='行程名稱或狀態錯誤'), 400
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT member_no FROM members WHERE id=%s FOR UPDATE", (member_id,))
+        member = cur.fetchone()
+        if not member:
+            cur.close(); conn.close(); return jsonify(ok=False, error='找不到會員'), 404
+        cur.execute("""INSERT INTO member_trips
+          (member_id,source_type,source_ref,tour_name,tour_category,departure_date,status,counts_trip,notes)
+          VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                    (member_id, (data.get('source_type') or 'manual')[:30],
+                     (data.get('source_ref') or None), tour_name,
+                     (data.get('tour_category') or '')[:60], data.get('departure_date') or None,
+                     status, bool(data.get('counts_trip', True)), (data.get('notes') or '')[:1000]))
+        trip_id = cur.fetchone()['id']
+        sync_trip_points(cur, trip_id)
+        trips, points = recalculate_member(cur, member_id)
+        write_audit(cur, 'create', '會員旅次', member['member_no'], 1, 0, tour_name)
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True, trip_id=trip_id, trip_count=trips, points_balance=points)
+    except psycopg2.errors.UniqueViolation:
+        try: conn.rollback(); cur.close(); conn.close()
+        except Exception: pass
+        return jsonify(ok=False, error='此來源訂單已認列'), 409
+    except Exception as exc:
+        return jsonify(ok=False, error=str(exc)), 500
+
+
+@app.route('/api/admin/member-trips/<int:trip_id>', methods=['PATCH'])
+def admin_member_update_trip(trip_id):
+    if not has_role('orders'):
+        return jsonify(ok=False, error='未授權'), 401
+    data = request.get_json(force=True, silent=True) or {}
+    status = (data.get('status') or '').strip()
+    if status not in {'planned', 'completed', 'cancelled'}:
+        return jsonify(ok=False, error='旅次狀態錯誤'), 400
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("""SELECT t.*,m.member_no,m.name,m.line_user_id,m.trip_count
+                       FROM member_trips t JOIN members m ON m.id=t.member_id
+                       WHERE t.id=%s FOR UPDATE OF t,m""", (trip_id,))
+        trip = cur.fetchone()
+        if not trip:
+            cur.close(); conn.close(); return jsonify(ok=False, error='找不到旅次'), 404
+        before_level = level_for_trips(trip['trip_count'])
+        cur.execute("""UPDATE member_trips SET status=%s,counts_trip=%s,notes=%s,updated_at=NOW()
+                       WHERE id=%s""", (status, bool(data.get('counts_trip', trip['counts_trip'])),
+                                        (data.get('notes', trip['notes']) or '')[:1000], trip_id))
+        sync_trip_points(cur, trip_id)
+        trips, points = recalculate_member(cur, trip['member_id'])
+        after_level = level_for_trips(trips)
+        write_audit(cur, 'update', '會員旅次', trip['member_no'], 1, 0,
+                    f"{trip['status']} → {status}; {trip['tour_name']}")
+        conn.commit(); cur.close(); conn.close()
+        if trip.get('line_user_id') and status == 'completed' and trip['status'] != 'completed':
+            message = f"{trip['name']} 您好，旅程「{trip['tour_name']}」已完成認列，目前累積 {trips} 次澎湖旅程。"
+            if after_level != before_level:
+                message += f"\n恭喜升等為「{after_level}」！"
+            _line_api_call('message/push', {'to': trip['line_user_id'],
+                                            'messages': [{'type': 'text', 'text': message}]})
+        return jsonify(ok=True, trip_count=trips, points_balance=points, level=after_level)
+    except Exception as exc:
+        return jsonify(ok=False, error=str(exc)), 500
+
+
+@app.route('/api/admin/members/<int:member_id>/points', methods=['POST'])
+def admin_member_adjust_points(member_id):
+    if not has_role('orders'):
+        return jsonify(ok=False, error='未授權'), 401
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        delta = int(data.get('delta'))
+    except (TypeError, ValueError):
+        return jsonify(ok=False, error='點數增減必須是整數'), 400
+    source = (data.get('source') or '').strip()[:100]
+    if not delta or not source:
+        return jsonify(ok=False, error='請填寫點數與來源'), 400
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT member_no,points_balance FROM members WHERE id=%s FOR UPDATE", (member_id,))
+        member = cur.fetchone()
+        if not member:
+            cur.close(); conn.close(); return jsonify(ok=False, error='找不到會員'), 404
+        if int(member['points_balance'] or 0) + delta < 0:
+            cur.close(); conn.close(); return jsonify(ok=False, error='點數餘額不可為負數'), 400
+        cur.execute("""INSERT INTO member_points (member_id,delta,source,redemption)
+                       VALUES (%s,%s,%s,%s)""", (member_id, delta, source,
+                                                   (data.get('redemption') or '')[:500]))
+        trips, points = recalculate_member(cur, member_id)
+        write_audit(cur, 'update', '會員點數', member['member_no'], 1, 0, f'{delta:+d} {source}')
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True, points_balance=points)
+    except Exception as exc:
+        return jsonify(ok=False, error=str(exc)), 500
+
+
+@app.route('/api/admin/members/merge', methods=['POST'])
+def admin_member_merge():
+    if not is_admin():
+        return jsonify(ok=False, error='僅管理者可合併會員'), 401
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        source_id, target_id = int(data.get('source_id')), int(data.get('target_id'))
+        if source_id == target_id: raise ValueError
+    except (TypeError, ValueError):
+        return jsonify(ok=False, error='來源與目標會員不正確'), 400
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT id,member_no,line_user_id FROM members WHERE id IN (%s,%s) FOR UPDATE", (source_id, target_id))
+        rows = {row['id']: row for row in cur.fetchall()}
+        if len(rows) != 2:
+            cur.close(); conn.close(); return jsonify(ok=False, error='找不到來源或目標會員'), 404
+        cur.execute("UPDATE member_trips SET member_id=%s WHERE member_id=%s", (target_id, source_id))
+        cur.execute("UPDATE member_points SET member_id=%s WHERE member_id=%s", (target_id, source_id))
+        if not rows[target_id].get('line_user_id') and rows[source_id].get('line_user_id'):
+            cur.execute("UPDATE members SET line_user_id=%s WHERE id=%s",
+                        (rows[source_id]['line_user_id'], target_id))
+        cur.execute("DELETE FROM members WHERE id=%s", (source_id,))
+        recalculate_member(cur, target_id)
+        write_audit(cur, 'merge', '會員', rows[target_id]['member_no'], 2, 0,
+                    f"合併來源 {rows[source_id]['member_no']}")
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True, target_id=target_id)
+    except psycopg2.errors.UniqueViolation:
+        try: conn.rollback(); cur.close(); conn.close()
+        except Exception: pass
+        return jsonify(ok=False, error='來源資料與目標已有相同訂單，請先人工處理重複旅次'), 409
+    except Exception as exc:
+        return jsonify(ok=False, error=str(exc)), 500
+
+
+@app.route('/api/admin/members/export.csv')
+def admin_members_export():
+    if not has_role('orders'):
+        return jsonify(ok=False, error='未授權'), 401
+    try:
+        import csv, io
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT * FROM members ORDER BY joined_at DESC"); rows = cur.fetchall()
+        output = io.StringIO(); output.write('\ufeff'); writer = csv.writer(output)
+        writer.writerow(['會員編號','姓名','手機','Email','生日月份','等級','累積旅次','點數餘額','LINE綁定','加入時間','備註'])
+        for row in rows:
+            writer.writerow([row['member_no'],row['name'],row['phone'],row['email'],row.get('birth_month') or '',
+                             level_for_trips(row['trip_count']),row['trip_count'],row['points_balance'],
+                             '是' if row.get('line_user_id') else '否',str(row['joined_at']),row.get('notes') or ''])
+        write_audit(cur, 'export', '會員名單', '全部', len(rows), 0, 'CSV 匯出')
+        conn.commit(); cur.close(); conn.close()
+        return app.response_class(output.getvalue(), mimetype='text/csv', headers={
+            'Content-Disposition': 'attachment; filename=phbay-members.csv'})
+    except Exception as exc:
+        return jsonify(ok=False, error=str(exc)), 500
+
+
 def send_contact_email(data):
     sender    = os.environ.get('EMAIL_USER', '')
     recipient = 'dodoken1002@phbay.net'
@@ -1600,6 +2129,7 @@ NEIHAI_VALID_STATUSES = {
     "pending_departure",
     "confirmed_departure",
     "confirmed",
+    "completed",
     "cancelled",
 }
 
@@ -1894,11 +2424,13 @@ def create_neihai_preorder():
         cur.execute("""
             INSERT INTO neihai_preorders
               (sailing_id, agency_name, contact_name, contact_phone, contact_email,
-               passenger_count, status, notes)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+               passenger_count, status, notes, utm)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
             RETURNING id, created_at
         """, (sailing["id"], agency_name, contact_name, contact_phone, contact_email,
-              passenger_count, status, notes))
+              passenger_count, status, notes,
+              Json({k: str(v)[:200] for k, v in (data.get('utm') or {}).items()
+                    if k.startswith('utm_') or k in ('landing_page', 'referrer')})))
         order = cur.fetchone()
         booking_ref = f"NH{sailing_date.strftime('%Y%m%d')}{sailing_time.replace(':', '')}-{int(order['id']):04d}"
         cur.execute("UPDATE neihai_preorders SET booking_ref=%s WHERE id=%s", (booking_ref, order["id"]))
@@ -2013,7 +2545,7 @@ def admin_neihai_preorders():
 
 NEIHAI_STATUS_LABELS = {
     "pending_departure": "待成團", "confirmed_departure": "已達發船門檻",
-    "confirmed": "人工確認", "cancelled": "已取消",
+    "confirmed": "人工確認", "completed": "旅程完成", "cancelled": "已取消",
 }
 
 
@@ -2128,6 +2660,16 @@ def admin_update_neihai_preorder(order_id):
         if changes:
             cur.execute("INSERT INTO neihai_preorder_logs (preorder_id, summary) VALUES (%s,%s)",
                         (order_id, "；".join(changes)))
+        if 'status' in data:
+            cur.execute("""SELECT o.booking_ref,o.contact_phone,o.status,s.sailing_date
+                           FROM neihai_preorders o JOIN neihai_sailings s ON s.id=o.sailing_id
+                           WHERE o.id=%s""", (order_id,))
+            synced = cur.fetchone()
+            if synced:  # JOIN 失配（例如航次已刪）時不可讓訂單更新整筆失敗
+                _sync_completed_order_trip(cur, 'neihai_order', synced['booking_ref'],
+                                           synced['contact_phone'], '小城故事・內海巡禮',
+                                           synced['sailing_date'], synced['status'],
+                                           counts_trip=True)  # 內海巡禮為潮旅自營
         conn.commit(); cur.close(); conn.close()
         return jsonify(ok=True, changed=len(changes),
                        summary=("；".join(changes) if changes else "無變更"))
@@ -2513,6 +3055,78 @@ def admin_email_test():
 LINE_BIND_KEYWORDS = {'綁定通知', '綁定', '我的id', 'id', 'userid', 'myid'}
 
 
+def _try_bind_member_line(user_id, text):
+    match = re.search(r'綁定會員\s*([0-9]{6})', text or '')
+    if not match:
+        return None
+    code = match.group(1)
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("""
+            SELECT c.*,m.member_no,m.name FROM member_auth_codes c
+            JOIN members m ON m.id=c.member_id
+            WHERE c.purpose='line_bind' AND c.used_at IS NULL AND c.expires_at>NOW()
+              AND c.attempts<5 AND m.is_active=TRUE
+            ORDER BY c.created_at DESC LIMIT 100 FOR UPDATE OF c
+        """)
+        matched = None
+        for token in cur.fetchall():
+            if hmac.compare_digest(token['code_hash'],
+                                   _member_code_hash(token['member_id'], 'line_bind', code)):
+                matched = token; break
+        if not matched:
+            cur.close(); conn.close()
+            return '綁定碼錯誤或已過期，請回會員中心重新取得。'
+        cur.execute("UPDATE members SET line_user_id=%s,updated_at=NOW() WHERE id=%s",
+                    (user_id, matched['member_id']))
+        cur.execute("UPDATE member_auth_codes SET used_at=NOW() WHERE id=%s", (matched['id'],))
+        conn.commit(); cur.close(); conn.close()
+        return f"綁定完成！{matched['name']} 您好，會員編號 {matched['member_no']}。之後旅次認列與升等會由這裡通知您。"
+    except psycopg2.errors.UniqueViolation:
+        try: conn.rollback(); cur.close(); conn.close()
+        except Exception: pass
+        return '這個 LINE 帳號已綁定其他會員，請聯絡潮旅客服協助。'
+    except Exception as exc:
+        print(f'[MEMBER LINE BIND] {exc}')
+        return '綁定暫時失敗，請稍後再試或聯絡潮旅客服。'
+
+
+def _member_line_command(user_id, text):
+    command = (text or '').strip().replace(' ', '')
+    commands = {'會員', '我的等級', '我的旅次', '我的點數', '旅行護照', '下一趟推薦', '專屬優惠'}
+    if command not in commands:
+        return None
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT * FROM members WHERE line_user_id=%s AND is_active=TRUE", (user_id,))
+        member = cur.fetchone()
+        if not member:
+            cur.close(); conn.close()
+            return '尚未綁定澎湖百旅會員。請先登入會員中心取得 6 位數綁定碼，再傳送「綁定會員 123456」。'
+        if command in {'會員', '我的等級'}:
+            nxt = next_level(member['trip_count'])
+            detail = f"目前等級：{level_for_trips(member['trip_count'])}\n累積旅次：{member['trip_count']} 次\n點數：{member['points_balance']} 點"
+            if nxt: detail += f"\n距「{nxt['name']}」還差 {nxt['remaining']} 次"
+        elif command in {'我的旅次', '旅行護照'}:
+            cur.execute("""SELECT tour_name,departure_date,status FROM member_trips
+                           WHERE member_id=%s ORDER BY departure_date DESC NULLS LAST LIMIT 8""",
+                        (member['id'],))
+            rows = cur.fetchall()
+            detail = '最近旅次：\n' + ('\n'.join(f"・{r['departure_date'] or '日期未定'} {r['tour_name']}（{r['status']}）" for r in rows) if rows else '尚無已登錄旅次')
+        elif command == '我的點數':
+            detail = f"目前點數餘額：{member['points_balance']} 點\n點數用途依潮旅當期公告。"
+        elif command == '下一趟推薦':
+            cur.execute("SELECT title FROM tours WHERE is_active=TRUE ORDER BY is_hero DESC,sort_order LIMIT 3")
+            detail = '為你推薦：\n' + '\n'.join(f"・{r['title']}" for r in cur.fetchall()) + '\nhttps://www.phbay.info/#contact'
+        else:
+            detail = '目前可用優惠依潮旅官方最新公告；系統不會顯示尚未定案的折抵承諾。'
+        cur.close(); conn.close()
+        return f"{member['name']} 您好｜{member['member_no']}\n{detail}\n\n可輸入：我的等級／我的旅次／我的點數／下一趟推薦"
+    except Exception as exc:
+        print(f'[MEMBER LINE COMMAND] {exc}')
+        return '會員資料暫時無法讀取，請稍後再試。'
+
+
 @app.route('/api/line/webhook', methods=['POST'])
 def line_webhook():
     """LINE 官方帳號 webhook：驗簽後記錄互動用戶；
@@ -2551,7 +3165,12 @@ def line_webhook():
                   last_seen = NOW()
             """, (user_id, display_name, text))
             conn.commit(); cur.close(); conn.close()
-            if text and text.lower().replace(' ', '') in LINE_BIND_KEYWORDS and ev.get('replyToken'):
+            member_reply = _try_bind_member_line(user_id, text) if text else None
+            if not member_reply and text:
+                member_reply = _member_line_command(user_id, text)
+            if member_reply and ev.get('replyToken'):
+                _line_reply(ev['replyToken'], member_reply)
+            elif text and text.lower().replace(' ', '') in LINE_BIND_KEYWORDS and ev.get('replyToken'):
                 _line_reply(ev['replyToken'],
                             f'您的 LINE userId 是：\n{user_id}\n\n'
                             '（此代碼供潮旅系統設定通知使用，一般旅客不需理會）')
@@ -2756,7 +3375,7 @@ def quiz_ai_note():
 
 
 # ─── 通用預購系統（音樂節等；每個行程一筆 preorder_products）───
-PREORDER_VALID_STATUSES = {'pending_departure', 'confirmed_departure', 'confirmed', 'cancelled'}
+PREORDER_VALID_STATUSES = {'pending_departure', 'confirmed_departure', 'confirmed', 'completed', 'cancelled'}
 
 
 def _get_product(slug, cur):
@@ -2952,11 +3571,13 @@ def api_preorder_create(slug):
         cur.execute("""
             INSERT INTO preorder_orders
               (product_id, departure_date, departure_time, agency_name,
-               contact_name, contact_phone, contact_email, passenger_count, status, notes)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+               contact_name, contact_phone, contact_email, passenger_count, status, notes, utm)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             RETURNING id, created_at
         """, (p['id'], dep_date, dep_time, agency_name, contact_name,
-              contact_phone, contact_email, len(clean), status, notes))
+              contact_phone, contact_email, len(clean), status, notes,
+              Json({k: str(v)[:200] for k, v in (data.get('utm') or {}).items()
+                    if k.startswith('utm_') or k in ('landing_page', 'referrer')})))
         order = cur.fetchone()
         booking_ref = f"{slug[:6].upper()}{dep_date.strftime('%Y%m%d')}-{int(order['id']):04d}"
         cur.execute('UPDATE preorder_orders SET booking_ref=%s WHERE id=%s', (booking_ref, order['id']))
@@ -3004,6 +3625,93 @@ def api_preorder_create(slug):
         )
     except Exception as e:
         return jsonify(ok=False, error=f'伺服器錯誤：{e}'), 500
+
+
+@app.route('/api/admin/preorder/products', methods=['GET'])
+def admin_preorder_products():
+    """預購商品的旅次認列政策清單。
+
+    規劃書載明：代售產品不得認列為潮旅旅次，否則會員等級會灌水。
+    這支同時回報「目前已認列幾筆」，讓管理者在切換政策前先看到影響範圍。
+    """
+    if not has_role('orders'):
+        return jsonify(ok=False, error='未授權'), 401
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("""
+            SELECT p.id, p.slug, p.name, p.is_active, p.counts_as_trip,
+                   (SELECT COUNT(*) FROM preorder_orders o
+                     WHERE o.product_id=p.id AND o.status='completed') AS completed_orders,
+                   (SELECT COUNT(*) FROM member_trips t
+                     WHERE t.source_type='preorder_order' AND t.status='completed'
+                       AND t.counts_trip=TRUE
+                       AND t.source_ref IN (SELECT o2.booking_ref FROM preorder_orders o2
+                                             WHERE o2.product_id=p.id)) AS counted_trips
+            FROM preorder_products p
+            ORDER BY p.is_active DESC, p.id
+        """)
+        products = [dict(row) for row in cur.fetchall()]
+        cur.close(); conn.close()
+        return jsonify(ok=True, products=products, points_per_trip=points_per_trip())
+    except Exception as exc:
+        print(f'[PREORDER PRODUCTS] {exc}')
+        return jsonify(ok=False, error='讀取預購商品失敗'), 500
+
+
+@app.route('/api/admin/preorder/products/<int:product_id>/counts-as-trip', methods=['PATCH'])
+def admin_preorder_product_trip_policy(product_id):
+    """切換單一預購商品可否認列為潮旅旅次。
+
+    這是商業政策而非日常訂位作業，因此限 owner。預設一併校正該商品既有的旅次，
+    否則設錯之後只能人工逐筆改——這正是規劃書要求「先界定哪些行程可認列」的原因。
+    點數帳本走 sync_trip_points 的差額沖銷，不會竄改歷史紀錄。
+    """
+    if not is_admin():
+        return jsonify(ok=False, error='僅管理者可調整旅次認列政策'), 401
+    data = request.get_json(force=True, silent=True) or {}
+    if 'counts_as_trip' not in data:
+        return jsonify(ok=False, error='缺少 counts_as_trip'), 400
+    counts = bool(data.get('counts_as_trip'))
+    apply_existing = bool(data.get('apply_to_existing', True))
+    conn = None
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("""UPDATE preorder_products SET counts_as_trip=%s, updated_at=NOW()
+                       WHERE id=%s RETURNING slug,name""", (counts, product_id))
+        product = cur.fetchone()
+        if not product:
+            conn.rollback(); cur.close(); conn.close()
+            return jsonify(ok=False, error='找不到預購商品'), 404
+        affected_members = set()
+        affected_trips = 0
+        if apply_existing:
+            cur.execute("""SELECT id, member_id FROM member_trips
+                           WHERE source_type='preorder_order' AND counts_trip <> %s
+                             AND source_ref IN (SELECT booking_ref FROM preorder_orders
+                                                 WHERE product_id=%s)
+                           FOR UPDATE""", (counts, product_id))
+            rows = cur.fetchall()
+            for row in rows:
+                cur.execute("UPDATE member_trips SET counts_trip=%s, updated_at=NOW() WHERE id=%s",
+                            (counts, row['id']))
+                sync_trip_points(cur, row['id'])
+                affected_members.add(row['member_id'])
+            affected_trips = len(rows)
+            for member_id in affected_members:
+                recalculate_member(cur, member_id)
+        write_audit(cur, 'update', '旅次認列政策', product['slug'], affected_trips, 0,
+                    f"{product['name']}：{'可認列' if counts else '不認列'}"
+                    f"；校正既有旅次 {affected_trips} 筆／{len(affected_members)} 位會員")
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True, counts_as_trip=counts, affected_trips=affected_trips,
+                       affected_members=len(affected_members))
+    except Exception as exc:
+        try:
+            if conn: conn.rollback(); conn.close()
+        except Exception:
+            pass
+        print(f'[PREORDER TRIP POLICY] {exc}')
+        return jsonify(ok=False, error='更新旅次認列政策失敗'), 500
 
 
 @app.route('/api/admin/preorder/orders', methods=['GET'])
@@ -3155,6 +3863,17 @@ def admin_update_preorder(order_id):
         if changes:
             cur.execute("INSERT INTO preorder_order_logs (order_id, summary) VALUES (%s,%s)",
                         (order_id, "；".join(changes)))
+        if 'status' in data:
+            cur.execute("""SELECT o.booking_ref,o.contact_phone,o.departure_date,o.status,
+                                  p.name,p.counts_as_trip
+                           FROM preorder_orders o JOIN preorder_products p ON p.id=o.product_id
+                           WHERE o.id=%s""", (order_id,))
+            synced = cur.fetchone()
+            if synced:  # JOIN 失配時不可讓訂單更新整筆失敗
+                _sync_completed_order_trip(cur, 'preorder_order', synced['booking_ref'],
+                                           synced['contact_phone'], synced['name'],
+                                           synced['departure_date'], synced['status'],
+                                           counts_trip=bool(synced.get('counts_as_trip', True)))
         conn.commit(); cur.close(); conn.close()
         return jsonify(ok=True)
     except Exception as e:
@@ -4136,6 +4855,7 @@ def dynamic_sitemap():
             (f'{SITE}/penghu-3days-itinerary', '0.8', 'monthly'),
             (f'{SITE}/penghu-family-travel', '0.8', 'monthly'),
             (f'{SITE}/penghu-food-guide', '0.8', 'monthly'),
+            (f'{SITE}/penghu-100', '0.8', 'monthly'),
             (f'{SITE}/penghu-2026-festival-guide', '0.8', 'weekly')]
     try:
         conn = get_db(); cur = conn.cursor()
@@ -4204,15 +4924,18 @@ def submit_contact():
             INSERT INTO contacts
               (name,phone,travel_date,travel_date_end,people,budget,transport,
                departure_city,tour_interest,slot_id,is_waitlist,notes,
-               visit_count,member_status,member_no)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id, created_at
+               visit_count,member_status,member_no,utm)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id, created_at
         """, (data['name'], data['phone'], data['travel_date'], data['travel_date_end'],
               data['people'], data.get('budget',''), data['transport'],
               data.get('departure_city',''), data.get('tour_interest',''),
               slot_id, is_waitlist, data.get('notes',''),
               (data.get('visit_count') or '')[:20],
               (data.get('member_status') or '')[:30],
-              (data.get('member_no') or '')[:40]))
+              (data.get('member_no') or '')[:40],
+              Json({k: str(v)[:200] for k, v in (data.get('utm') or {}).items()
+                    if k in ('utm_source', 'utm_medium', 'utm_campaign', 'utm_content',
+                             'utm_term', 'landing_page', 'referrer')})))
         row = cur.fetchone()
         conn.commit(); cur.close(); conn.close()
 
@@ -4270,7 +4993,7 @@ def submit_quiz_lead():
 
 @app.route('/api/contacts', methods=['GET'])
 def list_contacts():
-    if not is_admin():
+    if not has_role('orders'):
         return jsonify(ok=False, error='未授權'), 401
     try:
         conn = get_db()
@@ -4284,10 +5007,87 @@ def list_contacts():
             if r.get('travel_date'):     r['travel_date']     = str(r['travel_date'])
             if r.get('travel_date_end'): r['travel_date_end'] = str(r['travel_date_end'])
             if r.get('created_at'): r['created_at'] = str(r['created_at'])
+            if r.get('contacted_at'): r['contacted_at'] = str(r['contacted_at'])
+            if r.get('converted_at'): r['converted_at'] = str(r['converted_at'])
+            if r.get('conversion_value') is not None:
+                r['conversion_value'] = float(r['conversion_value'])
             result.append(r)
         return jsonify(ok=True, contacts=result)
     except Exception as e:
         return jsonify(ok=False, error='伺服器錯誤'), 500
+
+
+LEAD_STATUSES = {'new', 'contacted', 'qualified', 'converted', 'lost'}
+
+
+@app.route('/api/admin/contacts/<int:contact_id>', methods=['PATCH'])
+def update_contact_funnel(contact_id):
+    """更新諮詢漏斗狀態；時間戳由伺服器依狀態維護。"""
+    if not has_role('orders'):
+        return jsonify(ok=False, error='未授權'), 401
+    data = request.get_json(force=True, silent=True) or {}
+    status = (data.get('lead_status') or '').strip()
+    if status not in LEAD_STATUSES:
+        return jsonify(ok=False, error='無效的諮詢狀態'), 400
+    raw_value = data.get('conversion_value')
+    try:
+        value = None if raw_value in (None, '') else max(0, float(raw_value))
+    except (TypeError, ValueError):
+        return jsonify(ok=False, error='成交金額格式錯誤'), 400
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT id, lead_status FROM contacts WHERE id=%s FOR UPDATE", (contact_id,))
+        previous = cur.fetchone()
+        if not previous:
+            cur.close(); conn.close()
+            return jsonify(ok=False, error='找不到諮詢紀錄'), 404
+        cur.execute("""
+            UPDATE contacts SET lead_status=%s,
+              contacted_at=CASE WHEN %s IN ('contacted','qualified','converted')
+                                THEN COALESCE(contacted_at,NOW()) ELSE contacted_at END,
+              converted_at=CASE WHEN %s='converted' THEN COALESCE(converted_at,NOW())
+                                WHEN %s<>'converted' THEN NULL ELSE converted_at END,
+              conversion_value=CASE WHEN %s='converted' THEN %s ELSE NULL END
+            WHERE id=%s
+        """, (status, status, status, status, status, value, contact_id))
+        write_audit(cur, 'update', '諮詢漏斗', str(contact_id), 1, 0,
+                    f"{previous['lead_status'] or 'new'} → {status}; value={value or 0}")
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True, id=contact_id, lead_status=status,
+                       conversion_value=value)
+    except Exception as exc:
+        print(f'[CONTACT FUNNEL] {exc}')
+        return jsonify(ok=False, error='伺服器錯誤'), 500
+
+
+@app.route('/api/admin/conversion-summary', methods=['GET'])
+def conversion_summary():
+    """最近 30 天諮詢漏斗，供後台與營運報告使用。"""
+    if not has_role('orders'):
+        return jsonify(ok=False, error='未授權'), 401
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("""
+            SELECT COALESCE(lead_status,'new') AS status, COUNT(*) AS count,
+                   COALESCE(SUM(conversion_value),0) AS value
+            FROM contacts WHERE created_at >= NOW() - INTERVAL '30 days'
+            GROUP BY COALESCE(lead_status,'new')
+        """)
+        rows = {r['status']: {'count': r['count'], 'value': float(r['value'])}
+                for r in cur.fetchall()}
+        cur.execute("""
+            SELECT COALESCE(utm->>'utm_source','(direct)') AS source, COUNT(*) AS count
+            FROM contacts WHERE created_at >= NOW() - INTERVAL '30 days'
+            GROUP BY 1 ORDER BY 2 DESC LIMIT 10
+        """)
+        sources = [dict(r) for r in cur.fetchall()]
+        cur.close(); conn.close()
+        total = sum(row['count'] for row in rows.values())
+        converted = rows.get('converted', {}).get('count', 0)
+        return jsonify(ok=True, days=30, total=total, stages=rows, sources=sources,
+                       conversion_rate=(converted / total if total else 0))
+    except Exception as exc:
+        return jsonify(ok=False, error=str(exc)), 500
 
 
 # ─── 啟動 ──────────────────────────────────────────────────

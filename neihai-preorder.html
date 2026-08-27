@@ -204,6 +204,11 @@
   </main>
 
   <script>
+    const q = new URLSearchParams(location.search);
+    const attribution = {utm_source:q.get('utm_source')||'',utm_medium:q.get('utm_medium')||'',
+      utm_campaign:q.get('utm_campaign')||'',utm_content:q.get('utm_content')||'',
+      utm_term:q.get('utm_term')||'',landing_page:location.pathname+location.search,
+      referrer:document.referrer||''};
     const grid = document.getElementById('sailing-grid');
     const monthInput = document.getElementById('month-input');
     const selectedBox = document.getElementById('selected-sailing');
@@ -297,6 +302,7 @@
       const btn = e.submitter;
       btn.disabled = true;
       btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 送出中...';
+      if (typeof gtag === 'function') gtag('event','preorder_submit_attempt',{method:'neihai_preorder'});
       try {
         const res = await fetch('/api/neihai/preorders', {
           method:'POST',
@@ -307,6 +313,7 @@
             agency_name: document.getElementById('agency-name').value,
             contact_email: document.getElementById('contact-email').value.trim(),
             notes: document.getElementById('notes').value,
+            utm: attribution,
             passengers,
           })
         });
@@ -321,11 +328,17 @@
           <span style="font-size:.85rem;color:#5a7a94">加入後請傳訊息告知訂單編號 ${esc(json.booking_ref)}，方便我們與您聯繫。</span>`;
         resultBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
         if (typeof fbq === 'function') fbq('track', 'Lead', { content_name: '內海巡禮預購' });
+        if (typeof gtag === 'function') gtag('event','generate_lead',{
+          method:'neihai_preorder',booking_ref:json.booking_ref
+        });
         e.target.reset();
         passengerCount.value = 1;
         renderPassengers();
         await loadSailings();
       } catch (err) {
+        if (typeof gtag === 'function') gtag('event','preorder_submit_failed',{
+          method:'neihai_preorder',error_message:String(err.message||'').slice(0,100)
+        });
         resultBox.className = 'result err';
         resultBox.textContent = err.message || '送出失敗，請稍後再試或改用 LINE 聯繫。';
       } finally {

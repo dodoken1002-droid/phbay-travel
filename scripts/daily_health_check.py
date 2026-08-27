@@ -288,6 +288,28 @@ def render_markdown(report):
     return "\n".join(lines) + "\n"
 
 
+def send_line_critical_alert(report):
+    token = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN", "").strip()
+    owner = os.environ.get("LINE_OWNER_USER_ID", "").strip()
+    if not report["p3_blocked"]:
+        return {"status": "not_needed"}
+    if not token or not owner:
+        return {"status": "skipped", "reason": "LINE push credentials not configured"}
+    critical = [row for row in report["checks"] if row["status"] == "critical"]
+    message = "【P0 Critical】潮旅網站健康檢查異常，已暫停 P3 開發：\n" + \
+              "\n".join(f"・{row['label']}：{row['summary']}" for row in critical)
+    data = json.dumps({"to": owner, "messages": [{"type": "text", "text": message[:4900]}]},
+                      ensure_ascii=False).encode("utf-8")
+    try:
+        code, body, _ = fetch("https://api.line.me/v2/bot/message/push", method="POST", data=data,
+                              headers={"Content-Type": "application/json",
+                                       "Authorization": f"Bearer {token}"})
+        return {"status": "sent" if code == 200 else "failed", "http_status": code,
+                "response": body.decode("utf-8", "replace")[:200]}
+    except Exception as exc:
+        return {"status": "failed", "error": str(exc)}
+
+
 def run(site, expected_sha=""):
     checks = public_checks(site.rstrip("/"), expected_sha)
     checks.append(line_check(site.rstrip("/")))
@@ -308,6 +330,7 @@ def main():
     parser.add_argument("--markdown", default="health-report.md")
     args = parser.parse_args()
     report = run(args.site, args.expected_sha)
+    report["notification"] = send_line_critical_alert(report)
     Path(args.output).write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     markdown = render_markdown(report)
     Path(args.markdown).write_text(markdown, encoding="utf-8")

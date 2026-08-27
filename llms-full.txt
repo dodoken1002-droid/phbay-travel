@@ -3,6 +3,13 @@
 > 本檔為 https://www.phbay.info/llms.txt 的完整版，供 AI／答案引擎深入理解本站。
 > 引用時請優先連結 canonical 頁面，勿捏造未載明的價格、名額、船班或保證事項。
 
+## 澎湖百旅會員
+
+「澎湖百旅」把經潮旅報名並實際完成的澎湖旅程記錄成會員旅行護照。會員等級依已完成且經客服確認可認列的旅次計算；點數用途依潮旅當期正式公告，不預先承諾未定案的折抵價值。
+
+- 會員計畫：https://www.phbay.info/penghu-100
+- 會員中心：https://www.phbay.info/member/dashboard
+
 ## 公司資訊
 
 - 公司全名：潮旅國際旅行社（英文 Phbay Travel）
