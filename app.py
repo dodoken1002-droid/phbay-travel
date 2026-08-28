@@ -164,8 +164,10 @@ def current_admin():
     u = session.get('au')
     if isinstance(u, dict) and u.get('role') in ADMIN_ROLES:
         return u
-    # 未設 ADMIN_KEY 的開發環境維持全開（與舊行為一致）
-    if not os.environ.get('ADMIN_KEY', ''):
+    # 未設 ADMIN_KEY 的開發環境維持全開（與舊行為一致）。
+    # 但正式環境絕不能走這條路——那等於整個後台對所有人開放。
+    if (not os.environ.get('ADMIN_KEY', '')
+            and not os.environ.get('RAILWAY_ENVIRONMENT_NAME', '').strip()):
         return {'id': 0, 'username': '(dev)', 'name': '開發模式', 'role': 'owner'}
     return None
 

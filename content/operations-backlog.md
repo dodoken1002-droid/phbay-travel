@@ -19,7 +19,9 @@
 - [x] Railway 正式站資料庫健康、contacts 表及部署 commit 對照。
 - [x] GA4 昨日 page views 與前七日平均比較。
 - [x] GSC sitemap 索引數、錯誤及索引基準跌幅。
-- [ ] 在 GitHub 設定監控用 Secrets／Variables，手動跑一次 workflow 建立基準（需站方憑證）。
+- [ ] 在 GitHub 設定監控用 Secrets／Variables，手動跑一次 workflow 建立基準（需站方憑證）。
+      步驟與預期結果見 `content/monitoring-setup.md`。GSC 三項 secret 已存在不必重設；
+      實際還缺 LINE 三項 secret、`GA4_PROPERTY_ID`，以及把服務帳戶加進 GA4 資源存取管理。
 - [x] Critical 除 GitHub Issue 閘門外，可選擇推送 LINE owner；未設定憑證時安全略過。
 
 ## P1 — 轉換追蹤
@@ -106,4 +108,5 @@
       （2026-08-28 完成：只回 connection_failed，詳情留在 Railway log）
 - [x] 全站沒有 CSP，XSS 沒有第二道防線。
       （2026-08-28 完成：已上 Report-Only；觀察無誤報後設 CSP_ENFORCE=1 轉強制）
-- [ ] `current_admin()` 在 `ADMIN_KEY` 未設時回傳 owner（開發模式全開）。
+- [x] `current_admin()` 在 `ADMIN_KEY` 未設時回傳 owner（開發模式全開）。
+      （2026-08-28 完成：正式環境不再走這條路，開發全開僅限本機）
