@@ -19,16 +19,24 @@ jobs:
           python-version: "3.12"
       - run: pip install "google-api-python-client>=2,<3" "google-auth>=2,<3"
       - name: Build GA4 funnel report
+        id: report
+        continue-on-error: true
         env:
           GA4_PROPERTY_ID: ${{ vars.GA4_PROPERTY_ID }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           GSC_SERVICE_ACCOUNT_JSON: ${{ secrets.GSC_SERVICE_ACCOUNT_JSON }}
         run: python scripts/conversion_report.py --output conversion-report.json --markdown conversion-report.md
-      - run: cat conversion-report.md >> "$GITHUB_STEP_SUMMARY"
+      - if: always() && hashFiles('conversion-report.md') != ''
+        run: cat conversion-report.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: p1-conversion-${{ github.run_id }}
           path: |
             conversion-report.json
             conversion-report.md
           retention-days: 90
+          if-no-files-found: warn
+      - name: Enforce report gate
+        if: steps.report.outcome == 'failure'
+        run: exit 1

@@ -45,8 +45,13 @@ jobs:
         run: python scripts/daily_health_check.py --output health-report.json --markdown health-report.md
 
       - name: Publish run summary
-        if: always()
+        if: always() && hashFiles('health-report.md') != ''
         run: cat health-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Warn when the health script produced no report
+        if: always() && hashFiles('health-report.json') == ''
+        run: |
+          echo "::error::daily_health_check.py 未產出 health-report.json（腳本可能崩潰），本次無法評估 P0 閘門"             | tee -a "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -58,7 +63,7 @@ jobs:
           retention-days: 30
 
       - name: Open or close the P0 Critical gate
-        if: always()
+        if: always() && hashFiles('health-report.json') != ''
         uses: actions/github-script@v7
         with:
           script: |

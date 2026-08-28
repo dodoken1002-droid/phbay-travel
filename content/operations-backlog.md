@@ -58,39 +58,52 @@
 
 - [x] `member_trips.points_awarded` 已接上：完成且可認列的旅次自動給點（`MEMBER_POINTS_PER_TRIP`，預設 100），
       取消走負向沖銷；旅行護照新增「點數」欄並補齊五語。2026-08-27 完成。
-- [ ] 自動認列（`_sync_completed_order_trip`，最常見路徑）不發升等 LINE 通知，
+- [x] 自動認列（`_sync_completed_order_trip`，最常見路徑）不發升等 LINE 通知，
       只有後台手動 PATCH 才發，多數會員升等收不到訊息。
-- [ ] `ON CONFLICT` 不更新 `member_id`：訂單聯絡電話改綁另一位會員後，
+      （2026-08-28 完成：升等通知改在訂單 commit 之後推送，網路呼叫不佔交易鎖）
+- [x] `ON CONFLICT` 不更新 `member_id`：訂單聯絡電話改綁另一位會員後，
       旅次仍掛在原會員，兩邊 `trip_count` 都會失準。
+      （2026-08-28 完成：旅次與點數帳本一起改掛新會員，新舊雙方都重算）
 - [x] `preorder_products.counts_as_trip` 後台介面已完成（百旅會員頁籤 →「預購行程・旅次認列設定」），
       owner 專屬，切換時一併校正既有旅次與點數並寫稽核。2026-08-27 完成。
 
 ### 會員帳號安全
 
-- [ ] 註冊即發 session、Email 未經驗證；且 409「此手機或 Email 已加入」會洩漏帳號存在性，
+- [x] 註冊即發 session、Email 未經驗證；且 409「此手機或 Email 已加入」會洩漏帳號存在性，
       與 `login/request` 刻意做的防枚舉不一致。請統一策略。
-- [ ] 合併會員的 `WHERE id IN (%s,%s) FOR UPDATE` 沒有固定鎖順序，
+      （2026-08-28 完成：一律回相同訊息並寄驗證碼，驗證後才發 session）
+- [x] 合併會員的 `WHERE id IN (%s,%s) FOR UPDATE` 沒有固定鎖順序，
       並發合併理論上可 deadlock（owner-only、機率低）。
-- [ ] 七個 `/api/admin/member*` 端點用 `error=str(exc)` 回傳原始 psycopg2 例外，
+      （2026-08-28 完成：改為依 id 由小到大逐筆鎖定）
+- [x] 七個 `/api/admin/member*` 端點用 `error=str(exc)` 回傳原始 psycopg2 例外，
       與前台一律回通用訊息的做法不一致。
-- [ ] 會員名單 CSV（含姓名、手機、Email）目前 `orders` 角色即可匯出，
+      （2026-08-28 完成：8 處改為通用訊息＋伺服器端記錄，含 conversion_summary）
+- [x] 會員名單 CSV（含姓名、手機、Email）目前 `orders` 角色即可匯出，
       合併卻是 owner-only。請確認匯出權限是否也該收斂為 owner。
+      （2026-08-28 完成：收斂為 owner 專屬）
 
 ### 監控門檻校準
 
-- [ ] GSC「sitemap 尚未提交」與「errors > 0」都判 critical，會直接暫停 P3。
+- [x] GSC「sitemap 尚未提交」與「errors > 0」都判 critical，會直接暫停 P3。
       `GSC_SITEMAP_URL` 只要與 GSC 註冊路徑字串不完全一致（www／非 www）就會變成永久假 critical。
       建議降為 warning，或改用 suffix 比對。
-- [ ] `daily_health_check.py` 若硬崩潰而未產出 `health-report.json`，
+      （2026-08-28 完成：改為 warning＋結尾比對；只有收錄數跌破基準才 critical）
+- [x] `daily_health_check.py` 若硬崩潰而未產出 `health-report.json`，
       gate step 的 `readFileSync` 會丟例外 → run 變紅但不開 Issue、也不發 LINE。建議加 `hashFiles()` 保護。
-- [ ] `weekly-conversion-report.yml` 缺 `continue-on-error` 與 `if: always()`，
+      （2026-08-28 完成：閘門步驟加 hashFiles 保護，並另發 error 註記）
+- [x] `weekly-conversion-report.yml` 缺 `continue-on-error` 與 `if: always()`，
       腳本一失敗就拿不到 summary 與 artifact，與另外兩個 workflow 不一致。
-- [ ] 表單「昨日 0 次嘗試」判 ok。若前端 JS 整個壞掉導致完全沒有 attempt 事件，
+      （2026-08-28 完成：補上並加獨立的失敗閘門）
+- [x] 表單「昨日 0 次嘗試」判 ok。若前端 JS 整個壞掉導致完全沒有 attempt 事件，
       這個檢查看不出來——正是本次想堵的盲區。建議「attempt=0 但 pageview 正常」連續 N 天升 warning。
-- [ ] `EXPECTED_DEPLOY_SHA` 用 `github.sha`，部署延遲會產生假 critical，建議給 30 分鐘寬限。
+      （2026-08-28 完成：瀏覽量 ≥100 卻 0 次嘗試改判 warning）
+- [x] `EXPECTED_DEPLOY_SHA` 用 `github.sha`，部署延遲會產生假 critical，建議給 30 分鐘寬限。
+      （2026-08-28 完成：main 最新 commit 未滿 30 分鐘時降為 warning）
 
 ### 既有問題（非本次引入，但建議一併處理）
 
-- [ ] `/api/health` 未經驗證即回傳 `db_error` 原文，會洩漏資料庫連線細節。
-- [ ] 全站沒有 CSP，XSS 沒有第二道防線。
+- [x] `/api/health` 未經驗證即回傳 `db_error` 原文，會洩漏資料庫連線細節。
+      （2026-08-28 完成：只回 connection_failed，詳情留在 Railway log）
+- [x] 全站沒有 CSP，XSS 沒有第二道防線。
+      （2026-08-28 完成：已上 Report-Only；觀察無誤報後設 CSP_ENFORCE=1 轉強制）
 - [ ] `current_admin()` 在 `ADMIN_KEY` 未設時回傳 owner（開發模式全開）。

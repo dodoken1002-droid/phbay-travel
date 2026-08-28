@@ -134,7 +134,14 @@ def public_checks(site, expected_sha=""):
         if not healthy:
             status, summary = "critical", f"HTTP {code}，資料庫或 contacts 表異常"
         elif expected_sha and release and not expected_sha.startswith(release) and not release.startswith(expected_sha):
-            status, summary = "critical", f"正式站版本 {release[:7]} 不等於 main {expected_sha[:7]}"
+            grace = _deploy_grace_minutes()
+            if grace is not None and grace < 30:
+                status = "warning"
+                summary = (f"正式站版本 {release[:7]} 不等於 main {expected_sha[:7]}；"
+                           f"main 最新 commit 僅 {grace:.0f} 分鐘前，可能仍在部署中")
+            else:
+                status = "critical"
+                summary = f"正式站版本 {release[:7]} 不等於 main {expected_sha[:7]}"
         elif expected_sha and not release:
             status, summary = "warning", "正式站正常，但 Railway 未提供部署 commit"
         else:
@@ -145,6 +152,23 @@ def public_checks(site, expected_sha=""):
     except Exception as exc:
         results.append(check("railway", "Railway deploy／應用健康", "critical", str(exc)))
     return results
+
+
+def _deploy_grace_minutes():
+    """main 最新 commit 距現在幾分鐘；取不到回 None。
+
+    workflow 會 checkout 原始碼，因此這裡直接問 git。用途是區分
+    「Railway 還在部署」與「部署真的壞掉」，不要讓前者暫停 P3 開發。
+    """
+    try:
+        import subprocess
+        raw = subprocess.run(["git", "log", "-1", "--format=%ct"],
+                             capture_output=True, text=True, timeout=10)
+        if raw.returncode != 0 or not raw.stdout.strip():
+            return None
+        return max(0.0, (time.time() - int(raw.stdout.strip())) / 60)
+    except Exception:
+        return None
 
 
 def line_check(site):
@@ -206,6 +230,9 @@ def ga4_checks():
                 check("not_found", "404 是否增加", "warning", message),
                 check("ga4", "GA4 異常", "warning", message)]
 
+    pageviews = yesterday.get("page_view", 0)
+    pv_avg = baseline.get("page_view", 0) / 7
+
     attempts = yesterday.get("contact_submit_attempt", 0)
     failures = yesterday.get("contact_submit_failed", 0)
     successes = max(0, attempts - failures)
@@ -214,10 +241,16 @@ def ga4_checks():
         contact_status = "critical"
     elif attempts and rate < 0.95:
         contact_status = "warning"
+    elif not attempts and pageviews >= 100:
+        # 有正常流量卻一次送出嘗試都沒有，通常代表前端 JS 或事件掛了。
+        # 這正是 2026-07 表單無聲失敗那類問題的另一種面貌，不能判 ok。
+        contact_status = "warning"
     else:
         contact_status = "ok"
     contact_summary = (f"嘗試 {attempts}、失敗 {failures}、推定成功率 {rate:.1%}"
-                       if rate is not None else "昨日沒有表單送出嘗試")
+                       if rate is not None
+                       else (f"昨日 0 次表單送出嘗試，但有 {pageviews} 次瀏覽——請確認表單事件是否正常"
+                             if pageviews >= 100 else "昨日沒有表單送出嘗試"))
 
     not_found = yesterday.get("page_not_found", 0)
     not_found_avg = baseline.get("page_not_found", 0) / 7
@@ -228,8 +261,6 @@ def ga4_checks():
     else:
         nf_status = "ok"
 
-    pageviews = yesterday.get("page_view", 0)
-    pv_avg = baseline.get("page_view", 0) / 7
     ga_status = "warning" if pv_avg >= 20 and pageviews < pv_avg * 0.3 else "ok"
     return [
         check("contact", "諮詢表單成功率", contact_status, contact_summary,
@@ -255,7 +286,17 @@ def gsc_check(site):
         entries = service.sitemaps().list(siteUrl=property_url).execute().get("sitemap", [])
         sitemap = next((row for row in entries if row.get("path") == sitemap_url), None)
         if not sitemap:
-            return check("gsc", "Google Search Console 索引", "critical", "正式 sitemap 尚未提交")
+            # 完全比對失敗時再用結尾比對兜一次：GSC 註冊的字串只要 www／非 www
+            # 或結尾斜線差一個字，就會找不到而誤判。
+            tail = sitemap_url.rsplit("/", 1)[-1] or "sitemap.xml"
+            sitemap = next((row for row in entries
+                            if str(row.get("path", "")).endswith(tail)), None)
+        if not sitemap:
+            # 這是設定問題而非網站故障，不應暫停 P3 開發。
+            return check("gsc", "Google Search Console 索引", "warning",
+                         f"在 GSC 找不到 sitemap（設定值 {sitemap_url}），"
+                         f"請確認 GSC_SITEMAP_URL 與 GSC 後台註冊字串完全一致",
+                         registered=[row.get("path") for row in entries][:5])
         content = (sitemap.get("contents") or [{}])[0]
         indexed = int(content.get("indexed") or 0)
         submitted = int(content.get("submitted") or 0)
@@ -263,7 +304,9 @@ def gsc_check(site):
         baseline_raw = os.environ.get("GSC_INDEXED_BASELINE", "").strip()
         baseline = int(baseline_raw) if baseline_raw else None
         dropped = baseline is not None and indexed < baseline * 0.9
-        status = "critical" if errors or dropped else "ok"
+        # errors 多半是少數網址暫時抓不到，屬待辦而非緊急；
+        # 收錄數跌破基準 10% 才是真的該停下來查的事。
+        status = "critical" if dropped else ("warning" if errors else "ok")
         if baseline is None and status == "ok":
             status = "warning"
         summary = f"已收錄 {indexed}／提交 {submitted}；錯誤 {errors}"

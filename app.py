@@ -61,6 +61,39 @@ ASSET_VERSION = '20260827'
 _LONG_CACHE_EXT = ('.css', '.js', '.png', '.jpg', '.jpeg', '.webp', '.avif',
                    '.gif', '.svg', '.ico', '.woff', '.woff2')
 
+# 目前站上實際會用到的外部來源。CSP 先以 Report-Only 上線：
+# 瀏覽器只回報不攔截，確認一週沒有誤擋之後，把環境變數 CSP_ENFORCE 設為 1
+# 即可改成強制模式。屆時 XSS 就多了一道「就算注入也送不出去」的防線。
+_CSP = "; ".join([
+    "default-src 'self'",
+    # 站內腳本大量使用 inline，短期內無法移除，因此保留 unsafe-inline；
+    # 真正的價值在於下面幾條：外部腳本與資料外傳都被限制在白名單內。
+    "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com "
+    "https://connect.facebook.net https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
+    "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com",
+    "font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com",
+    "img-src 'self' data: blob: https:",
+    "connect-src 'self' https://www.google-analytics.com https://www.googletagmanager.com "
+    "https://region1.google-analytics.com",
+    "frame-src 'self' https://www.facebook.com https://www.instagram.com",
+    "form-action 'self'",
+    "frame-ancestors 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+])
+
+
+@app.after_request
+def _set_security_headers(resp):
+    header = ('Content-Security-Policy'
+              if os.environ.get('CSP_ENFORCE', '').strip() == '1'
+              else 'Content-Security-Policy-Report-Only')
+    resp.headers.setdefault(header, _CSP)
+    resp.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    resp.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+    return resp
+
+
 @app.after_request
 def _set_cache_headers(resp):
     path = request.path.lower()
@@ -1171,7 +1204,10 @@ def health():
             conn.close()
             db_status = 'connected'
         except Exception as e:
-            db_error = str(e)
+            # 這支端點不需驗證即可讀取，例外原文會帶出主機、帳號與資料庫名稱。
+            # 詳細內容留在 Railway log，對外只回一個代碼。
+            print(f'[HEALTH] 資料庫連線失敗：{e}')
+            db_error = 'connection_failed'
             db_status = 'error'
     release_sha = (os.environ.get('RAILWAY_GIT_COMMIT_SHA')
                    or os.environ.get('SOURCE_VERSION') or '').strip()
@@ -1491,8 +1527,24 @@ def member_register():
             raise ValueError
     except (TypeError, ValueError):
         return jsonify(ok=False, error='生日月份需為 1–12'), 400
+    # 不論這組手機／Email 是否已經是會員，一律回相同訊息並寄出驗證碼，
+    # 避免用註冊端點反查某人是不是會員（登入端點已經這樣做，兩邊必須一致）。
+    # 同時註冊當下不再直接發 session：必須收得到信、輸入驗證碼才算完成，
+    # 否則任何人都能拿別人的 Email 開帳號並立刻取得登入狀態。
+    def _generic():
+        return jsonify(ok=True, verify_required=True,
+                       message='我們已寄出 10 分鐘有效的驗證碼，請至 Email 收信後輸入以完成登入')
     try:
         conn = get_db(); cur = conn.cursor()
+        cur.execute("""SELECT * FROM members
+                       WHERE (LOWER(email)=%s OR phone_normalized=%s) AND is_active=TRUE
+                       ORDER BY (LOWER(email)=%s) DESC LIMIT 1""",
+                    (email, normalized, email))
+        existing = cur.fetchone()
+        if existing:
+            _issue_member_login_code(conn, cur, existing)
+            cur.close(); conn.close()
+            return _generic()
         member_id, member_no = next_member_no(cur)
         cur.execute("""
             INSERT INTO members
@@ -1501,16 +1553,41 @@ def member_register():
         """, (member_id, member_no, name, phone, normalized, email, birth_month))
         member = cur.fetchone()
         write_audit(cur, 'create', '會員', member_no, 1, 0, '前台會員註冊')
-        conn.commit(); cur.close(); conn.close()
-        session['member_id'] = member_id
-        return jsonify(ok=True, member=public_member(member)), 201
+        conn.commit()
+        _issue_member_login_code(conn, cur, member)
+        cur.close(); conn.close()
+        return _generic()
     except psycopg2.errors.UniqueViolation:
+        # 併發下兩個請求同時建立同一組資料才會走到這裡；仍然不能透露結果。
         try: conn.rollback(); cur.close(); conn.close()
         except Exception: pass
-        return jsonify(ok=False, error='此手機或 Email 已加入，請使用驗證碼登入'), 409
+        return _generic()
     except Exception as exc:
         print(f'[MEMBER REGISTER] {exc}')
         return jsonify(ok=False, error='註冊失敗，請稍後再試'), 500
+
+
+def _issue_member_login_code(conn, cur, member):
+    """發一組 10 分鐘有效的登入碼，並寄到「會員檔案上的」Email。
+
+    刻意不寄到請求輸入的信箱：否則只要知道別人的手機或 Email，
+    就能把對方的登入碼寄到自己信箱。每小時上限 5 次。
+    """
+    cur.execute("""SELECT COUNT(*) AS n FROM member_auth_codes
+                   WHERE member_id=%s AND purpose='login'
+                     AND created_at > NOW() - INTERVAL '1 hour'""", (member['id'],))
+    if int(cur.fetchone()['n'] or 0) >= 5:
+        return False
+    code = f'{random.SystemRandom().randrange(100000, 1000000)}'
+    cur.execute("""
+        INSERT INTO member_auth_codes (member_id,purpose,code_hash,expires_at)
+        VALUES (%s,'login',%s,NOW()+INTERVAL '10 minutes')
+    """, (member['id'], _member_code_hash(member['id'], 'login', code)))
+    conn.commit()
+    ok, detail = _send_member_code_email(member, code)
+    if not ok:
+        print(f'[MEMBER LOGIN EMAIL] {detail}')
+    return True
 
 
 @app.route('/api/member/login/request', methods=['POST'])
@@ -1523,19 +1600,7 @@ def member_login_request():
         cur.execute("SELECT * FROM members WHERE LOWER(email)=%s AND is_active=TRUE", (email,))
         member = cur.fetchone()
         if member:
-            cur.execute("""SELECT COUNT(*) AS n FROM member_auth_codes
-                           WHERE member_id=%s AND purpose='login'
-                             AND created_at > NOW() - INTERVAL '1 hour'""", (member['id'],))
-            if int(cur.fetchone()['n'] or 0) < 5:
-                code = f'{random.SystemRandom().randrange(100000, 1000000)}'
-                cur.execute("""
-                    INSERT INTO member_auth_codes (member_id,purpose,code_hash,expires_at)
-                    VALUES (%s,'login',%s,NOW()+INTERVAL '10 minutes')
-                """, (member['id'], _member_code_hash(member['id'], 'login', code)))
-                conn.commit()
-                ok, detail = _send_member_code_email(member, code)
-                if not ok:
-                    print(f'[MEMBER LOGIN EMAIL] {detail}')
+            _issue_member_login_code(conn, cur, member)
         cur.close(); conn.close()
     except Exception as exc:
         print(f'[MEMBER LOGIN REQUEST] {exc}')
@@ -1648,7 +1713,11 @@ def _sync_completed_order_trip(cur, source_type, source_ref, phone, tour_name,
 
     整段以 SAVEPOINT 包住：會員同步是附加功能，任何失敗都只記 log，
     絕不能讓「改訂單狀態」這個核心訂位作業失敗（2026-07 諮詢表單事故的教訓）。
-    注意 ON CONFLICT 不覆寫 counts_trip，客服在後台的人工判定優先於自動同步。"""
+    注意 ON CONFLICT 不覆寫 counts_trip，客服在後台的人工判定優先於自動同步。
+
+    回傳 dict：{'member_id':…, 'notify':(line_user_id, 文字) 或 None}。
+    LINE 推播刻意不在這裡發送——那是十幾秒的網路呼叫，放在交易裡會一直佔著
+    訂單的列鎖。改由呼叫端在 commit 之後再送。"""
     if not source_ref:
         return None
     normalized = normalize_phone(phone)
@@ -1656,11 +1725,21 @@ def _sync_completed_order_trip(cur, source_type, source_ref, phone, tour_name,
         return None
     cur.execute("SAVEPOINT member_trip_sync")
     try:
-        cur.execute("SELECT id FROM members WHERE phone_normalized=%s AND is_active=TRUE", (normalized,))
+        cur.execute("""SELECT id,name,line_user_id,trip_count FROM members
+                       WHERE phone_normalized=%s AND is_active=TRUE""", (normalized,))
         member = cur.fetchone()
         if not member:
             cur.execute("RELEASE SAVEPOINT member_trip_sync")
             return None
+        # 這筆訂單先前若已同步過，記下原本掛在誰身上、原本什麼狀態。
+        # 訂單聯絡電話改綁另一位會員時，旅次必須跟著搬，否則兩邊的累積旅次都會失準。
+        cur.execute("""SELECT id,member_id,status FROM member_trips
+                       WHERE source_type=%s AND source_ref=%s FOR UPDATE""",
+                    (source_type, source_ref))
+        previous = cur.fetchone()
+        previous_member_id = previous['member_id'] if previous else None
+        previous_status = previous['status'] if previous else None
+        before_level = level_for_trips(member['trip_count'])
         trip_status = ('completed' if order_status == 'completed' else
                        'cancelled' if order_status == 'cancelled' else 'planned')
         cur.execute("""
@@ -1668,16 +1747,35 @@ def _sync_completed_order_trip(cur, source_type, source_ref, phone, tour_name,
               (member_id,source_type,source_ref,tour_name,departure_date,status,counts_trip,notes)
             VALUES (%s,%s,%s,%s,%s,%s,%s,'由訂單狀態自動同步')
             ON CONFLICT (source_type,source_ref) DO UPDATE SET
+              member_id=EXCLUDED.member_id,
               status=EXCLUDED.status,tour_name=EXCLUDED.tour_name,
               departure_date=EXCLUDED.departure_date,updated_at=NOW()
             RETURNING id
         """, (member['id'], source_type, source_ref, tour_name, departure_date,
               trip_status, bool(counts_trip)))
+        trip_id = cur.fetchone()['id']
+        moved = previous_member_id is not None and previous_member_id != member['id']
+        if moved:
+            # 點數帳本要跟著旅次走，否則 sync_trip_points 會誤以為已經給過點，
+            # 新會員拿不到、舊會員也退不掉。
+            cur.execute("UPDATE member_points SET member_id=%s WHERE trip_id=%s",
+                        (member['id'], trip_id))
         # 認列狀態變動後同步點數帳本（冪等），再由帳本重算餘額與旅次數
-        sync_trip_points(cur, cur.fetchone()['id'])
-        recalculate_member(cur, member['id'])
+        sync_trip_points(cur, trip_id)
+        trips, _points = recalculate_member(cur, member['id'])
+        if moved:
+            recalculate_member(cur, previous_member_id)
+        notify = None
+        if (member['line_user_id'] and trip_status == 'completed'
+                and previous_status != 'completed' and bool(counts_trip)):
+            after_level = level_for_trips(trips)
+            text = (f"{member['name']} 您好，旅程「{tour_name}」已完成認列，"
+                    f"目前累積 {trips} 次澎湖旅程。")
+            if after_level != before_level:
+                text += f"\n恭喜升等為「{after_level}」！"
+            notify = (member['line_user_id'], text)
         cur.execute("RELEASE SAVEPOINT member_trip_sync")
-        return member['id']
+        return {'member_id': member['id'], 'notify': notify, 'moved_from': previous_member_id if moved else None}
     except Exception as exc:
         cur.execute("ROLLBACK TO SAVEPOINT member_trip_sync")
         cur.execute("RELEASE SAVEPOINT member_trip_sync")
@@ -1706,7 +1804,8 @@ def admin_members():
             cur.close(); conn.close()
             return jsonify(ok=True, members=members)
         except Exception as exc:
-            return jsonify(ok=False, error=str(exc)), 500
+            print(f'[ADMIN_MEMBERS] {exc}')
+        return jsonify(ok=False, error='會員資料讀取或建立失敗'), 500
     data = request.get_json(force=True, silent=True) or {}
     name = (data.get('name') or '').strip()[:100]
     phone = (data.get('phone') or '').strip()[:30]
@@ -1730,7 +1829,8 @@ def admin_members():
         except Exception: pass
         return jsonify(ok=False, error='手機或 Email 已存在'), 409
     except Exception as exc:
-        return jsonify(ok=False, error=str(exc)), 500
+        print(f'[ADMIN_MEMBERS] {exc}')
+        return jsonify(ok=False, error='會員資料讀取或建立失敗'), 500
 
 
 @app.route('/api/admin/members/<int:member_id>')
@@ -1761,7 +1861,8 @@ def admin_member_detail(member_id):
         cur.close(); conn.close()
         return jsonify(ok=True, member=detail, trips=trips, points=points)
     except Exception as exc:
-        return jsonify(ok=False, error=str(exc)), 500
+        print(f'[ADMIN_MEMBER_DETAIL] {exc}')
+        return jsonify(ok=False, error='讀取會員明細失敗'), 500
 
 
 @app.route('/api/admin/members/<int:member_id>/trips', methods=['POST'])
@@ -1797,7 +1898,8 @@ def admin_member_add_trip(member_id):
         except Exception: pass
         return jsonify(ok=False, error='此來源訂單已認列'), 409
     except Exception as exc:
-        return jsonify(ok=False, error=str(exc)), 500
+        print(f'[ADMIN_MEMBER_ADD_TRIP] {exc}')
+        return jsonify(ok=False, error='新增旅次失敗'), 500
 
 
 @app.route('/api/admin/member-trips/<int:trip_id>', methods=['PATCH'])
@@ -1834,7 +1936,8 @@ def admin_member_update_trip(trip_id):
                                             'messages': [{'type': 'text', 'text': message}]})
         return jsonify(ok=True, trip_count=trips, points_balance=points, level=after_level)
     except Exception as exc:
-        return jsonify(ok=False, error=str(exc)), 500
+        print(f'[ADMIN_MEMBER_UPDATE_TRIP] {exc}')
+        return jsonify(ok=False, error='更新旅次失敗'), 500
 
 
 @app.route('/api/admin/members/<int:member_id>/points', methods=['POST'])
@@ -1865,7 +1968,8 @@ def admin_member_adjust_points(member_id):
         conn.commit(); cur.close(); conn.close()
         return jsonify(ok=True, points_balance=points)
     except Exception as exc:
-        return jsonify(ok=False, error=str(exc)), 500
+        print(f'[ADMIN_MEMBER_ADJUST_POINTS] {exc}')
+        return jsonify(ok=False, error='調整點數失敗'), 500
 
 
 @app.route('/api/admin/members/merge', methods=['POST'])
@@ -1880,8 +1984,13 @@ def admin_member_merge():
         return jsonify(ok=False, error='來源與目標會員不正確'), 400
     try:
         conn = get_db(); cur = conn.cursor()
-        cur.execute("SELECT id,member_no,line_user_id FROM members WHERE id IN (%s,%s) FOR UPDATE", (source_id, target_id))
+        # 一律依 id 由小到大鎖定。若不固定順序，兩個 source/target 剛好相反的
+        # 合併同時進來就可能互相等待而 deadlock。
+        first, second = sorted((source_id, target_id))
+        cur.execute("SELECT id,member_no,line_user_id FROM members WHERE id=%s FOR UPDATE", (first,))
         rows = {row['id']: row for row in cur.fetchall()}
+        cur.execute("SELECT id,member_no,line_user_id FROM members WHERE id=%s FOR UPDATE", (second,))
+        rows.update({row['id']: row for row in cur.fetchall()})
         if len(rows) != 2:
             cur.close(); conn.close(); return jsonify(ok=False, error='找不到來源或目標會員'), 404
         cur.execute("UPDATE member_trips SET member_id=%s WHERE member_id=%s", (target_id, source_id))
@@ -1900,13 +2009,16 @@ def admin_member_merge():
         except Exception: pass
         return jsonify(ok=False, error='來源資料與目標已有相同訂單，請先人工處理重複旅次'), 409
     except Exception as exc:
-        return jsonify(ok=False, error=str(exc)), 500
+        print(f'[ADMIN_MEMBER_MERGE] {exc}')
+        return jsonify(ok=False, error='合併會員失敗'), 500
 
 
 @app.route('/api/admin/members/export.csv')
 def admin_members_export():
-    if not has_role('orders'):
-        return jsonify(ok=False, error='未授權'), 401
+    # 整份會員個資（姓名、手機、Email）一次帶走，風險等級與「合併會員」相同，
+    # 因此同樣限 owner；訂位人員仍可在後台逐筆查詢。
+    if not is_admin():
+        return jsonify(ok=False, error='僅管理者可匯出會員名單'), 401
     try:
         import csv, io
         conn = get_db(); cur = conn.cursor()
@@ -1922,7 +2034,8 @@ def admin_members_export():
         return app.response_class(output.getvalue(), mimetype='text/csv', headers={
             'Content-Disposition': 'attachment; filename=phbay-members.csv'})
     except Exception as exc:
-        return jsonify(ok=False, error=str(exc)), 500
+        print(f'[ADMIN_MEMBERS_EXPORT] {exc}')
+        return jsonify(ok=False, error='匯出會員名單失敗'), 500
 
 
 def send_contact_email(data):
@@ -2660,17 +2773,25 @@ def admin_update_neihai_preorder(order_id):
         if changes:
             cur.execute("INSERT INTO neihai_preorder_logs (preorder_id, summary) VALUES (%s,%s)",
                         (order_id, "；".join(changes)))
+        member_sync = None
         if 'status' in data:
             cur.execute("""SELECT o.booking_ref,o.contact_phone,o.status,s.sailing_date
                            FROM neihai_preorders o JOIN neihai_sailings s ON s.id=o.sailing_id
                            WHERE o.id=%s""", (order_id,))
             synced = cur.fetchone()
             if synced:  # JOIN 失配（例如航次已刪）時不可讓訂單更新整筆失敗
-                _sync_completed_order_trip(cur, 'neihai_order', synced['booking_ref'],
-                                           synced['contact_phone'], '小城故事・內海巡禮',
-                                           synced['sailing_date'], synced['status'],
-                                           counts_trip=True)  # 內海巡禮為潮旅自營
+                member_sync = _sync_completed_order_trip(
+                    cur, 'neihai_order', synced['booking_ref'],
+                    synced['contact_phone'], '小城故事・內海巡禮',
+                    synced['sailing_date'], synced['status'],
+                    counts_trip=True)  # 內海巡禮為潮旅自營
         conn.commit(); cur.close(); conn.close()
+        # LINE 升等通知在 commit 之後才送：網路呼叫不該佔著訂單的列鎖，
+        # 失敗也絕不能回頭影響已經寫進去的訂單狀態。
+        if member_sync and member_sync.get('notify'):
+            _line_api_call('message/push', {'to': member_sync['notify'][0],
+                                            'messages': [{'type': 'text',
+                                                          'text': member_sync['notify'][1]}]})
         return jsonify(ok=True, changed=len(changes),
                        summary=("；".join(changes) if changes else "無變更"))
     except Exception as e:
@@ -3863,6 +3984,7 @@ def admin_update_preorder(order_id):
         if changes:
             cur.execute("INSERT INTO preorder_order_logs (order_id, summary) VALUES (%s,%s)",
                         (order_id, "；".join(changes)))
+        member_sync = None
         if 'status' in data:
             cur.execute("""SELECT o.booking_ref,o.contact_phone,o.departure_date,o.status,
                                   p.name,p.counts_as_trip
@@ -3870,11 +3992,18 @@ def admin_update_preorder(order_id):
                            WHERE o.id=%s""", (order_id,))
             synced = cur.fetchone()
             if synced:  # JOIN 失配時不可讓訂單更新整筆失敗
-                _sync_completed_order_trip(cur, 'preorder_order', synced['booking_ref'],
-                                           synced['contact_phone'], synced['name'],
-                                           synced['departure_date'], synced['status'],
-                                           counts_trip=bool(synced.get('counts_as_trip', True)))
+                member_sync = _sync_completed_order_trip(
+                    cur, 'preorder_order', synced['booking_ref'],
+                    synced['contact_phone'], synced['name'],
+                    synced['departure_date'], synced['status'],
+                    counts_trip=bool(synced.get('counts_as_trip', True)))
         conn.commit(); cur.close(); conn.close()
+        # LINE 升等通知在 commit 之後才送：網路呼叫不該佔著訂單的列鎖，
+        # 失敗也絕不能回頭影響已經寫進去的訂單狀態。
+        if member_sync and member_sync.get('notify'):
+            _line_api_call('message/push', {'to': member_sync['notify'][0],
+                                            'messages': [{'type': 'text',
+                                                          'text': member_sync['notify'][1]}]})
         return jsonify(ok=True)
     except Exception as e:
         return jsonify(ok=False, error=str(e)), 500
@@ -5087,7 +5216,8 @@ def conversion_summary():
         return jsonify(ok=True, days=30, total=total, stages=rows, sources=sources,
                        conversion_rate=(converted / total if total else 0))
     except Exception as exc:
-        return jsonify(ok=False, error=str(exc)), 500
+        print(f'[CONVERSION SUMMARY] {exc}')
+        return jsonify(ok=False, error='讀取轉換摘要失敗'), 500
 
 
 # ─── 啟動 ──────────────────────────────────────────────────
