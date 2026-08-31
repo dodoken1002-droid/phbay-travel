@@ -310,6 +310,10 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
         <h2>小城故事・內海巡禮預購訂單</h2>
         <div class="toolbar-right">
           <input type="month" id="neihai-month" class="search-input" style="width:160px" />
+          <label style="display:flex;align-items:center;gap:4px;font-size:.85rem;white-space:nowrap"
+                 title="不分月份，列出全部訂單">
+            <input type="checkbox" id="neihai-all-months" onchange="loadNeihaiOrders()" /> 全部月份
+          </label>
           <button class="btn btn-primary" onclick="loadNeihaiOrders()">
             <i class="fas fa-sync"></i> 載入月份
           </button>
@@ -347,6 +351,10 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
             <option value="">全部行程</option>
           </select>
           <input type="month" id="preorder-month" class="search-input" style="width:160px" />
+          <label style="display:flex;align-items:center;gap:4px;font-size:.85rem;white-space:nowrap"
+                 title="不分月份，列出全部訂單">
+            <input type="checkbox" id="preorder-all-months" onchange="loadPreorderOrders()" /> 全部月份
+          </label>
           <button class="btn btn-primary" onclick="loadPreorderOrders()">
             <i class="fas fa-sync"></i> 載入月份
           </button>
@@ -1683,14 +1691,16 @@ function orderStatusColor(status) {
 
 function loadNeihaiOrders() {
   const monthEl = document.getElementById('neihai-month');
-  if (monthEl && !monthEl.value) monthEl.value = neihaiMonthDefault();
-  const month = monthEl ? monthEl.value : neihaiMonthDefault();
+  const allEl = document.getElementById('neihai-all-months');
+  // 月份留空時不帶參數，由後端開在最近有訂單的月份再回填。
+  const month = (allEl && allEl.checked) ? 'all' : (monthEl ? monthEl.value : '');
   const list = document.getElementById('neihai-orders-list');
   list.innerHTML = '載入中…';
   fetch(`/api/admin/neihai/preorders?month=${encodeURIComponent(month)}&key=${encodeURIComponent(ADMIN_KEY)}`)
     .then(r => r.json())
     .then(d => {
       if (!d.ok) { list.innerHTML = d.error || '載入失敗'; return; }
+      if (monthEl && d.month && d.month !== 'all') monthEl.value = d.month;
       window._neihaiOrders = {};
       (d.orders || []).forEach(o => window._neihaiOrders[o.id] = o);
       const showArchived = document.getElementById('neihai-show-archived').checked;
@@ -1709,7 +1719,7 @@ function loadNeihaiOrders() {
       const guaranteed = sailingStats.filter(s => s.booked >= s.min).length;
       const forming = sailingStats.filter(s => s.booked > 0 && s.booked < s.min).length;
       document.getElementById('neihai-stats').innerHTML = `
-        <div class="stat-card"><div class="num">${d.orders.length}</div><div class="lbl">本月訂單</div></div>
+        <div class="stat-card"><div class="num">${d.orders.length}</div><div class="lbl">${d.month === 'all' ? '全部訂單' : '本月訂單'}</div></div>
         <div class="stat-card"><div class="num">${pax}</div><div class="lbl">有效預購人數</div></div>
         <div class="stat-card"><div class="num">${guaranteed}</div><div class="lbl">已達發船船班</div></div>
         <div class="stat-card"><div class="num">${forming}</div><div class="lbl">待成團船班</div></div>`;
@@ -1718,7 +1728,9 @@ function loadNeihaiOrders() {
       const archivedHint = (!showArchived && archivedCount)
         ? `<p style="color:#a0aec0;text-align:center;padding:10px;font-size:.85rem">另有 ${archivedCount} 筆已封存訂單（勾選右上「顯示已封存」可查看）</p>` : '';
       if (!d.orders.length) {
-        list.innerHTML = archivedHint || '<p style="color:#a0aec0;text-align:center;padding:40px">本月尚無預購訂單</p>';
+        const hint = monthJumpHint(d.months, d.month, 'jumpNeihaiMonth');
+        list.innerHTML = (archivedHint + hint) ||
+          '<p style="color:#a0aec0;text-align:center;padding:40px">尚無預購訂單</p>';
         return;
       }
       list.innerHTML = renderNeihaiGroups(d.orders) + archivedHint;
@@ -2271,12 +2283,38 @@ function updateNeihaiOrderStatus(id, status) {
   });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  const el = document.getElementById('neihai-month');
-  if (el && !el.value) el.value = neihaiMonthDefault();
-  const pel = document.getElementById('preorder-month');
-  if (pel && !pel.value) pel.value = neihaiMonthDefault();
-});
+/* 月份選擇器刻意留空由後端決定：後端會開在最近有訂單的月份並回填這裡。
+   舊版一律預設當月，當月沒單就是一片空白，看起來像訂單全部消失了。 */
+
+/* 月份沒有訂單時，明白告訴使用者資料在哪一個月，並可一鍵跳過去。 */
+function monthJumpHint(months, current, onJump) {
+  const others = (months || []).filter(m => m.month !== current && m.active > 0);
+  if (!others.length) return '';
+  const latest = others[others.length - 1];
+  const links = others.map(m =>
+    `<button class="btn btn-ghost" style="margin:2px;padding:4px 10px;font-size:.85rem"
+             onclick="${onJump}('${m.month}')">${m.month}（${m.active} 筆）</button>`).join('');
+  return `<div style="text-align:center;padding:24px 12px;color:#a0aec0">
+      <p style="margin-bottom:6px">這個月沒有訂單，但資料都還在。</p>
+      <p style="margin-bottom:10px;color:#cbd5e0">最近有訂單的月份是
+        <strong style="color:#e2e8f0">${latest.month}</strong>（${latest.active} 筆）</p>
+      <div>${links}</div>
+    </div>`;
+}
+
+function jumpNeihaiMonth(month) {
+  const box = document.getElementById('neihai-all-months');
+  if (box) box.checked = false;
+  document.getElementById('neihai-month').value = month;
+  loadNeihaiOrders();
+}
+
+function jumpPreorderMonth(month) {
+  const box = document.getElementById('preorder-all-months');
+  if (box) box.checked = false;
+  document.getElementById('preorder-month').value = month;
+  loadPreorderOrders();
+}
 
 
 /* ══════════════════════════════════════
@@ -2284,8 +2322,8 @@ document.addEventListener('DOMContentLoaded', () => {
 ══════════════════════════════════════ */
 function loadPreorderOrders() {
   const monthEl = document.getElementById('preorder-month');
-  if (monthEl && !monthEl.value) monthEl.value = neihaiMonthDefault();
-  const month = monthEl ? monthEl.value : neihaiMonthDefault();
+  const allEl = document.getElementById('preorder-all-months');
+  const month = (allEl && allEl.checked) ? 'all' : (monthEl ? monthEl.value : '');
   const product = document.getElementById('preorder-product').value;
   const list = document.getElementById('preorder-orders-list');
   list.innerHTML = '載入中…';
@@ -2293,6 +2331,7 @@ function loadPreorderOrders() {
     .then(r => r.json())
     .then(d => {
       if (!d.ok) { list.innerHTML = d.error || '載入失敗'; return; }
+      if (monthEl && d.month && d.month !== 'all') monthEl.value = d.month;
       window._preorderOrders = {};
       (d.orders || []).forEach(o => window._preorderOrders[o.id] = o);
       // 行程下拉（保留目前選擇）
@@ -2307,14 +2346,16 @@ function loadPreorderOrders() {
       const pax = activeOrders.reduce((sum, o) => sum + (parseInt(o.passenger_count, 10) || 0), 0);
       const confirmed = activeOrders.filter(o => o.status === 'confirmed_departure' || o.status === 'confirmed').length;
       document.getElementById('preorder-stats').innerHTML = `
-        <div class="stat-card"><div class="num">${orders.length}</div><div class="lbl">本月訂單</div></div>
+        <div class="stat-card"><div class="num">${orders.length}</div><div class="lbl">${d.month === 'all' ? '全部訂單' : '本月訂單'}</div></div>
         <div class="stat-card"><div class="num">${pax}</div><div class="lbl">有效預購人數</div></div>
         <div class="stat-card"><div class="num">${confirmed}</div><div class="lbl">已確認訂單</div></div>`;
       fillExportDateOptions('preorder-export-date', orders, 'departure_date');
       const archivedHint = (!showArchived && archivedCount)
         ? `<p style="color:#a0aec0;text-align:center;padding:10px;font-size:.85rem">另有 ${archivedCount} 筆已封存訂單（勾選右上「顯示已封存」可查看）</p>` : '';
       if (!orders.length) {
-        list.innerHTML = archivedHint || '<p style="color:#a0aec0;text-align:center;padding:40px">本月尚無預購訂單</p>';
+        const hint = monthJumpHint(d.months, d.month, 'jumpPreorderMonth');
+        list.innerHTML = (archivedHint + hint) ||
+          '<p style="color:#a0aec0;text-align:center;padding:40px">尚無預購訂單</p>';
         return;
       }
       list.innerHTML = renderPreorderGroups(orders) + archivedHint;

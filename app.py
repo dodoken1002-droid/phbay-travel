@@ -318,7 +318,9 @@ def init_db():
         CREATE TABLE IF NOT EXISTS neihai_preorders (
             id              SERIAL PRIMARY KEY,
             booking_ref     VARCHAR(40) UNIQUE,
-            sailing_id      INT NOT NULL REFERENCES neihai_sailings(id) ON DELETE CASCADE,
+            -- RESTRICT 而非 CASCADE：航次底下還有訂單時必須擋下刪除，
+            -- 否則刪一筆航次會連同訂單與乘客個資一起靜默消失。
+            sailing_id      INT NOT NULL REFERENCES neihai_sailings(id) ON DELETE RESTRICT,
             agency_name     VARCHAR(120),
             contact_name    VARCHAR(100) NOT NULL,
             contact_phone   VARCHAR(50) NOT NULL,
@@ -456,7 +458,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS preorder_orders (
             id              SERIAL PRIMARY KEY,
             booking_ref     VARCHAR(40) UNIQUE,
-            product_id      INT NOT NULL REFERENCES preorder_products(id) ON DELETE CASCADE,
+            -- 同上：刪掉一個預購商品不該把該商品的所有訂單歷史一起帶走。
+            product_id      INT NOT NULL REFERENCES preorder_products(id) ON DELETE RESTRICT,
             departure_date  DATE NOT NULL,
             departure_time  VARCHAR(5) DEFAULT '',
             agency_name     VARCHAR(120),
@@ -550,6 +553,29 @@ def init_db():
              '兩人成行,每梯最多 5 人,三天兩夜,音樂節官方合作旅行社')
         ON CONFLICT (slug) DO NOTHING
     """)
+
+    # ── 既有資料庫的外鍵修正 ────────────────────────────────────────
+    # 這兩個外鍵原本是 ON DELETE CASCADE：刪掉一筆航次或一個預購商品，
+    # 會把底下所有訂單、乘客個資與異動紀錄一起靜默刪除，沒有任何警告。
+    # 改為 RESTRICT——底下還有訂單就擋下刪除，逼呼叫端先明確處理訂單。
+    # confdeltype='c' 代表 CASCADE，因此這段是冪等的，已改過就不再動。
+    for table, column, parent in (
+            ('neihai_preorders', 'sailing_id', 'neihai_sailings'),
+            ('preorder_orders', 'product_id', 'preorder_products')):
+        cur.execute("""
+            SELECT conname FROM pg_constraint
+            WHERE conrelid = %s::regclass AND contype = 'f'
+              AND confdeltype = 'c'
+              AND conkey = ARRAY[(SELECT attnum FROM pg_attribute
+                                  WHERE attrelid = %s::regclass AND attname = %s)]
+        """, (table, table, column))
+        row = cur.fetchone()
+        if row:
+            name = row['conname'] if not isinstance(row, tuple) else row[0]
+            cur.execute(f'ALTER TABLE {table} DROP CONSTRAINT "{name}"')
+            cur.execute(f'ALTER TABLE {table} ADD CONSTRAINT "{name}" '
+                        f'FOREIGN KEY ({column}) REFERENCES {parent}(id) ON DELETE RESTRICT')
+            print(f'[DB INIT] {table}.{column} 外鍵已由 CASCADE 改為 RESTRICT')
 
     # posts 部落格資料表
     cur.execute("""
@@ -2893,16 +2919,44 @@ def admin_neihai_preorders():
     if not has_role('orders'):
         return jsonify(ok=False, error='未授權'), 401
     try:
-        start, end = _parse_month(request.args.get("month"))
         conn = get_db()
         cur = conn.cursor()
+        # 先統計每個月各有幾筆訂單。兩個用途：月份沒有訂單時可以明白告訴使用者
+        # 「資料在哪一個月」，以及決定首次載入要打開哪一個月（見下方）。
         cur.execute("""
+            SELECT to_char(s.sailing_date, 'YYYY-MM') AS month,
+                   count(*) AS total,
+                   count(*) FILTER (WHERE NOT COALESCE(p.archived, FALSE)) AS active
+            FROM neihai_preorders p
+            JOIN neihai_sailings s ON s.id = p.sailing_id
+            GROUP BY 1 ORDER BY 1
+        """)
+        months = [dict(r) for r in cur.fetchall()]
+
+        requested = (request.args.get("month") or "").strip()
+        show_all = requested == "all"
+        if show_all:
+            start = end = None
+        elif requested:
+            start, end = _parse_month(requested)
+        else:
+            # 首次載入不帶月份時，直接開在最近有訂單的月份。
+            # 原本一律預設當月，當月沒單就是一片空白，看起來像訂單全部消失了。
+            with_orders = [m["month"] for m in months if m["active"]]
+            start, end = _parse_month(with_orders[-1] if with_orders else None)
+
+        base_sql = """
             SELECT p.*, s.sailing_date, s.sailing_time, s.capacity, s.min_people
             FROM neihai_preorders p
             JOIN neihai_sailings s ON s.id = p.sailing_id
-            WHERE s.sailing_date >= %s AND s.sailing_date < %s
+            {where}
             ORDER BY s.sailing_date, s.sailing_time, p.created_at
-        """, (start, end))
+        """
+        if show_all:
+            cur.execute(base_sql.format(where=""))
+        else:
+            cur.execute(base_sql.format(
+                where="WHERE s.sailing_date >= %s AND s.sailing_date < %s"), (start, end))
         orders = [dict(r) for r in cur.fetchall()]
         ids = [o["id"] for o in orders]
         passengers_by_order = {i: [] for i in ids}
@@ -2937,8 +2991,9 @@ def admin_neihai_preorders():
             o["passengers"] = passengers_by_order.get(o["id"], [])
             o["logs"] = logs_by_order.get(o["id"], [])
 
-        availability = _neihai_month_availability(start, end)
-        return jsonify(ok=True, month=start.strftime("%Y-%m"), orders=orders, sailings=availability)
+        availability = [] if show_all else _neihai_month_availability(start, end)
+        return jsonify(ok=True, month="all" if show_all else start.strftime("%Y-%m"),
+                       months=months, orders=orders, sailings=availability)
     except ValueError as e:
         return jsonify(ok=False, error=str(e)), 400
     except Exception as e:
@@ -4211,11 +4266,32 @@ def admin_preorder_orders():
     if not has_role('orders'):
         return jsonify(ok=False, error='未授權'), 401
     try:
-        start, end = _parse_month(request.args.get('month'))
         slug = (request.args.get('product') or '').strip()
         conn = get_db(); cur = conn.cursor()
-        params = [start, end]
-        where = 'o.departure_date >= %s AND o.departure_date < %s'
+        # 與內海同樣的處理：先統計各月訂單數，供空月份提示與首次載入的預設月份使用。
+        month_params = [slug] if slug else []
+        cur.execute(f"""
+            SELECT to_char(o.departure_date, 'YYYY-MM') AS month,
+                   count(*) AS total,
+                   count(*) FILTER (WHERE NOT COALESCE(o.archived, FALSE)) AS active
+            FROM preorder_orders o JOIN preorder_products pr ON pr.id = o.product_id
+            {'WHERE pr.slug = %s' if slug else ''}
+            GROUP BY 1 ORDER BY 1
+        """, month_params)
+        months = [dict(r) for r in cur.fetchall()]
+
+        requested = (request.args.get('month') or '').strip()
+        show_all = requested == 'all'
+        if show_all:
+            start = end = None
+        elif requested:
+            start, end = _parse_month(requested)
+        else:
+            with_orders = [m['month'] for m in months if m['active']]
+            start, end = _parse_month(with_orders[-1] if with_orders else None)
+
+        params = [] if show_all else [start, end]
+        where = '1=1' if show_all else 'o.departure_date >= %s AND o.departure_date < %s'
         if slug:
             where += ' AND pr.slug = %s'
             params.append(slug)
@@ -4250,7 +4326,8 @@ def admin_preorder_orders():
                 if o.get(k): o[k] = str(o[k])
             o['passengers'] = passengers_by_order.get(o['id'], [])
             o['logs'] = logs_by_order.get(o['id'], [])
-        return jsonify(ok=True, month=start.strftime('%Y-%m'), orders=orders, products=products)
+        return jsonify(ok=True, month='all' if show_all else start.strftime('%Y-%m'),
+                       months=months, orders=orders, products=products)
     except ValueError as e:
         return jsonify(ok=False, error=str(e)), 400
     except Exception as e:
