@@ -481,10 +481,17 @@ def init_db():
     # 後台補登的線下訂單（電話／LINE／同業）常常先拿到姓名與身分證、生日事後才補，
     # 故放寬 birth_date 可為空。前台公開訂購仍由 _clean_passengers 驗證必填，不受影響。
     # ⚠️ 生日未補齊者不可送保險，後台會標示「生日待補」。
+    # ⚠️ 這支 ALTER 在全新資料庫上必定失敗（preorder_passengers 在本函式更下面才建立）。
+    # 原本的 except 是直接 conn.rollback()，那會把「整個交易」回捲掉——包含前面所有
+    # CREATE TABLE，導致全新資料庫 init_db 到這裡就自我清空，後面 ALTER TABLE tours
+    # 直接噴 relation "tours" does not exist。正式站因為表早就存在才沒事。
+    # 改用 SAVEPOINT：失敗只回捲這一句，其餘建表結果保留。
+    cur.execute("SAVEPOINT sp_birth_nullable")
     try:
         cur.execute("ALTER TABLE preorder_passengers ALTER COLUMN birth_date DROP NOT NULL")
+        cur.execute("RELEASE SAVEPOINT sp_birth_nullable")
     except Exception:
-        conn.rollback()
+        cur.execute("ROLLBACK TO SAVEPOINT sp_birth_nullable")
     cur.execute("ALTER TABLE tours ADD COLUMN IF NOT EXISTS preorder_slug VARCHAR(50)")
     cur.execute("ALTER TABLE tour_slots ADD COLUMN IF NOT EXISTS slot_date DATE")
     cur.execute("""
@@ -507,7 +514,10 @@ def init_db():
             order_id        INT NOT NULL REFERENCES preorder_orders(id) ON DELETE CASCADE,
             name            VARCHAR(100) NOT NULL,
             national_id     VARCHAR(30) NOT NULL,
-            birth_date      DATE NOT NULL,
+            -- birth_date 刻意可為空：後台補登線下訂單常先拿到姓名與身分證、生日事後才補。
+            -- 舊資料庫由上面那支 DROP NOT NULL 補；新資料庫直接建成可空，兩邊 schema 才一致
+            -- （2026-08-26 contacts 表事故的教訓：建表語句與補欄位清單不同步＝正式站與新環境長不一樣）。
+            birth_date      DATE,
             phone           VARCHAR(50) NOT NULL,
             created_at      TIMESTAMP DEFAULT NOW()
         )
