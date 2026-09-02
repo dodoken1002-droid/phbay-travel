@@ -470,6 +470,26 @@ def init_db():
     # 澎湖百旅會員：是否可認列為潮旅旅次。潮旅自營行程為 TRUE；
     # 若日後把代售產品加進 preorder_products，務必設為 FALSE，避免代售行程灌水會員等級。
     cur.execute("ALTER TABLE preorder_products ADD COLUMN IF NOT EXISTS counts_as_trip BOOLEAN NOT NULL DEFAULT TRUE")
+    # ── 名額單一來源（2026-08-27）────────────────────────────
+    # 背景：同一批座位原本有兩套互不相通的名額（tour_slots 人工數 vs 預購訂單動態數），
+    # 任一通路都可能各自賣滿而超賣。改為：有對應預購產品的行程，名額一律以預購系統為準。
+    #   tours.preorder_slug        → 這條行程賣的是哪個預購產品（多條行程可共用同一產品＝共用座位）
+    #   tour_slots.slot_date       → 對應到預購產品的出發日（date_label 僅供顯示）
+    #   preorder_manual_holds      → 電話／LINE／同業等線下已售人數，依「產品＋日期」記錄（共用池只有一個數字）
+    # 可用名額 = 產品 capacity −（預購訂單人數 ＋ 線下已售人數）
+    cur.execute("ALTER TABLE tours ADD COLUMN IF NOT EXISTS preorder_slug VARCHAR(50)")
+    cur.execute("ALTER TABLE tour_slots ADD COLUMN IF NOT EXISTS slot_date DATE")
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS preorder_manual_holds (
+            id          SERIAL PRIMARY KEY,
+            product_id  INT NOT NULL REFERENCES preorder_products(id) ON DELETE CASCADE,
+            hold_date   DATE NOT NULL,
+            pax         INT  NOT NULL DEFAULT 0,
+            note        TEXT DEFAULT '',
+            updated_at  TIMESTAMP DEFAULT NOW(),
+            UNIQUE (product_id, hold_date)
+        )
+    """)
     cur.execute("ALTER TABLE preorder_orders ADD COLUMN IF NOT EXISTS contact_email VARCHAR(200)")
     cur.execute("ALTER TABLE preorder_orders ADD COLUMN IF NOT EXISTS utm JSONB DEFAULT '{}'")
     cur.execute("ALTER TABLE preorder_orders ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE")
@@ -2186,9 +2206,36 @@ def send_customer_confirmation_email(info):
 
 
 # ─── 梯次名額 API（公開）─────────────────────────────────────
+def _preorder_pool_usage(cur):
+    """回傳 {(product_id, 'YYYY-MM-DD'): {'online':N, 'manual':M, 'capacity':C}}。
+    online＝預購訂單人數；manual＝線下已售人數。同一產品的多條行程共用同一個池。"""
+    pool = {}
+    cur.execute("SELECT id, capacity FROM preorder_products")
+    caps = {r['id']: r['capacity'] for r in cur.fetchall()}
+    cur.execute("""
+        SELECT product_id, departure_date::text AS d,
+               COALESCE(SUM(CASE WHEN status <> 'cancelled' THEN passenger_count ELSE 0 END), 0) AS pax
+        FROM preorder_orders GROUP BY product_id, departure_date
+    """)
+    for r in cur.fetchall():
+        pool.setdefault((r['product_id'], r['d']), {})['online'] = int(r['pax'] or 0)
+    cur.execute("SELECT product_id, hold_date::text AS d, pax FROM preorder_manual_holds")
+    for r in cur.fetchall():
+        pool.setdefault((r['product_id'], r['d']), {})['manual'] = int(r['pax'] or 0)
+    for k, v in pool.items():
+        v.setdefault('online', 0)
+        v.setdefault('manual', 0)
+        v['capacity'] = caps.get(k[0])
+    return pool, caps
+
+
 @app.route('/api/slots', methods=['GET'])
 def get_slots():
-    """取得所有啟用梯次（可帶 ?tour_id=X 過濾）。"""
+    """取得所有啟用梯次（可帶 ?tour_id=X 過濾）。
+
+    名額單一來源：若該行程有對應的預購產品（tours.preorder_slug）且梯次有 slot_date，
+    名額一律以預購系統計算（預購訂單人數＋線下已售人數），tour_slots 只提供顯示用的
+    日期標籤與候補設定。沒有對應產品的行程維持原本的人工計數行為。"""
     try:
         conn = get_db()
         cur = conn.cursor()
@@ -2200,9 +2247,33 @@ def get_slots():
         else:
             cur.execute("SELECT * FROM tour_slots WHERE is_active=TRUE ORDER BY tour_id, id")
         rows = [dict(r) for r in cur.fetchall()]
+
+        # 行程 → 預購產品對應
+        cur.execute("""SELECT t.id AS tour_id, p.id AS product_id
+                       FROM tours t JOIN preorder_products p ON p.slug = t.preorder_slug
+                       WHERE t.preorder_slug IS NOT NULL AND t.preorder_slug <> ''""")
+        tour_product = {r['tour_id']: r['product_id'] for r in cur.fetchall()}
+        pool, _caps = _preorder_pool_usage(cur) if tour_product else ({}, {})
         cur.close(); conn.close()
+
         for r in rows:
             r['created_at'] = str(r.get('created_at', ''))
+            pid = tour_product.get(r['tour_id'])
+            sd = str(r['slot_date']) if r.get('slot_date') else None
+            if pid and sd:
+                usage = pool.get((pid, sd), {'online': 0, 'manual': 0, 'capacity': None})
+                cap = usage.get('capacity')
+                if cap is None:
+                    cap = r['capacity']            # 產品未設上限則沿用梯次設定
+                sold = int(usage['online']) + int(usage['manual'])
+                r['capacity'] = int(cap)
+                r['booked'] = sold
+                r['source'] = 'preorder'           # 供前端／除錯辨識名額來源
+                r['booked_online'] = int(usage['online'])
+                r['booked_manual'] = int(usage['manual'])
+            else:
+                r['source'] = 'manual'
+            r['slot_date'] = str(r['slot_date']) if r.get('slot_date') else ''
             r['remaining']  = max(0, r['capacity'] - r['booked'])
             r['wl_remaining'] = max(0, r['waitlist_cap'] - r['waitlisted'])
             r['status'] = (
@@ -2212,6 +2283,101 @@ def get_slots():
                 else 'available'
             )
         return jsonify(ok=True, slots=rows)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.route('/api/admin/manual-holds', methods=['GET', 'POST'])
+def admin_manual_holds():
+    """線下已售人數（電話／LINE／同業）：依『預購產品＋日期』維護，共用池只有一個數字。
+    GET  → 列出全部；POST {slug, date, pax, note} → 新增或更新。"""
+    if not has_role('orders'):
+        return jsonify(ok=False, error='未授權'), 401
+    try:
+        conn = get_db(); cur = conn.cursor()
+        if request.method == 'GET':
+            cur.execute("""SELECT h.id, p.slug, p.name, p.capacity, h.hold_date::text AS hold_date,
+                                  h.pax, h.note, h.updated_at
+                           FROM preorder_manual_holds h
+                           JOIN preorder_products p ON p.id = h.product_id
+                           ORDER BY h.hold_date""")
+            rows = [dict(r) for r in cur.fetchall()]
+            for r in rows:
+                r['updated_at'] = str(r['updated_at'])
+            cur.close(); conn.close()
+            return jsonify(ok=True, holds=rows)
+
+        data = request.get_json(force=True, silent=True) or {}
+        slug = (data.get('slug') or '').strip()
+        cur.execute("SELECT id FROM preorder_products WHERE slug=%s", (slug,))
+        prod = cur.fetchone()
+        if not prod:
+            cur.close(); conn.close()
+            return jsonify(ok=False, error='找不到此預購行程'), 404
+        try:
+            hold_date = _parse_sailing_date(data.get('date'))
+        except ValueError as e:
+            cur.close(); conn.close()
+            return jsonify(ok=False, error=str(e)), 400
+        pax = max(0, int(data.get('pax') or 0))
+        cur.execute("""
+            INSERT INTO preorder_manual_holds (product_id, hold_date, pax, note, updated_at)
+            VALUES (%s,%s,%s,%s,NOW())
+            ON CONFLICT (product_id, hold_date)
+            DO UPDATE SET pax=EXCLUDED.pax, note=EXCLUDED.note, updated_at=NOW()
+        """, (prod['id'], hold_date, pax, (data.get('note') or '')[:500]))
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.route('/api/admin/capacity-alerts', methods=['GET'])
+def admin_capacity_alerts():
+    """後台超賣警示：列出目前已超過上限的船班／梯次。
+    後台匯入採『超額僅警告不阻擋』，警告若沒人看見就等於沒有，故提供常駐查詢。"""
+    if not has_role('orders'):
+        return jsonify(ok=False, error='未授權'), 401
+    try:
+        conn = get_db(); cur = conn.cursor()
+        alerts = []
+        cur.execute("""
+            SELECT s.sailing_date::text AS d, s.sailing_time AS t, s.capacity,
+                   SUM(CASE WHEN p.status <> 'cancelled' THEN p.passenger_count ELSE 0 END) AS pax
+            FROM neihai_sailings s JOIN neihai_preorders p ON p.sailing_id = s.id
+            GROUP BY s.id, s.sailing_date, s.sailing_time, s.capacity
+            HAVING SUM(CASE WHEN p.status <> 'cancelled' THEN p.passenger_count ELSE 0 END) > s.capacity
+            ORDER BY s.sailing_date
+        """)
+        for r in cur.fetchall():
+            alerts.append({'kind': '內海預購', 'label': f"{r['d']} {r['t']}",
+                           'pax': int(r['pax']), 'capacity': int(r['capacity']),
+                           'over': int(r['pax']) - int(r['capacity'])})
+        cur.execute("""
+            SELECT pr.name, pr.capacity, o.departure_date::text AS d, o.departure_time AS t,
+                   SUM(o.passenger_count) AS pax
+            FROM preorder_orders o JOIN preorder_products pr ON pr.id = o.product_id
+            WHERE o.status <> 'cancelled' AND pr.capacity IS NOT NULL
+            GROUP BY pr.name, pr.capacity, o.departure_date, o.departure_time
+            HAVING SUM(o.passenger_count) > pr.capacity
+            ORDER BY o.departure_date
+        """)
+        for r in cur.fetchall():
+            alerts.append({'kind': f"預購：{r['name']}", 'label': f"{r['d']} {r['t'] or ''}".strip(),
+                           'pax': int(r['pax']), 'capacity': int(r['capacity']),
+                           'over': int(r['pax']) - int(r['capacity'])})
+        # 含線下已售人數後才超額的共用池
+        pool, caps = _preorder_pool_usage(cur)
+        cur.execute("SELECT id, name FROM preorder_products")
+        names = {r['id']: r['name'] for r in cur.fetchall()}
+        for (pid, d), v in sorted(pool.items(), key=lambda kv: kv[0][1]):
+            cap = v.get('capacity')
+            sold = v['online'] + v['manual']
+            if cap is not None and v['manual'] and sold > cap:
+                alerts.append({'kind': f"預購＋線下：{names.get(pid, pid)}", 'label': d,
+                               'pax': sold, 'capacity': int(cap), 'over': sold - int(cap)})
+        cur.close(); conn.close()
+        return jsonify(ok=True, alerts=alerts, count=len(alerts))
     except Exception as e:
         return jsonify(ok=False, error=str(e)), 500
 
