@@ -5306,10 +5306,12 @@ def reviews_page():
 @app.route('/sitemap.xml')
 def dynamic_sitemap():
     def _file_lastmod(filename):
-        """靜態頁的 lastmod 直接取檔案異動時間，改檔就會自動更新，不會忘了手動改。"""
+        """靜態頁的 lastmod 直接取檔案異動時間，改檔就會自動更新，不會忘了手動改。
+        主機時區是 UTC，換算成台灣時間才會跟站上其他日期一致。"""
         try:
             path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
-            return datetime.fromtimestamp(os.path.getmtime(path)).strftime('%Y-%m-%d')
+            mtime = datetime.utcfromtimestamp(os.path.getmtime(path)) + timedelta(hours=8)
+            return mtime.strftime('%Y-%m-%d')
         except Exception:
             return None
 
@@ -5559,6 +5561,11 @@ def conversion_summary():
 
 
 # ─── 啟動 ──────────────────────────────────────────────────
+from member_v1 import register_member_v1
+register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email,
+                   public_member, _sync_completed_order_trip)
+
+
 if __name__ == '__main__':
     try:
         init_db()
