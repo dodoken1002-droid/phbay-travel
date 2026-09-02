@@ -477,6 +477,13 @@ def init_db():
     #   tour_slots.slot_date       → 對應到預購產品的出發日（date_label 僅供顯示）
     #   preorder_manual_holds      → 電話／LINE／同業等線下已售人數，依「產品＋日期」記錄（共用池只有一個數字）
     # 可用名額 = 產品 capacity −（預購訂單人數 ＋ 線下已售人數）
+    # 後台補登的線下訂單（電話／LINE／同業）常常先拿到姓名與身分證、生日事後才補，
+    # 故放寬 birth_date 可為空。前台公開訂購仍由 _clean_passengers 驗證必填，不受影響。
+    # ⚠️ 生日未補齊者不可送保險，後台會標示「生日待補」。
+    try:
+        cur.execute("ALTER TABLE preorder_passengers ALTER COLUMN birth_date DROP NOT NULL")
+    except Exception:
+        conn.rollback()
     cur.execute("ALTER TABLE tours ADD COLUMN IF NOT EXISTS preorder_slug VARCHAR(50)")
     cur.execute("ALTER TABLE tour_slots ADD COLUMN IF NOT EXISTS slot_date DATE")
     cur.execute("""
@@ -2793,7 +2800,7 @@ def admin_neihai_preorders():
             """, (ids,))
             for r in cur.fetchall():
                 r = dict(r)
-                r["birth_date"] = str(r["birth_date"])
+                r["birth_date"] = str(r["birth_date"]) if r.get("birth_date") else ""
                 if r.get("created_at"):
                     r["created_at"] = str(r["created_at"])
                 passengers_by_order[r["preorder_id"]].append(r)
@@ -4031,7 +4038,8 @@ def admin_preorder_orders():
             cur.execute('SELECT * FROM preorder_passengers WHERE order_id = ANY(%s) ORDER BY order_id, id', (ids,))
             for r in cur.fetchall():
                 r = dict(r)
-                r['birth_date'] = str(r['birth_date'])
+                # 線下補登的訂單可能尚未取得生日，空值要輸出空字串而非 "None"
+                r['birth_date'] = str(r['birth_date']) if r.get('birth_date') else ''
                 if r.get('created_at'): r['created_at'] = str(r['created_at'])
                 passengers_by_order[r['order_id']].append(r)
             cur.execute("""SELECT order_id, summary, changed_at FROM preorder_order_logs
