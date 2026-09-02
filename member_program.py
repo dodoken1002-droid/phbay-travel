@@ -136,6 +136,127 @@ def init_member_tables(cur):
         )
     """)
     cur.execute("CREATE INDEX IF NOT EXISTS idx_member_codes_active ON member_auth_codes (purpose, expires_at DESC)")
+    # V1 的多重登入、訂單認領、同意紀錄與標準化點數帳本。
+    # 舊表保留以相容既有後台；新功能一律透過這些表記錄可稽核狀態。
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS member_identities (
+            id BIGSERIAL PRIMARY KEY,
+            member_id INT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+            provider VARCHAR(30) NOT NULL CHECK
+              (provider IN ('email','phone','line','google','facebook')),
+            provider_subject VARCHAR(255) NOT NULL,
+            email_normalized VARCHAR(200),
+            phone_normalized VARCHAR(30),
+            verified_at TIMESTAMP NOT NULL,
+            last_login_at TIMESTAMP,
+            profile JSONB NOT NULL DEFAULT '{}',
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            UNIQUE (provider, provider_subject)
+        )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_member_identities_member ON member_identities (member_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_member_identities_email ON member_identities (email_normalized) WHERE email_normalized IS NOT NULL")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_member_identities_phone ON member_identities (phone_normalized) WHERE phone_normalized IS NOT NULL")
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS member_consents (
+            id BIGSERIAL PRIMARY KEY,
+            member_id INT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+            consent_type VARCHAR(50) NOT NULL,
+            policy_version VARCHAR(40) NOT NULL,
+            granted BOOLEAN NOT NULL,
+            source VARCHAR(40) NOT NULL DEFAULT 'web',
+            ip_hash VARCHAR(128),
+            user_agent_hash VARCHAR(128),
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_member_consents_member ON member_consents (member_id,consent_type,created_at DESC)")
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS point_wallet (
+            member_id INT PRIMARY KEY REFERENCES members(id) ON DELETE CASCADE,
+            balance INT NOT NULL DEFAULT 0 CHECK (balance >= 0),
+            lifetime_earned INT NOT NULL DEFAULT 0 CHECK (lifetime_earned >= 0),
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS point_transactions (
+            id BIGSERIAL PRIMARY KEY,
+            member_id INT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+            trip_id INT REFERENCES member_trips(id) ON DELETE SET NULL,
+            order_type VARCHAR(30),
+            order_id INT,
+            transaction_type VARCHAR(30) NOT NULL,
+            points INT NOT NULL CHECK (points <> 0),
+            reason VARCHAR(200) NOT NULL,
+            idempotency_key VARCHAR(180) NOT NULL UNIQUE,
+            reversed_transaction_id BIGINT REFERENCES point_transactions(id),
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_point_transactions_member ON point_transactions (member_id,created_at DESC)")
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS member_verification_challenges (
+            id BIGSERIAL PRIMARY KEY,
+            member_id INT REFERENCES members(id) ON DELETE CASCADE,
+            purpose VARCHAR(40) NOT NULL,
+            channel VARCHAR(20) NOT NULL CHECK (channel IN ('email','phone')),
+            destination_normalized VARCHAR(200) NOT NULL,
+            code_hash VARCHAR(128) NOT NULL,
+            expires_at TIMESTAMP NOT NULL,
+            used_at TIMESTAMP,
+            attempts INT NOT NULL DEFAULT 0,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_member_challenges_active ON member_verification_challenges (purpose,destination_normalized,expires_at DESC)")
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS order_claims (
+            id BIGSERIAL PRIMARY KEY,
+            member_id INT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+            order_type VARCHAR(30) NOT NULL CHECK (order_type IN ('neihai_order','preorder_order')),
+            order_id INT NOT NULL,
+            channel VARCHAR(20) NOT NULL CHECK (channel IN ('email','phone')),
+            destination_normalized VARCHAR(200) NOT NULL,
+            challenge_id BIGINT NOT NULL REFERENCES member_verification_challenges(id) ON DELETE CASCADE,
+            claimed_at TIMESTAMP,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            UNIQUE (order_type, order_id)
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS member_merge_requests (
+            id BIGSERIAL PRIMARY KEY,
+            source_member_id INT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+            target_member_id INT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+            proof_identity_id BIGINT NOT NULL REFERENCES member_identities(id),
+            challenge_id BIGINT NOT NULL REFERENCES member_verification_challenges(id),
+            status VARCHAR(20) NOT NULL DEFAULT 'pending',
+            requested_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            completed_at TIMESTAMP,
+            CHECK (source_member_id <> target_member_id)
+        )
+    """)
+    # 可重複執行的舊資料回填。既有 Email 沒有足夠證據證明曾完成 OTP，故不冒然標 verified；
+    # LINE user_id 則只會在既有綁定碼流程成功後寫入，可安全轉成 identity。
+    cur.execute("""INSERT INTO member_identities
+      (member_id,provider,provider_subject,verified_at,last_login_at)
+      SELECT id,'line',line_user_id,updated_at,updated_at FROM members
+      WHERE line_user_id IS NOT NULL
+      ON CONFLICT (provider,provider_subject) DO NOTHING""")
+    cur.execute("""INSERT INTO point_transactions
+      (member_id,trip_id,transaction_type,points,reason,idempotency_key,created_at)
+      SELECT member_id,trip_id,CASE WHEN delta>0 THEN 'legacy_credit' ELSE 'legacy_debit' END,
+             delta,source,'legacy-member-point:'||id,created_at
+      FROM member_points WHERE delta<>0
+      ON CONFLICT (idempotency_key) DO NOTHING""")
+    cur.execute("""INSERT INTO point_wallet (member_id,balance,lifetime_earned,updated_at)
+      SELECT m.id,GREATEST(COALESCE(SUM(p.delta),0),0),
+             COALESCE(SUM(CASE WHEN p.delta>0 THEN p.delta ELSE 0 END),0),NOW()
+      FROM members m LEFT JOIN member_points p ON p.member_id=m.id GROUP BY m.id
+      ON CONFLICT (member_id) DO UPDATE SET balance=EXCLUDED.balance,
+        lifetime_earned=GREATEST(point_wallet.lifetime_earned,EXCLUDED.lifetime_earned),updated_at=NOW()""")
     _migrate_member_columns(cur)
 
 

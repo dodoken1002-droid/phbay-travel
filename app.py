@@ -5573,15 +5573,6 @@ def conversion_summary():
 
 
 # ─── 啟動 ──────────────────────────────────────────────────
-# member_v1 仍在開發中，模組尚未進版控；缺檔時略過註冊，不要讓整個站起不來。
-try:
-    from member_v1 import register_member_v1
-except ModuleNotFoundError:
-    print('[MEMBER V1] 找不到 member_v1 模組，略過會員 v1 路由註冊')
-else:
-    register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email,
-                       public_member, _sync_completed_order_trip, recalculate_member)
-
 
 if __name__ == '__main__':
     try:
