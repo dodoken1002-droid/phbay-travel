@@ -35,8 +35,11 @@ if not prod:
 pid = prod['id']
 print(f"產品 festival：capacity={prod['capacity']} min_people={prod['min_people']} max_party={prod['max_party']}")
 
-# 重跑時先清掉舊的測試資料，讓腳本可重複執行
-cur.execute("DELETE FROM preorder_orders WHERE booking_ref LIKE 'TEST%%' AND product_id=%s", (pid,))
+# 重跑時先清乾淨，讓腳本（與 test_p0_0_live.py）可以重複執行。
+# ⚠️ 必須連 test_p0_0_live.py 自己建立的訂單（公開下單的 FESTIV*、匯入的 IMPOVER*）
+# 一起刪掉，否則第二次跑會因為 9/19 已被前一輪塞滿、IMPOVER* 已存在被略過，
+# 而出現一堆看起來像 regression 的假失敗。這是 dev 庫，直接清掉該產品全部訂單最乾淨。
+cur.execute("DELETE FROM preorder_orders WHERE product_id=%s", (pid,))
 cur.execute("DELETE FROM preorder_manual_holds WHERE product_id=%s", (pid,))
 
 for dep_date, pax in (('2026-09-12', 2), ('2026-09-19', 2)):

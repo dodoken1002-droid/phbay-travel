@@ -1,12 +1,24 @@
 # -*- coding: utf-8 -*-
 """對本機 dev 站台實跑 P0-0 的四條防線。"""
 import json
+import subprocess
+import sys
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 B = 'http://127.0.0.1:5001'
 KEY = 'devkey-local-only'
 fails = []
+
+# 這支測試會下單、匯入、改期，跑完資料庫狀態就變了。
+# 每次執行先重種一次，否則第二次跑會因為 9/19 已被前一輪塞滿、IMPOVER* 已存在被
+# 略過，冒出一堆看起來像 regression 的假失敗。
+_seed = Path(__file__).with_name('seed_dev_data.py')
+_r = subprocess.run([sys.executable, str(_seed)], capture_output=True, text=True)
+if _r.returncode != 0:
+    sys.exit('種測試資料失敗：\n' + _r.stdout + _r.stderr)
+print('[setup] 已重種測試資料\n')
 
 
 def call(method, path, body=None):
