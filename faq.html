@@ -917,6 +917,13 @@
       transition: var(--transition);
     }
     .faq-toc a:hover { background: var(--blue-main); color: var(--white); }
+    .faq-money-paths { margin: -18px 0 34px; padding: 22px; border: 1px solid #d9e7f0;
+      border-radius: 14px; background: #f7fbfd; text-align: center; }
+    .faq-money-paths h2 { color: var(--blue-dark); font-size: 1.2rem; margin-bottom: 8px; }
+    .faq-money-paths p { color: var(--text-mid); line-height: 1.7; margin-bottom: 14px; }
+    .faq-money-links { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+    .faq-money-links a { padding: 9px 14px; border-radius: 22px; background: var(--white);
+      border: 1px solid var(--blue-main); color: var(--blue-main); font-weight: 700; }
 
     /* 分類標題 */
     .faq-cat { margin: 40px 0 14px; scroll-margin-top: 110px; }
@@ -1080,6 +1087,16 @@
       <a href="#cat-plan" data-i18n="faq.tocPlan">💰 預算規劃</a>
       <a href="#cat-info" data-i18n="faq.tocInfo">🎵 音樂節與實用資訊</a>
     </nav>
+
+    <aside class="faq-money-paths" aria-label="依天氣與同行者選行程">
+      <h2 data-i18n="faq.moneyTitle">查完澎湖天氣，下一步怎麼排行程？</h2>
+      <p data-i18n="faq.moneyDesc">4–9 月適合跳島與玩水；冬季改排聚落、地質與美食。再依天數和同行者選擇最適合的規劃入口。</p>
+      <div class="faq-money-links">
+        <a href="/penghu-family-travel" data-i18n="faq.moneyFamily">親子同行：看親子旅遊攻略</a>
+        <a href="/penghu-3days-itinerary" data-i18n="faq.money3days">第一次來：看三天兩夜行程</a>
+        <a href="/penghu-itinerary-recommendations" data-i18n="faq.moneyRecommend">還沒決定：比較澎湖行程推薦</a>
+      </div>
+    </aside>
 
     <!-- ═══ 1. 交通抵達 ═══ -->
     <section class="faq-cat" id="cat-traffic">

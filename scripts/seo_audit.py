@@ -20,7 +20,7 @@ if hasattr(sys.stdout, "reconfigure"):
 ROOT = Path(__file__).resolve().parents[1]
 SITE = "https://www.phbay.info"
 CORE_PATHS = ["/", "/blog", "/faq.html", "/penghu-3days-itinerary",
-              "/penghu-family-travel", "/penghu-food-guide",
+              "/penghu-family-travel", "/penghu-itinerary-recommendations", "/penghu-food-guide",
               "/penghu-2026-festival-guide", "/reviews", "/penghu-100"]
 
 
@@ -139,7 +139,8 @@ def audit_repository_content():
             findings.append(Finding("warning", target, "缺少諮詢或 LINE CTA"))
     for filename in ("llms.txt", "llms-full.txt"):
         text = (ROOT / filename).read_text(encoding="utf-8")
-        for path in ("/penghu-3days-itinerary", "/penghu-family-travel", "/penghu-food-guide", "/penghu-100"):
+        for path in ("/penghu-3days-itinerary", "/penghu-family-travel",
+                     "/penghu-itinerary-recommendations", "/penghu-food-guide", "/penghu-100"):
             if path not in text:
                 findings.append(Finding("warning", filename, f"未列出 {path}"))
     return findings

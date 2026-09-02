@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """Pillar pages（主題攻略頁）內容與渲染。
 
-四頁：/penghu-3days-itinerary、/penghu-family-travel、/penghu-food-guide、
-/penghu-2026-festival-guide。內容集中本模組，app.py 只負責路由與共用外殼。
+五頁：/penghu-3days-itinerary、/penghu-family-travel、/penghu-itinerary-recommendations、
+/penghu-food-guide、/penghu-2026-festival-guide。內容集中本模組，app.py 只負責路由與共用外殼。
 事實來源限既有站內內容（llms.txt 快答、已發布文章、官方活動資訊），
 勿新增未經確認的價格、名額、時刻或活動細節。
 """
@@ -25,6 +25,7 @@ PILLAR_STYLE = (
     '.pp-wrap p{line-height:1.9;color:var(--text-dark);margin-bottom:14px}'
     '.pp-wrap ul{margin:0 0 16px 22px;line-height:1.9;color:var(--text-dark)}'
     '.pp-wrap a{color:var(--blue-main);text-decoration:underline}'
+    '.pp-hero-image{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:14px;margin:4px 0 24px;box-shadow:0 4px 18px rgba(0,0,0,.10)}'
     '.pp-conclusion{background:var(--blue-pale);border-left:4px solid var(--blue-main);border-radius:10px;padding:18px 22px;margin:0 0 8px}'
     '.pp-conclusion p{margin:0;line-height:1.9}'
     '.pp-table-scroll{overflow-x:auto;margin-bottom:8px}'
@@ -107,12 +108,14 @@ def _breadcrumb_ld(trail):
                                 for i, (name, url) in enumerate(trail)]}
 
 
-def _webpage_ld(slug, title, desc):
-    return {"@context": "https://schema.org", "@type": "WebPage",
-            "name": title, "description": desc, "url": f"{SITE}/{slug}",
-            "inLanguage": "zh-TW", "dateModified": "2026-07-19",
-            "publisher": {"@type": "Organization", "name": "潮旅國際旅行社",
-                          "url": f"{SITE}/"}}
+def _article_ld(slug, title, desc, published='2026-07-19'):
+    canonical = f"{SITE}/{slug}"
+    org = {"@type": "Organization", "name": "潮旅國際旅行社", "url": f"{SITE}/"}
+    return {"@context": "https://schema.org", "@type": "Article",
+            "headline": title, "description": desc, "url": canonical,
+            "mainEntityOfPage": {"@type": "WebPage", "@id": canonical},
+            "inLanguage": "zh-TW", "datePublished": published,
+            "dateModified": "2026-09-02", "author": org, "publisher": org}
 
 
 # ═══════════════════════ 1. 三天兩夜 ═══════════════════════
@@ -132,7 +135,7 @@ def _page_3days():
         ('適合季節', '4–9 月；玩水以 6–8 月最佳'),
         ('預算感', '套裝行程（含交通、住宿、行程）約 NT$6,000 起／人，依出發地、季節、住宿等級調整，以報價為準'),
         ('推薦玩法', '北環一日＋馬公市區半日＋跳島或海上體驗一日'),
-        ('可搭配頁面', '<a href="/#quiz">30 秒行程診斷</a>、<a href="/neihai-preorder.html">內海巡禮船遊預購</a>、<a href="/tides">潮汐查詢</a>'),
+        ('可搭配頁面', '<a href="/penghu-itinerary-recommendations">澎湖行程推薦</a>、<a href="/penghu-family-travel">澎湖親子旅遊</a>、<a href="/tides">潮汐查詢</a>'),
     ])
     personas = (
         '<h3>第一次來澎湖</h3><p>把北環（跨海大橋、通梁古榕、西嶼）排成完整一天，市區留半天逛'
@@ -200,7 +203,8 @@ def _page_3days():
         '<p class="pp-intro">三天兩夜是澎湖最熱門的玩法，但南海北海、望安七美不可能一次走完。'
         '這頁由澎湖在地旅行社整理：怎麼取捨海域、怎麼配天數與季節、預算怎麼抓，'
         '並附上可以直接照走的範例動線。</p>'
-        + _cta_row()
+        '<img class="pp-hero-image" src="/images/tours/t201.jpg" alt="澎湖三天兩夜行程中的漁翁島燈塔與旅客合照" width="768" height="512" loading="eager">'
+        + _cta_row('<a href="/penghu-itinerary-recommendations" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-route"></i> 比較推薦行程</a>')
         + '<section class="pp-conclusion"><h2 style="margin:0 0 10px">先講結論</h2><p>'
         + conclusion + '</p></section>'
         + '<h2>快速決策表</h2>' + table
@@ -245,7 +249,7 @@ def _page_family():
         ('適合季節', '4–9 月；6–8 月玩水最好但要防曬'),
         ('預算感', '套裝行程約 NT$6,000 起／人，兒童依年齡與內容另計，以報價為準'),
         ('推薦玩法', '潮間帶生態＋內海船遊＋DIY，搭配一天輕鬆北環'),
-        ('可搭配頁面', '<a href="/penghu-3days-itinerary">三天兩夜行程規劃</a>、<a href="/neihai-preorder.html">內海巡禮船遊</a>、<a href="/tides">潮汐查詢</a>'),
+        ('可搭配頁面', '<a href="/penghu-3days-itinerary">三天兩夜行程規劃</a>、<a href="/penghu-itinerary-recommendations">澎湖行程推薦</a>、<a href="/tides">潮汐查詢</a>'),
     ])
     personas = (
         '<h3>學齡前（0–6 歲）</h3><p>以「玩沙、看魚、搭船」為主：淺灘玩水、內海船遊航程短又平穩，'
@@ -306,7 +310,8 @@ def _page_family():
         '<p class="pp-intro">澎湖是對小孩非常友善的海島：航程短、車程短、體驗多。'
         '這頁整理不同年齡層的玩法、太熱與下雨的備案、以及親子行程最常見的踩雷點，'
         '照著排就能玩得輕鬆。</p>'
-        + _cta_row()
+        '<img class="pp-hero-image" src="/images/tours/t102.jpg" alt="親子家庭在澎湖潮間帶觀察海洋生物" width="768" height="512" loading="eager">'
+        + _cta_row('<a href="/penghu-itinerary-recommendations" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-route"></i> 比較親子推薦行程</a>')
         + '<section class="pp-conclusion"><h2 style="margin:0 0 10px">先講結論</h2><p>'
         + conclusion + '</p></section>'
         + '<h2>快速決策表</h2>' + table
@@ -329,7 +334,92 @@ def _page_family():
                 extra_ld=[trip_ld], faq=faq, breadcrumb_name='澎湖親子旅遊攻略')
 
 
-# ═══════════════════════ 3. 美食 ═══════════════════════
+# ═══════════════════════ 3. 行程推薦 ═══════════════════════
+
+def _page_itinerary_recommendations():
+    slug = 'penghu-itinerary-recommendations'
+    title = '澎湖行程推薦｜2天1夜、3天2夜、4天3夜怎麼選｜潮旅國際旅行社'
+    desc = ('澎湖行程推薦怎麼選？在地旅行社依天數、同行對象與季節整理 2 天 1 夜、'
+            '3 天 2 夜、4 天 3 夜安排，附比較表、避雷原則與客製諮詢。')
+    conclusion = ('第一次去澎湖，首選 3 天 2 夜：一天本島、一天下海或跳島、半天留給馬公市區。'
+                  '帶幼兒、長輩或想玩兩個海域，建議 4 天 3 夜；只有週末才選 2 天 1 夜，'
+                  '並把目標縮成單一主題。選行程時先決定「天數、同行者、最想玩的體驗」，'
+                  '再看季節與船班，不要從景點清單倒推。')
+    table = _decision_table([
+        ('2 天 1 夜', '週末快閃；馬公市區＋北環或單一海上體驗，適合時間有限的情侶朋友'),
+        ('3 天 2 夜', '第一次來澎湖首選；本島精華＋一個跳島或海上體驗，適合多數旅客'),
+        ('4 天 3 夜', '親子、長輩、三代同堂或深度旅遊；可保留雨天備案與第二個海域'),
+        ('5 天以上', '慢旅、攝影、潛水或跨兩個以上離島；每天保留半天空白更舒服'),
+        ('規劃工具', '<a href="/#quiz">30 秒行程診斷</a>、<a href="/tides">潮汐查詢</a>、<a href="/faq.html#cat-season">季節天氣 FAQ</a>'),
+    ])
+    plans = _plan_cards([
+        ('第一次來', '經典三天兩夜',
+         'Day 1 北環、Day 2 七美／望安／內海巡禮擇一、Day 3 馬公市區。完整版本看<a href="/penghu-3days-itinerary">澎湖三天兩夜行程</a>。'),
+        ('親子家庭', '親子友善三至四天',
+         '潮間帶、DIY 或短程船遊只選一至兩項，午後保留午休；依年齡建議看<a href="/penghu-family-travel">澎湖親子旅遊攻略</a>。'),
+        ('喜歡慢旅', '內海與聚落深度線',
+         '用內海巡禮、望安花宅或西嶼聚落取代趕場式跳島，適合想聽故事、拍照與避開人潮的旅客。'),
+    ])
+    chooser = (
+        '<h2>依季節選行程</h2>'
+        '<h3>4–6 月｜活動與舒服氣溫</h3><p>適合本島散步、跳島與活動檔期；熱門週末交通住宿要提早確認。</p>'
+        '<h3>7–8 月｜玩水旺季</h3><p>浮潛、SUP、潮間帶與跳島選擇最多，但正中午要留給室內、船上或休息。</p>'
+        '<h3>9–10 月｜海水仍暖、行程更鬆</h3><p>適合深度旅行與活動搭配；出發前留意東北季風與船班調整。</p>'
+        '<h3>11–2 月｜風季慢旅</h3><p>不以玩水為主，改排聚落、地質、美食與文化；跨海活動須保留替代方案。</p>'
+        '<h2>選澎湖套裝行程前先確認 5 件事</h2>'
+        '<ol><li>費用是否包含往返交通、住宿、接送、船票與保險。</li>'
+        '<li>海上活動遇天候取消時，改期、退款或替代方案怎麼處理。</li>'
+        '<li>同行有幼兒或長輩時，船程、步行量與午休是否能調整。</li>'
+        '<li>同一天景點是否同方向，避免把時間浪費在折返。</li>'
+        '<li>價格是否標明出發地、住宿等級與適用日期；本站價格均以正式報價為準。</li></ol>'
+    )
+    links = _article_links([
+        ('2026-07-16-penghu-airport-bus-budget-meme-guide', '澎湖交通與省錢動線'),
+        ('2026-06-24-penghu-great-bridge-north-ring-guide', '跨海大橋與北環順遊'),
+        ('2026-06-22-wangan-slow-travel-guide', '望安慢旅：綠蠵龜與花宅古厝'),
+        ('2026-06-22-kueibishan-tidal-walk-guide', '奎壁山潮間帶與潮汐安排'),
+        ('2026-07-15-penghu-living-museum-rainy-day-guide', '澎湖雨天備案：生活博物館'),
+    ])
+    faq = [
+        ('第一次去澎湖，最推薦幾天？',
+         '多數旅客最適合 3 天 2 夜，可完成本島精華、一次跳島或海上體驗，以及馬公市區。帶幼兒、長輩或想放慢速度，建議 4 天 3 夜。'),
+        ('澎湖 2 天 1 夜怎麼排才不趕？',
+         '只選一條主線：北環、南環或單一海上體驗，不要再加長程跳島。抵達與離開當天以馬公市區、觀音亭或中央老街等短動線為主。'),
+        ('澎湖自由行和套裝行程怎麼選？',
+         '喜歡自己開車、能處理交通住宿與船班，可以自由行；帶家人、多人成行或想把跳島接送一次處理，套裝或半自助通常更省時間。'),
+        ('親子澎湖行程最推薦什麼？',
+         '潮間帶生態、DIY、淺水活動與短程船遊最適合親子。每天最多三個點，體驗排上午、午後保留休息，會比塞滿熱門景點更好玩。'),
+        ('澎湖行程價格怎麼比較？',
+         '先用相同出發地、日期、住宿等級與包含項目比較，不要只看總價。機票或船票、接送、海上活動、保險與天候取消規則，都是實際成本。'),
+        ('可以請潮旅客製澎湖行程嗎？',
+         '可以。提供出發地、日期、人數、同行年齡與最想玩的項目，潮旅會依季節、潮汐與移動方向提出建議，正式價格以報價單為準。'),
+    ]
+    body = (
+        '<div class="pp-wrap"><div class="pp-kicker">澎湖行程推薦</div>'
+        '<h1>澎湖行程推薦｜2天1夜、3天2夜、4天3夜怎麼選</h1>'
+        '<p class="pp-intro">不是行程排越滿越划算。這頁用天數、同行對象與季節三個條件，'
+        '幫你先選對旅遊骨架，再決定跳島、玩水或深度聚落。</p>'
+        '<img class="pp-hero-image" src="/images/neihai-cruise-hero-2026.webp" alt="澎湖行程推薦中的內海巡禮船遊與沙洲體驗" width="1400" height="788" loading="eager">'
+        + _cta_row('<a href="/#quiz" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-compass"></i> 30 秒行程診斷</a>')
+        + '<section class="pp-conclusion"><h2 style="margin:0 0 10px">先講結論</h2><p>' + conclusion + '</p></section>'
+        + '<h2>澎湖行程天數比較</h2>' + table
+        + '<h2>三種最常見的推薦行程</h2>' + plans
+        + chooser
+        + '<h2>延伸閱讀</h2>' + links
+        + _faq_html(faq)
+        + _bottom_cta('把日期、人數與最想玩的三件事傳給我們，收到不繞路的澎湖行程建議。')
+        + '</div>')
+    trip_ld = {
+        "@context": "https://schema.org", "@type": "TouristTrip",
+        "name": "澎湖行程推薦", "description": desc, "url": f"{SITE}/{slug}",
+        "touristType": ["第一次到澎湖的旅客", "親子家庭", "情侶朋友", "長輩同行"],
+        "provider": {"@type": "TravelAgency", "name": "潮旅國際旅行社", "url": f"{SITE}/"},
+    }
+    return dict(slug=slug, title=title, desc=desc, body=body, published='2026-09-02',
+                extra_ld=[trip_ld], faq=faq, breadcrumb_name='澎湖行程推薦')
+
+
+# ═══════════════════════ 4. 美食 ═══════════════════════
 
 _FOOD_SECTIONS = [
     ('早餐與早午餐', [
@@ -435,7 +525,7 @@ def _page_food():
                 extra_ld=[item_ld], faq=faq, breadcrumb_name='澎湖美食地圖')
 
 
-# ═══════════════════════ 4. 音樂節 ═══════════════════════
+# ═══════════════════════ 5. 音樂節 ═══════════════════════
 
 def _page_festival():
     slug = 'penghu-2026-festival-guide'
@@ -559,11 +649,12 @@ def _page_festival():
 
 def _build_pages():
     pages = {}
-    for builder in (_page_3days, _page_family, _page_food, _page_festival):
+    for builder in (_page_3days, _page_family, _page_itinerary_recommendations,
+                    _page_food, _page_festival):
         p = builder()
         slug = p['slug']
         trail = [("首頁", f"{SITE}/"), (p['breadcrumb_name'], f"{SITE}/{slug}")]
-        ld_blocks = ([_webpage_ld(slug, p['title'], p['desc']),
+        ld_blocks = ([_article_ld(slug, p['title'], p['desc'], p.get('published', '2026-07-19')),
                       _breadcrumb_ld(trail), _faq_ld(p['faq'])] + p['extra_ld'])
         head_extra = PILLAR_STYLE + ''.join(
             '<script type="application/ld+json">' + json.dumps(d, ensure_ascii=False) + '</script>'

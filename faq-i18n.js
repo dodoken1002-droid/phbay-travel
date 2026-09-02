@@ -461,6 +461,35 @@
     }
   };
 
+  Object.assign(FAQ.en, {
+    'faq.moneyTitle':'Checked Penghu weather—what should you plan next?',
+    'faq.moneyDesc':'April–September suits island hopping and water activities; in winter, choose villages, geology and food. Then pick a guide by trip length and companions.',
+    'faq.moneyFamily':'With children: family travel guide',
+    'faq.money3days':'First visit: 3-day itinerary',
+    'faq.moneyRecommend':'Still deciding: compare itineraries'
+  });
+  Object.assign(FAQ.ja, {
+    'faq.moneyTitle':'澎湖の天気を確認したら、次は旅程を選びましょう',
+    'faq.moneyDesc':'4〜9月は島巡りや海遊び、冬は集落・地質・グルメがおすすめ。日数と同行者に合わせて案内を選べます。',
+    'faq.moneyFamily':'子連れ：ファミリー旅行ガイド',
+    'faq.money3days':'初めて：3日間モデルコース',
+    'faq.moneyRecommend':'未定：おすすめ旅程を比較'
+  });
+  Object.assign(FAQ.ko, {
+    'faq.moneyTitle':'펑후 날씨를 확인했다면 다음은 일정 선택입니다',
+    'faq.moneyDesc':'4~9월은 섬 투어와 물놀이, 겨울은 마을·지질·미식 여행이 좋습니다. 기간과 동행자에 맞춰 가이드를 선택하세요.',
+    'faq.moneyFamily':'아이 동반: 가족 여행 가이드',
+    'faq.money3days':'첫 방문: 3일 일정',
+    'faq.moneyRecommend':'아직 고민 중: 추천 일정 비교'
+  });
+  Object.assign(FAQ['zh-cn'], {
+    'faq.moneyTitle':'查完澎湖天气，下一步怎么排行程？',
+    'faq.moneyDesc':'4–9 月适合跳岛与玩水；冬季改排聚落、地质与美食。再依天数和同行者选择合适的规划入口。',
+    'faq.moneyFamily':'亲子同行：看亲子旅游攻略',
+    'faq.money3days':'第一次来：看三天两夜行程',
+    'faq.moneyRecommend':'还没决定：比较澎湖行程推荐'
+  });
+
   ['en','ja','ko','zh-cn'].forEach(l => {
     if (DICT[l]) Object.assign(DICT[l], FAQ[l]);
   });

@@ -790,6 +790,10 @@ except Exception as _e:
 
 @app.before_request
 def ensure_db():
+    # 將裸網域永久集中到 canonical 主機，避免 phbay.info 與 www.phbay.info 分散訊號。
+    if request.host.split(':', 1)[0].lower() == 'phbay.info':
+        path = request.full_path[:-1] if request.full_path.endswith('?') else request.full_path
+        return redirect(f'https://www.phbay.info{path}', code=308)
     global _db_initialized
     if not _db_initialized:
         try:
@@ -5175,12 +5179,14 @@ from pillar_pages import PILLAR_PAGES
 _PILLAR_OG_IMAGE = {
     'penghu-3days-itinerary': f'{SITE}/images/summer-festival-hero-2026.jpg',
     'penghu-family-travel': f'{SITE}/images/neihai-cruise-hero-2026.jpg',
+    'penghu-itinerary-recommendations': f'{SITE}/images/neihai-cruise-hero-2026.webp',
     'penghu-food-guide': f'{SITE}/images/penghu-small-squid-and-bigfin-reef-squid.jpg',
     'penghu-2026-festival-guide': f'{SITE}/images/festival-poster.jpg',
 }
 
 @app.route('/penghu-3days-itinerary')
 @app.route('/penghu-family-travel')
+@app.route('/penghu-itinerary-recommendations')
 @app.route('/penghu-food-guide')
 @app.route('/penghu-2026-festival-guide')
 def pillar_page():
@@ -5261,6 +5267,7 @@ def dynamic_sitemap():
             (f'{SITE}/neihai-preorder.html', '0.8', 'weekly'),
             (f'{SITE}/penghu-3days-itinerary', '0.8', 'monthly'),
             (f'{SITE}/penghu-family-travel', '0.8', 'monthly'),
+            (f'{SITE}/penghu-itinerary-recommendations', '0.9', 'monthly'),
             (f'{SITE}/penghu-food-guide', '0.8', 'monthly'),
             (f'{SITE}/penghu-100', '0.8', 'monthly'),
             (f'{SITE}/penghu-2026-festival-guide', '0.8', 'weekly')]

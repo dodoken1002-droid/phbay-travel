@@ -1,0 +1,22 @@
+[
+  {"keyword":"澎湖親子旅遊","cluster":"親子","priority":"P0","target":"/penghu-family-travel"},
+  {"keyword":"澎湖親子行程","cluster":"親子","priority":"P0","target":"/penghu-family-travel"},
+  {"keyword":"澎湖親子三天兩夜","cluster":"親子","priority":"P0","target":"/penghu-family-travel"},
+  {"keyword":"澎湖親子景點","cluster":"親子","priority":"P1","target":"/penghu-family-travel"},
+  {"keyword":"澎湖三天兩夜","cluster":"三天兩夜","priority":"P0","target":"/penghu-3days-itinerary"},
+  {"keyword":"澎湖三天兩夜行程","cluster":"三天兩夜","priority":"P0","target":"/penghu-3days-itinerary"},
+  {"keyword":"澎湖三天兩夜自由行","cluster":"三天兩夜","priority":"P1","target":"/penghu-3days-itinerary"},
+  {"keyword":"澎湖三天兩夜費用","cluster":"三天兩夜","priority":"P1","target":"/penghu-3days-itinerary"},
+  {"keyword":"澎湖自由行","cluster":"自由行","priority":"P0","target":"/penghu-itinerary-recommendations"},
+  {"keyword":"澎湖自由行行程","cluster":"自由行","priority":"P0","target":"/penghu-itinerary-recommendations"},
+  {"keyword":"澎湖自由行三天兩夜","cluster":"自由行","priority":"P1","target":"/penghu-itinerary-recommendations"},
+  {"keyword":"澎湖自由行套裝行程","cluster":"自由行","priority":"P1","target":"/penghu-itinerary-recommendations"},
+  {"keyword":"澎湖深度旅遊","cluster":"深度旅遊","priority":"P0","target":"/"},
+  {"keyword":"澎湖深度旅行","cluster":"深度旅遊","priority":"P1","target":"/"},
+  {"keyword":"澎湖在地體驗","cluster":"深度旅遊","priority":"P1","target":"/"},
+  {"keyword":"澎湖秘境行程","cluster":"深度旅遊","priority":"P2","target":"/"},
+  {"keyword":"澎湖行程推薦","cluster":"行程推薦","priority":"P0","target":"/penghu-itinerary-recommendations"},
+  {"keyword":"澎湖旅遊行程","cluster":"行程推薦","priority":"P0","target":"/penghu-itinerary-recommendations"},
+  {"keyword":"澎湖旅遊推薦","cluster":"行程推薦","priority":"P1","target":"/penghu-itinerary-recommendations"},
+  {"keyword":"澎湖套裝行程","cluster":"行程推薦","priority":"P1","target":"/penghu-itinerary-recommendations"}
+]

@@ -6,6 +6,7 @@
     python scripts/gsc_report.py sitemaps   # 只看 sitemap
     python scripts/gsc_report.py inspect    # 只看重點頁收錄
     python scripts/gsc_report.py brand      # 只看品牌詞成效（近 28 天）
+    python scripts/gsc_report.py money      # 20 個 Money Keywords 基準與 9 月 KPI
 
 金鑰路徑從環境變數 GSC_KEY_FILE 讀（建議放 .env，不要 commit 金鑰檔）。
 """
@@ -34,6 +35,7 @@ KEY_URLS = [
     f"{SITE}/neihai-preorder.html",
     f"{SITE}/penghu-3days-itinerary",
     f"{SITE}/penghu-family-travel",
+    f"{SITE}/penghu-itinerary-recommendations",
     f"{SITE}/penghu-food-guide",
     f"{SITE}/penghu-2026-festival-guide",
 ]
@@ -57,6 +59,8 @@ def _latest_post_urls(n: int = 3) -> list:
     return urls
 
 BRAND_TERMS = ["潮旅", "phbay"]
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MONEY_KEYWORDS_FILE = os.path.join(ROOT, "content", "seo-money-keywords.json")
 
 
 def _service():
@@ -187,6 +191,47 @@ def report_growth(svc, days: int = 28) -> None:
             print(f"  {row['keys'][0]}｜曝光 {row['impressions']}｜點擊 {row['clicks']}｜排名 {row['position']:.1f}")
 
 
+def report_money(svc, days: int = 28) -> None:
+    """固定 20 個 Money Keywords 的可重跑基準，避免每週換詞造成誤判。"""
+    import json
+    keywords = json.load(open(MONEY_KEYWORDS_FILE, encoding="utf-8"))
+    end = date.today() - timedelta(days=2)
+    start = end - timedelta(days=days - 1)
+    rows = []
+    for item in keywords:
+        body = {
+            "startDate": start.isoformat(), "endDate": end.isoformat(),
+            "dimensions": ["query"],
+            "dimensionFilterGroups": [{"filters": [{
+                "dimension": "query", "operator": "equals",
+                "expression": item["keyword"],
+            }]}],
+            "rowLimit": 1,
+        }
+        found = svc.searchanalytics().query(siteUrl=PROPERTY, body=body).execute().get("rows", [])
+        metric = found[0] if found else {}
+        rows.append({**item, "clicks": int(metric.get("clicks", 0)),
+                     "impressions": int(metric.get("impressions", 0)),
+                     "position": metric.get("position")})
+
+    exposed = sum(r["impressions"] > 0 for r in rows)
+    top30 = sum(r["position"] is not None and r["position"] <= 30 for r in rows)
+    top20 = sum(r["position"] is not None and r["position"] <= 20 for r in rows)
+    clicks = sum(r["clicks"] for r in rows)
+    print(f"== 20 個 Money Keywords 基準（{start}～{end}）==")
+    print("  關鍵字｜群組｜優先｜目標頁｜曝光｜點擊｜平均排名")
+    for r in rows:
+        pos = f'{r["position"]:.1f}' if r["position"] is not None else '—'
+        print(f'  {r["keyword"]}｜{r["cluster"]}｜{r["priority"]}｜{r["target"]}｜'
+              f'{r["impressions"]}｜{r["clicks"]}｜{pos}')
+    print("== 9 月 KPI 漏斗 ==")
+    print(f"  已納入追蹤：{len(rows)}/20（目標 20）")
+    print(f"  有曝光：{exposed}/20（目標至少 10）")
+    print(f"  Top 30：{top30}/20（目標至少 5）")
+    print(f"  Top 20：{top20}/20（目標 2–3）")
+    print(f"  Money Keywords 非品牌點擊：{clicks}（目標開始產生）")
+
+
 def main() -> None:
     cmd = sys.argv[1] if len(sys.argv) > 1 else "all"
     svc = _service()
@@ -198,6 +243,8 @@ def main() -> None:
         report_brand(svc)
     if cmd in ("all", "growth"):
         report_growth(svc)
+    if cmd in ("all", "money"):
+        report_money(svc)
 
 
 if __name__ == "__main__":
