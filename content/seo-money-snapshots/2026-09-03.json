@@ -1,0 +1,225 @@
+{
+  "run_date": "2026-09-03",
+  "period": {
+    "start": "2026-08-05",
+    "end": "2026-09-01"
+  },
+  "kpi": {
+    "tracked": 20,
+    "exposed": 0,
+    "top30": 0,
+    "top20": 0,
+    "nonbrand_clicks": 0,
+    "nonbrand_impressions": 386,
+    "money_exact_clicks": 0
+  },
+  "keywords": [
+    {
+      "keyword": "澎湖親子旅遊",
+      "cluster": "親子",
+      "priority": "P0",
+      "target": "/penghu-family-travel",
+      "clicks": 0,
+      "impressions": 0,
+      "position": null
+    },
+    {
+      "keyword": "澎湖親子行程",
+      "cluster": "親子",
+      "priority": "P0",
+      "target": "/penghu-family-travel",
+      "clicks": 0,
+      "impressions": 0,
+      "position": null
+    },
+    {
+      "keyword": "澎湖親子三天兩夜",
+      "cluster": "親子",
+      "priority": "P0",
+      "target": "/penghu-family-travel",
+      "clicks": 0,
+      "impressions": 0,
+      "position": null
+    },
+    {
+      "keyword": "澎湖親子景點",
+      "cluster": "親子",
+      "priority": "P1",
+      "target": "/penghu-family-travel",
+      "clicks": 0,
+      "impressions": 0,
+      "position": null
+    },
+    {
+      "keyword": "澎湖三天兩夜",
+      "cluster": "三天兩夜",
+      "priority": "P0",
+      "target": "/penghu-3days-itinerary",
+      "clicks": 0,
+      "impressions": 0,
+      "position": null
+    },
+    {
+      "keyword": "澎湖三天兩夜行程",
+      "cluster": "三天兩夜",
+      "priority": "P0",
+      "target": "/penghu-3days-itinerary",
+      "clicks": 0,
+      "impressions": 0,
+      "position": null
+    },
+    {
+      "keyword": "澎湖三天兩夜自由行",
+      "cluster": "三天兩夜",
+      "priority": "P1",
+      "target": "/penghu-3days-itinerary",
+      "clicks": 0,
+      "impressions": 0,
+      "position": null
+    },
+    {
+      "keyword": "澎湖三天兩夜費用",
+      "cluster": "三天兩夜",
+      "priority": "P1",
+      "target": "/penghu-3days-itinerary",
+      "clicks": 0,
+      "impressions": 0,
+      "position": null
+    },
+    {
+      "keyword": "澎湖自由行",
+      "cluster": "自由行",
+      "priority": "P0",
+      "target": "/penghu-itinerary-recommendations",
+      "clicks": 0,
+      "impressions": 0,
+      "position": null
+    },
+    {
+      "keyword": "澎湖自由行行程",
+      "cluster": "自由行",
+      "priority": "P0",
+      "target": "/penghu-itinerary-recommendations",
+      "clicks": 0,
+      "impressions": 0,
+      "position": null
+    },
+    {
+      "keyword": "澎湖自由行三天兩夜",
+      "cluster": "自由行",
+      "priority": "P1",
+      "target": "/penghu-itinerary-recommendations",
+      "clicks": 0,
+      "impressions": 0,
+      "position": null
+    },
+    {
+      "keyword": "澎湖自由行套裝行程",
+      "cluster": "自由行",
+      "priority": "P1",
+      "target": "/penghu-itinerary-recommendations",
+      "clicks": 0,
+      "impressions": 0,
+      "position": null
+    },
+    {
+      "keyword": "澎湖深度旅遊",
+      "cluster": "深度旅遊",
+      "priority": "P0",
+      "target": "/",
+      "clicks": 0,
+      "impressions": 0,
+      "position": null
+    },
+    {
+      "keyword": "澎湖深度旅行",
+      "cluster": "深度旅遊",
+      "priority": "P1",
+      "target": "/",
+      "clicks": 0,
+      "impressions": 0,
+      "position": null
+    },
+    {
+      "keyword": "澎湖在地體驗",
+      "cluster": "深度旅遊",
+      "priority": "P1",
+      "target": "/",
+      "clicks": 0,
+      "impressions": 0,
+      "position": null
+    },
+    {
+      "keyword": "澎湖秘境行程",
+      "cluster": "深度旅遊",
+      "priority": "P2",
+      "target": "/",
+      "clicks": 0,
+      "impressions": 0,
+      "position": null
+    },
+    {
+      "keyword": "澎湖行程推薦",
+      "cluster": "行程推薦",
+      "priority": "P0",
+      "target": "/penghu-itinerary-recommendations",
+      "clicks": 0,
+      "impressions": 0,
+      "position": null
+    },
+    {
+      "keyword": "澎湖旅遊行程",
+      "cluster": "行程推薦",
+      "priority": "P0",
+      "target": "/penghu-itinerary-recommendations",
+      "clicks": 0,
+      "impressions": 0,
+      "position": null
+    },
+    {
+      "keyword": "澎湖旅遊推薦",
+      "cluster": "行程推薦",
+      "priority": "P1",
+      "target": "/penghu-itinerary-recommendations",
+      "clicks": 0,
+      "impressions": 0,
+      "position": null
+    },
+    {
+      "keyword": "澎湖套裝行程",
+      "cluster": "行程推薦",
+      "priority": "P1",
+      "target": "/penghu-itinerary-recommendations",
+      "clicks": 0,
+      "impressions": 0,
+      "position": null
+    }
+  ],
+  "clusters": {
+    "親子": {
+      "queries": 0,
+      "impressions": 0,
+      "clicks": 0
+    },
+    "三天兩夜": {
+      "queries": 0,
+      "impressions": 0,
+      "clicks": 0
+    },
+    "自由行": {
+      "queries": 0,
+      "impressions": 0,
+      "clicks": 0
+    },
+    "深度旅遊": {
+      "queries": 0,
+      "impressions": 0,
+      "clicks": 0
+    },
+    "行程推薦": {
+      "queries": 0,
+      "impressions": 0,
+      "clicks": 0
+    }
+  }
+}

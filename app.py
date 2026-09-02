@@ -5186,7 +5186,7 @@ def blog_post(slug):
 
 # ── 旅客評價（遊客心得）──
 # ── Pillar pages（主題攻略頁，內容在 pillar_pages.py）──
-from pillar_pages import PILLAR_PAGES
+from pillar_pages import PILLAR_PAGES, LAST_MODIFIED as PILLAR_LAST_MODIFIED
 
 _PILLAR_OG_IMAGE = {
     'penghu-3days-itinerary': f'{SITE}/images/summer-festival-hero-2026.jpg',
@@ -5277,10 +5277,10 @@ def dynamic_sitemap():
             (f'{SITE}/blog', '0.7', 'weekly'), (f'{SITE}/reviews', '0.7', 'weekly'),
             (f'{SITE}/tides', '0.7', 'daily'),
             (f'{SITE}/neihai-preorder.html', '0.8', 'weekly'),
-            (f'{SITE}/penghu-3days-itinerary', '0.8', 'monthly'),
-            (f'{SITE}/penghu-family-travel', '0.8', 'monthly'),
-            (f'{SITE}/penghu-itinerary-recommendations', '0.9', 'monthly'),
-            (f'{SITE}/penghu-food-guide', '0.8', 'monthly'),
+            (f'{SITE}/penghu-3days-itinerary', '0.8', 'monthly', PILLAR_LAST_MODIFIED),
+            (f'{SITE}/penghu-family-travel', '0.8', 'monthly', PILLAR_LAST_MODIFIED),
+            (f'{SITE}/penghu-itinerary-recommendations', '0.9', 'monthly', PILLAR_LAST_MODIFIED),
+            (f'{SITE}/penghu-food-guide', '0.8', 'monthly', PILLAR_LAST_MODIFIED),
             (f'{SITE}/penghu-100', '0.8', 'monthly'),
             (f'{SITE}/penghu-2026-festival-guide', '0.8', 'weekly')]
     try:

@@ -71,7 +71,16 @@ const DICT = {
     'events.e2.title':'Chasing-the-Wind Music & Light Festival | Sep 12–Oct 11',
     'events.e2.desc':'<strong>Venue: Guanyinting Park</strong>, with light shows nightly Sep 12–Oct 11. Five concerts: <strong>Sep 12</strong> Kyuhyun (Super Junior), Crowd Lu, TRASH | <strong>Sep 13</strong> Bestards, Cosmos People, Pallas | <strong>Sep 19</strong> Amazing Show, Mango Jump, The Chairs, Who Cares | <strong>Sep 26</strong> Nine One One, OSN, PIZZALI | <strong>Oct 3</strong> NICKTHEREAL, Amber An, Papun Band. Phbay is an official partner agency — <a href="/preorder/festival">festival tour packages available</a>.',
     'events.e3.title':'Penghu Cross-Sea Marathon | Nov 1',
-    'events.e3.desc':'Held <strong>Nov 1 (Sun)</strong> with full 42K, half 21K, 11K and 5K fun-run categories, crossing the Penghu Great Bridge with ocean views. Phbay can arrange lodging and post-race tours.'
+    'events.e3.desc':'Held <strong>Nov 1 (Sun)</strong> with full 42K, half 21K, 11K and 5K fun-run categories, crossing the Penghu Great Bridge with ocean views. Phbay can arrange lodging and post-race tours.',
+    'deep.kicker':'In-Depth Penghu',
+    'deep.title':'In-Depth Penghu Travel: Time for the Places Only Locals Know',
+    'deep.subtitle':'No rushing, no over-packed days. Phbay is guided by Penghu locals, and just two travellers are enough to depart.',
+    'deep.d1.title':'How to travel Penghu in depth',
+    'deep.d1.desc':'Travelling Penghu in depth is not about ticking off sights — it is about <strong>giving one sea area a whole day</strong>. Rather than cramming the South Sea, North Sea, Wang’an and Qimei into three days, pick one place and stay: watch the tide turn, hear how the village came to be, wait for sunset before you leave. To settle on length and structure first, see our <a href="/penghu-itinerary-recommendations">Penghu itinerary recommendations</a>.',
+    'deep.d2.title':'Local experiences in Penghu',
+    'deep.d2.desc':'The most popular local experiences are <strong>guided tide-pool ecology walks, the Inner Sea cruise, night squid fishing and the green sea turtle conservation talk on Wang’an</strong> — all led by local guides or instructors. These are the outings Penghu people take their own friends on, and they teach you far more about the islands than a photo stop.',
+    'deep.d3.title':'Where Penghu’s hidden spots are',
+    'deep.d3.desc':'Penghu’s hidden spots are mostly tucked away in <strong>the Hua-Zhai old houses on Wang’an, Erkan village, the unnamed sea cliffs of Xiyu, and tidal flats that only appear at low tide</strong>. There are no big car parks or signboards; whether you can go at all depends on the tide, the season and the wind — which is the most practical reason to have a local agency plan your days. Check the <a href="/tides">Penghu tide times</a> before you set out.'
   },
 
   /* ─────────── 日本語 ─────────── */
@@ -137,7 +146,16 @@ const DICT = {
     'events.e2.title':'澎湖追風音楽燈光祭｜9/12〜10/11',
     'events.e2.desc':'<strong>会場：観音亭園区</strong>。ライトショーは9/12〜10/11毎晩開催。ライブは全5回：<strong>9/12</strong> キュヒョン（SUPER JUNIOR）、盧廣仲（クラウド・ルー）、TRASH｜<strong>9/13</strong> 理想混蛋、宇宙人、Pallas｜<strong>9/19</strong> 美秀集團、芒果醬、椅子樂團、Who Cares｜<strong>9/26</strong> 玖壹壹、OSN、PIZZALI｜<strong>10/3</strong> 周湯豪（NICKTHEREAL）、安心亞、怕胖團。潮旅は公式提携旅行社です。<a href="/preorder/festival">音楽祭テーマツアー予約受付中</a>。',
     'events.e3.title':'菊島澎湖クロスシー・マラソン｜11/1',
-    'events.e3.desc':'<strong>11/1（日）</strong>開催。フル42K・ハーフ21K・体験11K・ファンラン5Kの4部門で、澎湖跨海大橋を渡る絶景コース。宿泊やレース後の観光手配も潮旅にご相談ください。'
+    'events.e3.desc':'<strong>11/1（日）</strong>開催。フル42K・ハーフ21K・体験11K・ファンラン5Kの4部門で、澎湖跨海大橋を渡る絶景コース。宿泊やレース後の観光手配も潮旅にご相談ください。',
+    'deep.kicker':'澎湖ディープ旅',
+    'deep.title':'澎湖ディープ旅：地元の人しか知らない場所に時間を使う',
+    'deep.subtitle':'急がない、詰め込まない。潮旅は澎湖在住のガイドがご案内、2名から催行します',
+    'deep.d1.title':'澎湖を深く旅するには',
+    'deep.d1.desc':'澎湖のディープな旅で大切なのは、名所をいくつ回ったかではなく<strong>1日にひとつの海域をじっくり味わうこと</strong>です。南海・北海・望安・七美を3日間に詰め込むより、ひとつの場所に留まってみてください。潮が変わる様子を眺め、集落の成り立ちを聞き、日没を待ってから戻る。日数と全体の組み立てから決めたい方は<a href="/penghu-itinerary-recommendations">澎湖のおすすめ行程</a>をご覧ください。',
+    'deep.d2.title':'澎湖の地元体験',
+    'deep.d2.desc':'人気の地元体験は<strong>干潟の生態ガイドツアー、内海クルーズ、夜のイカ釣り、望安のアオウミガメ保護解説</strong>など。いずれも地元ガイドやインストラクターが同行します。澎湖の人が自分の友人を連れて行く遊び方で、写真を撮るだけの観光よりずっとこの島を理解できます。',
+    'deep.d3.title':'澎湖の秘境はどこに',
+    'deep.d3.desc':'澎湖の秘境の多くは<strong>望安の花宅古厝、二崁集落、西嶼の名もなき海崖、干潮時にだけ現れる干潟</strong>に隠れています。大きな駐車場も看板もなく、行けるかどうかは潮・季節・風次第。だからこそ地元の旅行社に行程を任せる意味があります。お出かけ前に<a href="/tides">澎湖の潮汐時間</a>をご確認ください。'
   },
 
   /* ─────────── 한국어 ─────────── */
@@ -203,7 +221,16 @@ const DICT = {
     'events.e2.title':'펑후 추풍 음악조명축제｜9/12~10/11',
     'events.e2.desc':'<strong>장소: 관음정 공원</strong>. 조명 쇼는 9/12~10/11 매일 밤 열립니다. 콘서트는 총 5회: <strong>9/12</strong> 규현(슈퍼주니어), 크라우드 루(盧廣仲), TRASH｜<strong>9/13</strong> Bestards(理想混蛋), Cosmos People(宇宙人), Pallas｜<strong>9/19</strong> Amazing Show, Mango Jump, The Chairs, Who Cares｜<strong>9/26</strong> Nine One One(玖壹壹), OSN, PIZZALI｜<strong>10/3</strong> NICKTHEREAL(周湯豪), Amber An(安心亞), 怕胖團. Phbay는 공식 제휴 여행사입니다. <a href="/preorder/festival">축제 테마 투어 예약 중</a>.',
     'events.e3.title':'쥐다오 펑후 크로스씨 마라톤｜11/1',
-    'events.e3.desc':'<strong>11/1(일)</strong> 개최. 풀 42K·하프 21K·체험 11K·펀런 5K 부문으로, 펑후 대교를 건너는 바다 전망 코스입니다. 숙박과 레이스 후 일정도 Phbay가 도와드립니다.'
+    'events.e3.desc':'<strong>11/1(일)</strong> 개최. 풀 42K·하프 21K·체험 11K·펀런 5K 부문으로, 펑후 대교를 건너는 바다 전망 코스입니다. 숙박과 레이스 후 일정도 Phbay가 도와드립니다.',
+    'deep.kicker':'펑후 深度 여행',
+    'deep.title':'펑후 깊이 여행하기: 현지인만 아는 곳에 시간을 쓰세요',
+    'deep.subtitle':'서두르지 않고, 일정을 욱여넣지 않습니다. 펑후 현지 가이드가 안내하며 2명부터 출발합니다',
+    'deep.d1.title':'펑후를 깊이 여행하는 법',
+    'deep.d1.desc':'펑후 심층 여행의 핵심은 명소를 몇 곳 돌았는가가 아니라 <strong>하루에 한 해역만 제대로 보는 것</strong>입니다. 남해·북해·왕안·치메이를 사흘에 몰아넣기보다 한 곳에 머물러 보세요. 물때가 바뀌는 모습을 보고, 마을이 생겨난 이야기를 듣고, 해질 무렵까지 기다렸다 돌아오는 여행입니다. 일수와 큰 틀부터 정하고 싶다면 <a href="/penghu-itinerary-recommendations">펑후 추천 일정</a>을 참고하세요.',
+    'deep.d2.title':'펑후 현지 체험',
+    'deep.d2.desc':'가장 인기 있는 현지 체험은 <strong>갯벌 생태 가이드 투어, 내해 크루즈, 야간 오징어 낚시, 왕안 푸른바다거북 보전 해설</strong>입니다. 모두 현지 가이드나 강사가 함께합니다. 펑후 사람들이 자기 친구를 데려가는 방식이라, 사진만 찍고 오는 관광보다 이 섬을 훨씬 잘 이해하게 됩니다.',
+    'deep.d3.title':'펑후 숨은 명소는 어디에',
+    'deep.d3.desc':'펑후의 숨은 명소는 대개 <strong>왕안의 화자이 옛집, 얼칸 마을, 시위의 이름 없는 해벽, 썰물 때만 드러나는 갯벌</strong>에 숨어 있습니다. 큰 주차장도 안내판도 없고, 갈 수 있는지는 물때·계절·바람이 결정합니다. 현지 여행사에 일정을 맡기는 가장 현실적인 이유이기도 합니다. 출발 전 <a href="/tides">펑후 물때 시간</a>을 확인하세요.'
   },
 
   /* ─────────── 简体中文 ─────────── */
@@ -269,7 +296,16 @@ const DICT = {
     'events.e2.title':'澎湖追风音乐灯光节｜9/12–10/11',
     'events.e2.desc':'<strong>地点：观音亭园区</strong>，灯光艺术展演 9/12–10/11 每晚点灯。五场演唱会：<strong>9/12</strong> 圭贤（Super Junior）、卢广仲、TRASH｜<strong>9/13</strong> 理想混蛋、宇宙人、帕拉斯｜<strong>9/19</strong> 美秀集团、芒果酱、椅子乐团、胡凯儿｜<strong>9/26</strong> 玖壹壹、高尔宣、PIZZALI｜<strong>10/3</strong> 周汤豪、安心亚、怕胖团。潮旅为官方合作旅行社，<a href="/preorder/festival">音乐节主题行程预购中</a>。',
     'events.e3.title':'菊岛澎湖跨海马拉松｜11/1',
-    'events.e3.desc':'<strong>11/1（日）</strong>开跑，设全马 42K、半马 21K、体验组 11K 与休闲组 5K，路线行经跨海大桥、饱览海景。想边跑边玩，潮旅可协助安排住宿与赛后行程。'
+    'events.e3.desc':'<strong>11/1（日）</strong>开跑，设全马 42K、半马 21K、体验组 11K 与休闲组 5K，路线行经跨海大桥、饱览海景。想边跑边玩，潮旅可协助安排住宿与赛后行程。',
+    'deep.kicker':'澎湖深度旅游',
+    'deep.title':'澎湖深度旅游：把时间留给只有在地人才知道的地方',
+    'deep.subtitle':'不赶点、不塞行程。潮旅由澎湖在地向导带路，两人即可成行',
+    'deep.d1.title':'澎湖深度旅行怎么玩',
+    'deep.d1.desc':'澎湖深度旅行的重点不是走完几个景点，而是<strong>一天只挑一个海域玩透</strong>。与其把南海、北海、望安、七美全部塞进三天，不如选一个地方待整天：看潮汐怎么换、听聚落怎么形成、等日落再走。想先抓天数与骨架，可看<a href="/penghu-itinerary-recommendations">澎湖行程推荐</a>。',
+    'deep.d2.title':'澎湖在地体验有哪些',
+    'deep.d2.desc':'最受欢迎的澎湖在地体验是<strong>潮间带生态导览、内海巡礼船游、夜钓小管与望安绿蠵龟保育解说</strong>，都由在地向导或教练带领。这些是澎湖人自己也会带朋友去的玩法，比单纯拍照打卡更能理解这座海岛。',
+    'deep.d3.title':'澎湖秘境行程去哪里',
+    'deep.d3.desc':'澎湖秘境行程多半藏在<strong>望安花宅古厝、二崁聚落、西屿的无名海崖与退潮才出现的潮间带</strong>。这类地点没有大型停车场与招牌，需要看潮汐、看季节、看风向决定当天能不能去——这也是找在地旅行社排行程最实际的理由。出发前可先查<a href="/tides">澎湖潮汐时间</a>。'
   }
 };
 

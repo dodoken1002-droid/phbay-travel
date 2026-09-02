@@ -61,6 +61,7 @@ def _latest_post_urls(n: int = 3) -> list:
 BRAND_TERMS = ["潮旅", "phbay"]
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MONEY_KEYWORDS_FILE = os.path.join(ROOT, "content", "seo-money-keywords.json")
+SNAPSHOT_DIR = os.path.join(ROOT, "content", "seo-money-snapshots")
 
 
 def _service():
@@ -224,12 +225,83 @@ def report_money(svc, days: int = 28) -> None:
         pos = f'{r["position"]:.1f}' if r["position"] is not None else '—'
         print(f'  {r["keyword"]}｜{r["cluster"]}｜{r["priority"]}｜{r["target"]}｜'
               f'{r["impressions"]}｜{r["clicks"]}｜{pos}')
+
+    # 精確詞在 0 曝光階段看不出進展，改用「群組 contains」當領先指標：
+    # 只要相關長尾開始有曝光，就代表該主題頁已經被 Google 看見。
+    clusters = {}
+    for item in keywords:
+        clusters.setdefault(item["cluster"], set()).add(item["keyword"])
+    print("== 群組領先指標（contains 比對，含長尾）==")
+    cluster_stat = {}
+    for cluster in clusters:
+        body = {
+            "startDate": start.isoformat(), "endDate": end.isoformat(),
+            "dimensions": ["query"],
+            "dimensionFilterGroups": [{"filters": [{
+                "dimension": "query", "operator": "contains", "expression": cluster,
+            }]}],
+            "rowLimit": 25,
+        }
+        found = svc.searchanalytics().query(siteUrl=PROPERTY, body=body).execute().get("rows", [])
+        imp = sum(r["impressions"] for r in found)
+        clk = sum(r["clicks"] for r in found)
+        cluster_stat[cluster] = {"queries": len(found), "impressions": imp, "clicks": clk}
+        print(f"  {cluster}｜相關查詢 {len(found)} 個｜曝光 {imp}｜點擊 {clk}")
+        for r in found[:3]:
+            print(f"      ↳ {r['keys'][0]}｜曝光 {r['impressions']}｜排名 {r['position']:.1f}")
+
+    # 非品牌點擊：KPI 說的是「開始產生非品牌旅遊關鍵字點擊」，
+    # 範圍是全站扣掉品牌詞，不只這 20 個精確詞。
+    body = {"startDate": start.isoformat(), "endDate": end.isoformat(),
+            "dimensions": ["query"], "rowLimit": 500}
+    all_rows = svc.searchanalytics().query(siteUrl=PROPERTY, body=body).execute().get("rows", [])
+    nonbrand = [r for r in all_rows
+                if not any(b.lower() in r["keys"][0].lower() for b in BRAND_TERMS)]
+    nonbrand_clicks = sum(r["clicks"] for r in nonbrand)
+    nonbrand_imp = sum(r["impressions"] for r in nonbrand)
+
     print("== 9 月 KPI 漏斗 ==")
-    print(f"  已納入追蹤：{len(rows)}/20（目標 20）")
-    print(f"  有曝光：{exposed}/20（目標至少 10）")
-    print(f"  Top 30：{top30}/20（目標至少 5）")
-    print(f"  Top 20：{top20}/20（目標 2–3）")
-    print(f"  Money Keywords 非品牌點擊：{clicks}（目標開始產生）")
+    print(f"  ① 已納入追蹤：{len(rows)}/20（目標 20）{'✅' if len(rows) >= 20 else '❌'}")
+    print(f"  ② 有曝光：{exposed}/20（目標至少 10）{'✅' if exposed >= 10 else '❌'}")
+    print(f"  ③ Top 30：{top30}/20（目標至少 5）{'✅' if top30 >= 5 else '❌'}")
+    print(f"  ④ Top 20：{top20}/20（目標 2–3）{'✅' if top20 >= 2 else '❌'}")
+    print(f"  ⑤ 非品牌點擊：{nonbrand_clicks}（目標開始產生）{'✅' if nonbrand_clicks > 0 else '❌'}"
+          f"｜非品牌曝光 {nonbrand_imp}｜非品牌查詢 {len(nonbrand)} 個")
+    print(f"     其中 Money Keywords 精確詞點擊：{clicks}")
+
+    snapshot = {
+        "run_date": date.today().isoformat(),
+        "period": {"start": start.isoformat(), "end": end.isoformat()},
+        "kpi": {"tracked": len(rows), "exposed": exposed, "top30": top30, "top20": top20,
+                "nonbrand_clicks": nonbrand_clicks, "nonbrand_impressions": nonbrand_imp,
+                "money_exact_clicks": clicks},
+        "keywords": rows, "clusters": cluster_stat,
+    }
+    os.makedirs(SNAPSHOT_DIR, exist_ok=True)
+    path = os.path.join(SNAPSHOT_DIR, f"{date.today().isoformat()}.json")
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(snapshot, fh, ensure_ascii=False, indent=2)
+    print(f"  已寫入快照：{os.path.relpath(path, ROOT)}")
+    _print_trend()
+
+
+def _print_trend() -> None:
+    """列出歷次快照的 KPI 走勢，讓每週重跑能直接看到有沒有前進。"""
+    import glob
+    import json
+    paths = sorted(glob.glob(os.path.join(SNAPSHOT_DIR, "*.json")))
+    if len(paths) < 2:
+        return
+    print("== KPI 走勢（歷次快照）==")
+    print("  日期｜有曝光｜Top30｜Top20｜非品牌點擊")
+    for p in paths:
+        try:
+            s = json.load(open(p, encoding="utf-8"))
+        except Exception:
+            continue
+        k = s.get("kpi", {})
+        print(f'  {s.get("run_date", "?")}｜{k.get("exposed", 0)}｜{k.get("top30", 0)}｜'
+              f'{k.get("top20", 0)}｜{k.get("nonbrand_clicks", 0)}')
 
 
 def main() -> None:
