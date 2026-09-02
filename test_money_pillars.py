@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from app import app
+from app import _pillar_link_for_tags
 from pillar_pages import PILLAR_PAGES
 
 
@@ -48,6 +49,12 @@ class MoneyPillarTests(unittest.TestCase):
                      "/penghu-itinerary-recommendations"):
             self.assertIn(path, faq)
             self.assertIn(path, tides)
+
+    def test_generic_itinerary_articles_link_to_recommendations(self):
+        self.assertEqual(_pillar_link_for_tags("澎湖自由行,交通,預算")[0],
+                         "/penghu-itinerary-recommendations")
+        self.assertEqual(_pillar_link_for_tags("親子,自由行")[0],
+                         "/penghu-family-travel")
 
 
 if __name__ == "__main__":

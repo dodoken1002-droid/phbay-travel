@@ -131,7 +131,7 @@ def audit_repository_content():
         missing_langs = sorted(required_langs - set((post.get("i18n") or {}).keys()))
         if missing_langs:
             findings.append(Finding("warning", target, "缺少翻譯：" + ", ".join(missing_langs)))
-        if not re.search(r'href=["\']/penghu-(?:3days|family|food|2026)', content):
+        if not re.search(r'href=["\']/penghu-(?:3days|family|itinerary|food|2026)', content):
             findings.append(Finding("warning", target, "缺少 pillar page 內鏈"))
         if len(re.findall(r'href=["\']/blog/', content)) < 2:
             findings.append(Finding("warning", target, "相關文章內鏈少於 2 個"))

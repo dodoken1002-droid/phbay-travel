@@ -3592,7 +3592,7 @@ def admin_gemini_blog_draft():
 1. 繁體中文（台灣用語），親切、在地、實用，不浮誇。全文約 900–1300 字。
 2. content 為 HTML：只用 <h2> <h3> <p> <strong> <ul> <li> <a> 標籤；2–4 個 <h2> 段落。
 3. summary 寫成 2–3 句「先講結論」式摘要（會顯示在文章開頭的結論框），不要釣魚式開頭。
-4. 內文自然放入 1 個相關主題攻略頁連結（美食主題連 /penghu-food-guide、親子連 /penghu-family-travel、行程景點連 /penghu-3days-itinerary、音樂節連 /penghu-2026-festival-guide），
+4. 內文自然放入 1 個相關主題攻略頁連結（美食主題連 /penghu-food-guide、親子連 /penghu-family-travel、三天兩夜連 /penghu-3days-itinerary、一般行程／自由行連 /penghu-itinerary-recommendations、音樂節連 /penghu-2026-festival-guide），
    以及文末 1 句 CTA 引導加官方 LINE @phbay2018 或造訪 https://www.phbay.info/。
 5. 絕對不可捏造：具體店名、地址、價格、營業時間、船班時刻、活動細節。不確定的就用通稱（例如「馬公市區的老字號店家」）。
 6. tags 為 4–6 個逗號分隔標籤，第一個必須是「澎湖美食」「澎湖景點」或「澎湖旅遊」其中之一。
@@ -5071,7 +5071,9 @@ def _pillar_link_for_tags(tags):
         return ('/penghu-family-travel', '澎湖親子旅遊攻略')
     if any(k in t for k in ('美食', '小吃', '伴手禮', '海鮮', '早餐')):
         return ('/penghu-food-guide', '澎湖美食地圖')
-    if any(k in t for k in ('景點', '行程', '自由行', '跳島', '慢旅')):
+    if any(k in t for k in ('自由行', '行程推薦', '套裝行程', '交通', '預算')):
+        return ('/penghu-itinerary-recommendations', '澎湖行程推薦與天數比較')
+    if any(k in t for k in ('景點', '行程', '跳島', '慢旅')):
         return ('/penghu-3days-itinerary', '澎湖三天兩夜行程規劃')
     return None
 
