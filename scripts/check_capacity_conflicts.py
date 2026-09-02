@@ -49,35 +49,60 @@ def main():
     if problems == 0:
         print("  （無）")
 
-    # ── 2. 兩套系統並存的行程：合計是否已超過單邊上限 ─────────
-    print("\n【2】同時有『行程卡梯次』與『預購訂單』的行程（兩套名額互不扣減）")
+    # ── 2. 共用池：預購訂單＋線下已售是否超過上限 ────────────
+    print("\n【2】共用座位池（預購訂單 ＋ 線下已售）")
     cur.execute("""
-        SELECT s.id, s.tour_id, t.title, s.date_label, s.capacity, s.booked
-        FROM tour_slots s LEFT JOIN tours t ON t.id = s.tour_id
-        WHERE s.is_active = TRUE
-        ORDER BY s.tour_id, s.id
+        SELECT p.id, p.slug, p.name, p.capacity,
+               STRING_AGG(DISTINCT t.title, '、') AS tours
+        FROM preorder_products p
+        LEFT JOIN tours t ON t.preorder_slug = p.slug
+        GROUP BY p.id, p.slug, p.name, p.capacity
+        HAVING COUNT(t.id) > 0
     """)
-    slots = cur.fetchall()
+    pools = cur.fetchall()
+    if not pools:
+        print("  （尚無行程對應到預購產品）")
+    for pool in pools:
+        print(f"  ▸ {pool['name']}（{pool['slug']}，上限 {pool['capacity']}）")
+        print(f"    共用行程：{pool['tours']}")
+        cur.execute("""
+            SELECT d::text AS d,
+                   COALESCE(SUM(online), 0) AS online, COALESCE(SUM(manual), 0) AS manual
+            FROM (
+                SELECT departure_date AS d,
+                       SUM(CASE WHEN status <> 'cancelled' THEN passenger_count ELSE 0 END) AS online,
+                       0 AS manual
+                FROM preorder_orders WHERE product_id = %s GROUP BY departure_date
+                UNION ALL
+                SELECT hold_date AS d, 0 AS online, pax AS manual
+                FROM preorder_manual_holds WHERE product_id = %s
+            ) x GROUP BY d ORDER BY d
+        """, (pool['id'], pool['id']))
+        for r in cur.fetchall():
+            sold = int(r['online']) + int(r['manual'])
+            cap = pool['capacity']
+            over = (sold - cap) if cap is not None and sold > cap else 0
+            if over:
+                problems += 1
+            mark = f"  ⚠ 超賣 {over} 人" if over else ""
+            rem = (cap - sold) if cap is not None else '—'
+            print(f"      {r['d']}  預購 {r['online']:>2} ＋ 線下 {r['manual']:>2} = {sold:>2}/{cap}"
+                  f"  剩 {rem}{mark}")
+
+    # ── 3. 未接上預購產品、仍用人工計數的梯次 ────────────────
     cur.execute("""
-        SELECT pr.slug, pr.capacity, o.departure_date::text AS d,
-               SUM(o.passenger_count) AS pax
-        FROM preorder_orders o JOIN preorder_products pr ON pr.id = o.product_id
-        WHERE o.status <> 'cancelled'
-        GROUP BY pr.slug, pr.capacity, o.departure_date
+        SELECT t.title, COUNT(*) AS n
+        FROM tour_slots s JOIN tours t ON t.id = s.tour_id
+        WHERE s.is_active = TRUE AND (t.preorder_slug IS NULL OR t.preorder_slug = '')
+        GROUP BY t.title ORDER BY t.title
     """)
-    pre = cur.fetchall()
-    if slots and pre:
-        print("  行程卡梯次：")
-        for s in slots:
-            print(f"    tour{s['tour_id']:>3} {str(s['title'])[:20]:22} {s['date_label'][:18]:20} "
-                  f"諮詢已訂 {s['booked']}/{s['capacity']}")
-        print("  預購訂單：")
-        for p in pre:
-            print(f"    {p['slug'][:16]:18} {p['d']}  預購已訂 {p['pax']}/{p['capacity']}")
-        print("  ⚠ 以上兩份數字互不扣減；若代表同一批座位，實際已售 = 兩者相加。")
-        problems += 1
+    legacy = cur.fetchall()
+    print("\n【3】仍使用人工計數的梯次（無對應預購產品，名額需人工維護）")
+    if legacy:
+        for r in legacy:
+            print(f"    {str(r['title'])[:34]:36} {r['n']} 個梯次")
     else:
-        print("  （無並存情形）")
+        print("    （無）")
 
     print(f"\n→ 共 {problems} 項需要注意" if problems else "\n→ 一切正常")
     cur.close()
