@@ -18,6 +18,7 @@ import base64
 import hmac
 import hashlib
 import random
+import zlib
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -2902,10 +2903,29 @@ def admin_update_neihai_preorder(order_id):
                     INSERT INTO neihai_sailings (sailing_date, sailing_time, capacity, min_people)
                     VALUES (%s,%s,%s,%s) ON CONFLICT (sailing_date, sailing_time) DO NOTHING
                 """, (new_d, new_t, NEIHAI_DEFAULT_CAPACITY, NEIHAI_MIN_PEOPLE))
-                cur.execute("SELECT id FROM neihai_sailings WHERE sailing_date=%s AND sailing_time=%s",
+                # FOR UPDATE：改期＝把整筆人數搬到另一個船班，一樣可能超賣。
+                # 原本這裡完全沒有容量檢查。政策同匯入：不阻擋但要確認並留紀錄。
+                cur.execute("""SELECT id, capacity FROM neihai_sailings
+                               WHERE sailing_date=%s AND sailing_time=%s FOR UPDATE""",
                             (new_d, new_t))
+                target = cur.fetchone()
+                if order['status'] != 'cancelled':
+                    cur.execute("""
+                        SELECT COALESCE(SUM(passenger_count), 0) AS booked FROM neihai_preorders
+                        WHERE sailing_id=%s AND status <> 'cancelled' AND id <> %s
+                    """, (target['id'], order_id))
+                    booked = int(cur.fetchone()['booked'] or 0)
+                    cap = int(target['capacity'] or NEIHAI_DEFAULT_CAPACITY)
+                    total = booked + int(order['passenger_count'] or 0)
+                    if total > cap:
+                        if not data.get('confirm_overbook'):
+                            conn.rollback(); cur.close(); conn.close()
+                            return jsonify(ok=False, needs_confirm=True,
+                                           error=f'改到 {new_d} {new_t} 後共 {total} 人，'
+                                                 f'超過上限 {cap}，確定仍要改期嗎？'), 409
+                        changes.append(f'⚠️ 已確認超額改期：{new_d} {new_t} 共 {total} 人（上限 {cap}）')
                 changes.append(f"班次：{old_d} {old_t} → {new_d} {new_t}")
-                set_parts.append("sailing_id=%s"); params.append(cur.fetchone()["id"])
+                set_parts.append("sailing_id=%s"); params.append(target["id"])
 
         if set_parts:
             set_parts.append("updated_at=NOW()")
@@ -3056,7 +3076,8 @@ def admin_neihai_import():
     overwrite = (data.get('mode') or '').strip() == 'overwrite'
     if not isinstance(orders, list) or not orders:
         return jsonify(ok=False, error='沒有可匯入的訂單'), 400
-    created, updated, skipped, errors, warnings = [], [], [], [], []
+    confirm_overbook = bool(data.get('confirm_overbook'))
+    created, updated, skipped, errors, warnings, overbooked = [], [], [], [], [], []
     try:
         conn = get_db(); cur = conn.cursor()
         for i, o in enumerate(orders, start=1):
@@ -3098,6 +3119,7 @@ def admin_neihai_import():
                 else 'pending_departure')
             if status != 'cancelled' and booked + len(clean) > capacity:
                 warnings.append(f'{sailing_date} {sailing_time} 匯入後共 {booked + len(clean)} 人，超過上限 {capacity}')
+                overbooked.append(f'{sailing_date} {sailing_time}')
             agency = (o.get('agency_name') or '').strip()
             cname = (o.get('contact_name') or '').strip() or clean[0]['name']
             cphone = (o.get('contact_phone') or '').strip() or clean[0]['phone']
@@ -3135,12 +3157,19 @@ def admin_neihai_import():
                 cur.execute("INSERT INTO neihai_preorder_logs (preorder_id, summary) VALUES (%s,%s)",
                             (oid, '後台匯入建立'))
                 created.append(new_ref)
+        # 超額不阻擋，但要人「看見並確認」才寫入：整批 rollback 後回 409 請前端再送一次。
+        if overbooked and not confirm_overbook:
+            conn.rollback(); cur.close(); conn.close()
+            return jsonify(ok=False, needs_confirm=True, overbooked=overbooked,
+                           warnings=warnings, errors=errors,
+                           error='這批匯入會讓下列船班超過人數上限，請確認後再送出'), 409
         if created or updated:
             pax = sum(len(o.get('passengers') or []) for o in orders)
             write_audit(cur, 'import', category='內海預購',
                         scope=f'新增{len(created)}／覆蓋{len(updated)}',
                         record_count=len(created) + len(updated), pax_count=pax,
-                        detail=('覆蓋模式' if overwrite else '一般匯入'))
+                        detail=('覆蓋模式' if overwrite else '一般匯入')
+                                + ('｜已確認超額匯入：' + '、'.join(overbooked) if overbooked else ''))
         conn.commit(); cur.close(); conn.close()
         return jsonify(ok=True, created=created, updated=updated, skipped=skipped,
                        errors=errors, warnings=warnings)
@@ -3693,6 +3722,50 @@ def _product_public(p):
     }
 
 
+def _manual_hold_pax(cur, product_id, dep_date):
+    """該產品該日的線下已售人數（電話／LINE／同業，由後台「線下已售」維護）。
+
+    ⚠️ preorder_manual_holds 的唯一鍵是 (product_id, hold_date)，只到「日」不到「時段」。
+    多時段產品（slot_type='times'）同一天的各時段會共用同一個數字，等於對每個時段
+    都各扣一次。這是刻意選的安全方向（寧可少賣也不要超賣）；若日後真有多時段產品
+    要記線下已售，再幫 preorder_manual_holds 加 hold_time 欄位並改這裡。
+    """
+    cur.execute("SELECT pax FROM preorder_manual_holds WHERE product_id=%s AND hold_date=%s",
+                (product_id, dep_date))
+    row = cur.fetchone()
+    return int((row or {}).get('pax') or 0)
+
+
+def _slot_booked_pax(cur, product_id, dep_date, dep_time, exclude_order_id=None):
+    """場次已佔用人數 ＝ 線上預購訂單人數 ＋ 線下已售人數。
+
+    ⚠️ 名額單一來源：行程卡（/api/slots 走 _preorder_pool_usage）、預購頁的場次列表、
+    公開下單與後台匯入／改期的容量檢查，一律以「訂單 ＋ 線下已售」為準。
+    不要在任何地方單獨 SUM preorder_orders——2026-08-27 的單一名額來源只改了行程卡
+    那一半，預購頁與下單 API 仍會賣掉老闆線下已經賣出的位子。
+    exclude_order_id：覆蓋更新／改期時排除自己，避免把自己算進去。
+    """
+    cur.execute("""
+        SELECT COALESCE(SUM(passenger_count), 0) AS booked FROM preorder_orders
+        WHERE product_id=%s AND departure_date=%s AND departure_time=%s
+          AND status <> 'cancelled' AND id <> %s
+    """, (product_id, dep_date, dep_time, exclude_order_id or 0))
+    online = int(cur.fetchone()['booked'] or 0)
+    return online + _manual_hold_pax(cur, product_id, dep_date)
+
+
+def _slot_lock_key(product_id, dep_date, dep_time):
+    """同場次交易鎖的鍵值。
+
+    ⚠️ 一定要用決定性雜湊，不能用 Python 內建 hash()：字串 hash 預設隨機化
+    （PYTHONHASHSEED 未設定），同一場次在不同行程算出的鍵值不同，鎖就會**安靜地
+    失去作用、不會報錯**。目前 gunicorn --workers 2 是從同一個 master fork、共用
+    同一組 seed 所以僥倖有效，但 Railway 一旦擴成多個實例就會出事。
+    """
+    raw = f'{product_id}|{dep_date}|{dep_time}'.encode('utf-8')
+    return zlib.crc32(raw) % (2 ** 31)
+
+
 def _preorder_slot_status(booked, capacity, min_people):
     """通用場次狀態；capacity=None 表示不設上限。"""
     booked = int(booked or 0)
@@ -3717,6 +3790,11 @@ def _preorder_availability(product, start, end):
     """, (product['id'], start, end))
     booked_map = {(str(r['departure_date']), r['departure_time'] or ''): int(r['booked'])
                   for r in cur.fetchall()}
+    # 線下已售人數（後台維護，依「產品＋日期」記錄）也要佔名額，
+    # 否則預購頁會比行程卡多賣出老闆已經在電話／LINE 賣掉的位子。
+    cur.execute("SELECT hold_date::text AS d, pax FROM preorder_manual_holds WHERE product_id=%s",
+                (product['id'],))
+    manual_map = {r['d']: int(r['pax'] or 0) for r in cur.fetchall()}
     cur.close(); conn.close()
 
     today = _taiwan_now().date()
@@ -3736,7 +3814,7 @@ def _preorder_availability(product, start, end):
                     continue
             elif d < today:  # 套裝行程：過去日期不列
                 continue
-            booked = booked_map.get((str(d), tm), 0)
+            booked = booked_map.get((str(d), tm), 0) + manual_map.get(str(d), 0)
             code, label, remaining = _preorder_slot_status(booked, product['capacity'], product['min_people'])
             item = {
                 'date': str(d), 'time': tm, 'booked': booked,
@@ -3852,13 +3930,8 @@ def api_preorder_create(slug):
         notes = (data.get('notes') or '').strip()
 
         # 同場次交易鎖（避免有名額上限的行程超賣）
-        lock_key = abs(hash((p['id'], str(dep_date), dep_time))) % (2 ** 31)
-        cur.execute('SELECT pg_advisory_xact_lock(%s)', (lock_key,))
-        cur.execute("""
-            SELECT COALESCE(SUM(passenger_count), 0) AS booked FROM preorder_orders
-            WHERE product_id=%s AND departure_date=%s AND departure_time=%s AND status <> 'cancelled'
-        """, (p['id'], dep_date, dep_time))
-        booked = int(cur.fetchone()['booked'] or 0)
+        cur.execute('SELECT pg_advisory_xact_lock(%s)', (_slot_lock_key(p['id'], dep_date, dep_time),))
+        booked = _slot_booked_pax(cur, p['id'], dep_date, dep_time)
         if p['capacity'] is not None and booked + len(clean) > int(p['capacity']):
             conn.rollback(); cur.close(); conn.close()
             return jsonify(ok=False, error=f'此場次剩餘 {max(0, int(p["capacity"]) - booked)} 位，不足以容納本次人數'), 400
@@ -4105,6 +4178,7 @@ def admin_update_preorder(order_id):
                     changes.append(f"{FLABEL[field]}：{order.get(field) or '（空）'} → {v or '（空）'}")
                     set_parts.append(f'{field}=%s'); params.append(v)
 
+        new_dep_date, new_dep_time, slot_moved = order.get('departure_date'), order.get('departure_time') or '', False
         if data.get('departure_date'):
             try:
                 dep = datetime.strptime(str(data['departure_date']).strip(), '%Y-%m-%d').date()
@@ -4114,11 +4188,32 @@ def admin_update_preorder(order_id):
             if str(dep) != str(order.get('departure_date')):
                 changes.append(f"出發日期：{order.get('departure_date')} → {dep}")
                 set_parts.append('departure_date=%s'); params.append(dep)
+                new_dep_date, slot_moved = dep, True
         if 'departure_time' in data:
             nt = (data.get('departure_time') or '').strip()
             if nt != (order.get('departure_time') or ''):
                 changes.append(f"出發時間：{order.get('departure_time') or '（空）'} → {nt or '（空）'}")
                 set_parts.append('departure_time=%s'); params.append(nt)
+                new_dep_time, slot_moved = nt, True
+
+        # 改期＝把整筆人數搬到另一個場次，一樣可能超賣。原本這裡完全沒有容量檢查。
+        # 政策同匯入：不阻擋（後台要能處理例外），但要人看見並確認，並留在修改紀錄裡。
+        if slot_moved and order['status'] != 'cancelled':
+            cur.execute('SELECT pg_advisory_xact_lock(%s)',
+                        (_slot_lock_key(order['product_id'], new_dep_date, new_dep_time),))
+            cur.execute("SELECT capacity FROM preorder_products WHERE id=%s", (order['product_id'],))
+            cap = (cur.fetchone() or {}).get('capacity')
+            if cap is not None:
+                booked = _slot_booked_pax(cur, order['product_id'], new_dep_date, new_dep_time, order_id)
+                total = booked + int(order['passenger_count'] or 0)
+                if total > int(cap):
+                    label = f"{new_dep_date} {new_dep_time}".strip()
+                    if not data.get('confirm_overbook'):
+                        conn.rollback(); cur.close(); conn.close()
+                        return jsonify(ok=False, needs_confirm=True,
+                                       error=f'改到 {label} 後共 {total} 人，超過上限 {cap}，'
+                                             f'確定仍要改期嗎？'), 409
+                    changes.append(f'⚠️ 已確認超額改期：{label} 共 {total} 人（上限 {cap}）')
 
         if set_parts:
             set_parts.append('updated_at=NOW()')
@@ -4215,7 +4310,8 @@ def admin_preorder_import():
     overwrite = (data.get('mode') or '').strip() == 'overwrite'
     if not isinstance(orders, list) or not orders:
         return jsonify(ok=False, error='沒有可匯入的訂單'), 400
-    created, updated, skipped, errors, warnings = [], [], [], [], []
+    confirm_overbook = bool(data.get('confirm_overbook'))
+    created, updated, skipped, errors, warnings, overbooked = [], [], [], [], [], []
     try:
         conn = get_db(); cur = conn.cursor()
         cur.execute("SELECT * FROM preorder_products")
@@ -4246,17 +4342,15 @@ def admin_preorder_import():
                     if not overwrite:
                         skipped.append(ref); continue
                     existing_id = row['id']
-            cur.execute("""
-                SELECT COALESCE(SUM(passenger_count), 0) AS booked FROM preorder_orders
-                WHERE product_id=%s AND departure_date=%s AND departure_time=%s
-                  AND status <> 'cancelled' AND id <> %s
-            """, (prod['id'], dep_date, dep_time, existing_id or 0))
-            booked = int(cur.fetchone()['booked'] or 0)
+            cur.execute('SELECT pg_advisory_xact_lock(%s)',
+                        (_slot_lock_key(prod['id'], dep_date, dep_time),))
+            booked = _slot_booked_pax(cur, prod['id'], dep_date, dep_time, existing_id)
             status = IMPORT_STATUS_LABELS.get((o.get('status') or '').strip()) or (
                 'confirmed_departure' if booked + len(clean) >= int(prod['min_people'] or 2)
                 else 'pending_departure')
             if status != 'cancelled' and prod['capacity'] is not None and booked + len(clean) > int(prod['capacity']):
                 warnings.append(f"{prod['name']} {dep_date} {dep_time} 匯入後共 {booked + len(clean)} 人，超過上限 {prod['capacity']}")
+                overbooked.append(f"{prod['name']} {dep_date} {dep_time}".strip())
             agency = (o.get('agency_name') or '').strip()
             cname = (o.get('contact_name') or '').strip() or clean[0]['name']
             cphone = (o.get('contact_phone') or '').strip() or clean[0]['phone']
@@ -4295,12 +4389,20 @@ def admin_preorder_import():
                 cur.execute("INSERT INTO preorder_order_logs (order_id, summary) VALUES (%s,%s)",
                             (oid, '後台匯入建立'))
                 created.append(new_ref)
+        # 超額不阻擋，但要人「看見並確認」才寫入：整批 rollback 後回 409 請前端再送一次。
+        # （2026-08-27 已知：後台匯入原本只是把警告塞進回應，沒人看見就等於沒有守門。）
+        if overbooked and not confirm_overbook:
+            conn.rollback(); cur.close(); conn.close()
+            return jsonify(ok=False, needs_confirm=True, overbooked=overbooked,
+                           warnings=warnings, errors=errors,
+                           error='這批匯入會讓下列場次超過人數上限，請確認後再送出'), 409
         if created or updated:
             pax = sum(len(o.get('passengers') or []) for o in orders)
             write_audit(cur, 'import', category='行程預購',
                         scope=f'新增{len(created)}／覆蓋{len(updated)}',
                         record_count=len(created) + len(updated), pax_count=pax,
-                        detail=('覆蓋模式' if overwrite else '一般匯入'))
+                        detail=('覆蓋模式' if overwrite else '一般匯入')
+                                + ('｜已確認超額匯入：' + '、'.join(overbooked) if overbooked else ''))
         conn.commit(); cur.close(); conn.close()
         return jsonify(ok=True, created=created, updated=updated, skipped=skipped,
                        errors=errors, warnings=warnings)
@@ -5352,7 +5454,7 @@ def update_contact_funnel(contact_id):
                                 THEN COALESCE(contacted_at,NOW()) ELSE contacted_at END,
               converted_at=CASE WHEN %s='converted' THEN COALESCE(converted_at,NOW())
                                 WHEN %s<>'converted' THEN NULL ELSE converted_at END,
-              conversion_value=CASE WHEN %s='converted' THEN %s ELSE NULL END
+              conversion_value=CASE WHEN %s='converted' THEN %s::numeric ELSE NULL END
             WHERE id=%s
         """, (status, status, status, status, status, value, contact_id))
         write_audit(cur, 'update', '諮詢漏斗', str(contact_id), 1, 0,

@@ -1914,12 +1914,23 @@ function saveNeihaiOrder(id) {
     contact_phone: g('cphone').value, contact_email: g('cemail').value, notes: g('notes').value,
     passengers, _key: ADMIN_KEY,
   };
-  fetch(`/api/admin/neihai/preorders/${id}?key=${encodeURIComponent(ADMIN_KEY)}`, {
-    method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+  // 改期若會讓目標船班超額，後端回 409 needs_confirm 且整筆未寫入，確認後再送一次。
+  const save = (confirmOverbook) => fetch(
+    `/api/admin/neihai/preorders/${id}?key=${encodeURIComponent(ADMIN_KEY)}`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ ...body, confirm_overbook: !!confirmOverbook })
   }).then(r => r.json()).then(d => {
+    if (d.needs_confirm && !confirmOverbook) {
+      if (!confirm('⚠️ ' + d.error + '\n\n（目前尚未儲存）\n' +
+                   '按【確定】＝仍要改期，並記入修改紀錄\n按【取消】＝先不改')) {
+        showToast('已取消，資料未變動', 'error'); return;
+      }
+      return save(true);
+    }
     if (d.ok) { showToast(d.changed ? '已儲存並記錄修改' : '無變更', 'success'); loadNeihaiOrders(); }
     else showToast(d.error || '儲存失敗', 'error');
   }).catch(() => showToast('儲存失敗', 'error'));
+  save(false);
 }
 
 function archiveNeihaiOrder(id, archived) {
@@ -2145,10 +2156,22 @@ function importCsvFile(input, kind) {
         '（沒有編號或編號是新的訂單，一律新增，不受此選擇影響）');
     }
     const url = kind === 'neihai' ? '/api/admin/neihai/import' : '/api/admin/preorder/import';
-    fetch(`${url}?key=${encodeURIComponent(ADMIN_KEY)}`, {
+    // 超額匯入不阻擋，但要人看見並確認：後端回 409 needs_confirm 時整批未寫入，
+    // 由這裡跳確認框後帶 confirm_overbook 再送一次。
+    const send = (confirmOverbook) => fetch(`${url}?key=${encodeURIComponent(ADMIN_KEY)}`, {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ orders, mode: overwrite ? 'overwrite' : '', _key: ADMIN_KEY }),
+      body: JSON.stringify({ orders, mode: overwrite ? 'overwrite' : '',
+                             confirm_overbook: !!confirmOverbook, _key: ADMIN_KEY }),
     }).then(r => r.json()).then(d => {
+      if (d.needs_confirm && !confirmOverbook) {
+        const ok = confirm(
+          '⚠️ 這批匯入會讓下列場次超過人數上限：\n\n' +
+          (d.overbooked || []).map(s => '　・' + s).join('\n') +
+          '\n\n（目前整批都還沒寫入）\n' +
+          '按【確定】＝仍要匯入，並記入操作紀錄\n按【取消】＝先不匯入，回去確認名額');
+        if (!ok) { showToast('已取消匯入，資料未變動', 'error'); return; }
+        return send(true);
+      }
       if (!d.ok) { showToast(d.error || '匯入失敗', 'error'); return; }
       const parts = [`新增 ${d.created.length} 筆`];
       if ((d.updated || []).length) parts.push(`覆蓋更新 ${d.updated.length} 筆`);
@@ -2159,6 +2182,7 @@ function importCsvFile(input, kind) {
         alert(['匯入結果', ...d.errors.map(e => '❌ ' + e), ...d.warnings.map(w => '⚠️ ' + w)].join('\n'));
       if (kind === 'neihai') loadNeihaiOrders(); else loadPreorderOrders();
     }).catch(() => showToast('匯入失敗，請稍後再試', 'error'));
+    send(false);
   };
   reader.readAsText(file, 'utf-8');
 }
@@ -2411,12 +2435,23 @@ function savePreorderOrder(id) {
     contact_phone: g('cphone').value, contact_email: g('cemail').value, notes: g('notes').value,
     passengers, _key: ADMIN_KEY,
   };
-  fetch(`/api/admin/preorder/orders/${id}?key=${encodeURIComponent(ADMIN_KEY)}`, {
-    method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+  // 改期若會讓目標場次超額，後端回 409 needs_confirm 且整筆未寫入，確認後再送一次。
+  const save = (confirmOverbook) => fetch(
+    `/api/admin/preorder/orders/${id}?key=${encodeURIComponent(ADMIN_KEY)}`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ ...body, confirm_overbook: !!confirmOverbook })
   }).then(r => r.json()).then(d => {
+    if (d.needs_confirm && !confirmOverbook) {
+      if (!confirm('⚠️ ' + d.error + '\n\n（目前尚未儲存）\n' +
+                   '按【確定】＝仍要改期，並記入修改紀錄\n按【取消】＝先不改')) {
+        showToast('已取消，資料未變動', 'error'); return;
+      }
+      return save(true);
+    }
     if (d.ok) { showToast('已儲存', 'success'); loadPreorderOrders(); }
     else showToast(d.error || '儲存失敗', 'error');
   }).catch(() => showToast('儲存失敗', 'error'));
+  save(false);
 }
 
 function archivePreorderOrder(id, archived) {
