@@ -113,9 +113,18 @@ Python 字串 hash 預設隨機化（未設 PYTHONHASHSEED）。
       前端跳確認框後帶 `confirm_overbook` 再送，並把超額場次寫進 `write_audit` 的 detail。
 - [x] 兩套後台 PATCH 改期補容量檢查（原本完全沒有）→ 同樣 409 `needs_confirm`，
       確認後把「⚠️ 已確認超額改期」寫進 `preorder_order_logs`／`neihai_preorder_logs`。
-- [ ] **部署後**跑 `scripts/check_capacity_conflicts.py <DATABASE_PUBLIC_URL>` 驗既有資料
-      （本機 `.env` 是 localhost 佔位字串，連不到正式庫，所以還沒跑過）。
-- [ ] **部署後**人工驗收：行程卡與預購頁對同一場次顯示同一個剩餘數字。
+- [x] **部署後對帳**（2026-09-02 16:35，deployment 718d635b SUCCESS）：
+      `railway variables --service Postgres --json` 取 `DATABASE_PUBLIC_URL`，
+      跑 `scripts/check_capacity_conflicts.py`。festival 共用池五個日期數字正確，
+      【3】無仍用人工計數的梯次。唯一兩筆警示是**既有歷史資料**、非本次改動造成：
+      內海 2026-07-05 09:00 為 16/13、2026-07-07 20:30 為 22/13（8/27 就已知，
+      日期已過、船已開，程式修正不會回頭改資料。要不要清理是營運決定）。
+      ⚠️ Windows 跑這支腳本要加 `PYTHONIOENCODING=utf-8`，否則 cp950 會在 `⚠` 字元炸掉。
+- [x] **部署後端對端驗收**（線上實測，非本機）：`/api/preorder/festival/slots`（預購頁）
+      與 `/api/slots`（行程卡）五個日期的 remaining **完全一致，0 筆不符**。
+      **關鍵證據 2026-09-12：線上 2 ＋ 線下 3 ＝ 5/5，兩邊都顯示額滿。**
+      修好之前預購頁只看線上訂單，會顯示「剩 3 位・確定成行」，
+      等於把老闆已經在電話／LINE 賣掉的 3 個位子再賣一次。
 - ⚠️ **新的操作注意事項**：匯入的容量檢查現在也把「線下已售」算進去。
       如果老闆把原本記在「線下已售」的那幾筆，之後又用 CSV 匯入成正式訂單，
       同一批人會被算兩次而跳出超額確認框。
