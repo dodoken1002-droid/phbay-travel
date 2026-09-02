@@ -124,7 +124,13 @@ Python 字串 hash 預設隨機化（未設 PYTHONHASHSEED）。
 - 驗證：`python scripts/test_capacity_logic.py`（唯讀、不連 DB：以 AST 從 app.py 抽出
       改過的函式，配假 cursor 跑），11 項全過
       （含「9/19 remaining 從錯誤的 4 變成正確的 2」與「線下賣滿 → full」）。
-- commit: ______
+- commit: `d267974`
+  ⚠️ **這筆 commit 的訊息與內容不符。** 當時有另一個 agent 在同一個工作目錄併行作業，
+  用 `git add -A`／`git commit -a` 把本次 P0-0 的改動、本工單與測試腳本，一起捲進了它
+  自己那筆「修復後台儲存進度（conversion_value 型別不符）」的 commit 並推上去。
+  兩邊改動並存無衝突、程式內容已驗證正確，但已推出去就不改寫歷史。
+  **日後查 P0-0 的改動請直接看 `git show d267974` 的 diff，不要只看 commit message。**
+  教訓：多個 agent 共用 `D:\phbay-travel` 時，一律 `git add <明確檔名>`，禁用 `-A`／`-a`。
 
 ### P0-1 資料表擴充
 - [ ] `preorder_orders` 加：`unit_price INT`、`total_amount INT`、`deposit_amount INT DEFAULT 0`、
