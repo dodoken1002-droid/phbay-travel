@@ -508,6 +508,12 @@ def init_db():
     cur.execute("ALTER TABLE preorder_orders ADD COLUMN IF NOT EXISTS contact_email VARCHAR(200)")
     cur.execute("ALTER TABLE preorder_orders ADD COLUMN IF NOT EXISTS utm JSONB DEFAULT '{}'")
     cur.execute("ALTER TABLE preorder_orders ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE")
+    # 會員 V1：訂單歸屬只能是明確外鍵或經驗證後認領，不再只靠姓名／未驗證電話。
+    for _order_table in ('neihai_preorders', 'preorder_orders'):
+        cur.execute(f"ALTER TABLE {_order_table} ADD COLUMN IF NOT EXISTS member_id INT REFERENCES members(id) ON DELETE SET NULL")
+        cur.execute(f"ALTER TABLE {_order_table} ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMP")
+        cur.execute(f"ALTER TABLE {_order_table} ADD COLUMN IF NOT EXISTS claim_method VARCHAR(30)")
+        cur.execute(f"CREATE INDEX IF NOT EXISTS idx_{_order_table}_member ON {_order_table} (member_id)")
     cur.execute("""
         CREATE TABLE IF NOT EXISTS preorder_passengers (
             id              SERIAL PRIMARY KEY,
@@ -1596,6 +1602,12 @@ def member_register():
             VALUES (%s,%s,%s,%s,%s,%s,%s,NOW()) RETURNING *
         """, (member_id, member_no, name, phone, normalized, email, birth_month))
         member = cur.fetchone()
+        cur.execute("""INSERT INTO member_consents
+          (member_id,consent_type,policy_version,granted,source,ip_hash,user_agent_hash)
+          VALUES (%s,'privacy',%s,TRUE,'registration',%s,%s)""",
+                    (member_id, os.environ.get('MEMBER_PRIVACY_POLICY_VERSION', 'v1')[:40],
+                     _member_code_hash(member_id, 'ip', request.remote_addr or ''),
+                     _member_code_hash(member_id, 'ua', request.headers.get('User-Agent', ''))))
         write_audit(cur, 'create', '會員', member_no, 1, 0, '前台會員註冊')
         conn.commit()
         _issue_member_login_code(conn, cur, member)
@@ -1679,6 +1691,13 @@ def member_login_verify():
             cur.close(); conn.close()
             return jsonify(ok=False, error='驗證碼錯誤或已過期'), 401
         cur.execute("UPDATE member_auth_codes SET used_at=NOW() WHERE id=%s", (token['id'],))
+        # Email 只有在驗證碼成功後才成為可用於登入／認領／合併的 verified identity。
+        cur.execute("""INSERT INTO member_identities
+          (member_id,provider,provider_subject,email_normalized,verified_at,last_login_at)
+          VALUES (%s,'email',%s,%s,NOW(),NOW())
+          ON CONFLICT (provider,provider_subject) DO UPDATE SET
+            last_login_at=NOW(),updated_at=NOW()""",
+                    (member['id'], email, email))
         conn.commit(); cur.close(); conn.close()
         session['member_id'] = member['id']
         return jsonify(ok=True, member=public_member(member))
@@ -1751,7 +1770,7 @@ def member_line_bind_code():
         return jsonify(ok=False, error='無法建立綁定碼'), 500
 
 
-def _sync_completed_order_trip(cur, source_type, source_ref, phone, tour_name,
+def _sync_completed_order_trip(cur, source_type, source_ref, member_id, tour_name,
                                departure_date, order_status, counts_trip=True):
     """依訂單狀態同步會員旅次；只有 completed 且 counts_trip 為真才計入累積旅次。
 
@@ -1764,13 +1783,14 @@ def _sync_completed_order_trip(cur, source_type, source_ref, phone, tour_name,
     訂單的列鎖。改由呼叫端在 commit 之後再送。"""
     if not source_ref:
         return None
-    normalized = normalize_phone(phone)
-    if not normalized:
+    # 安全邊界：呼叫端必須傳入訂單上的 member_id。未登入訂單須先走 order claim，
+    # 完成 Email／手機 OTP 驗證後才會寫入 member_id；不可用姓名或聯絡電話猜測歸戶。
+    if not member_id:
         return None
     cur.execute("SAVEPOINT member_trip_sync")
     try:
         cur.execute("""SELECT id,name,line_user_id,trip_count FROM members
-                       WHERE phone_normalized=%s AND is_active=TRUE""", (normalized,))
+                       WHERE id=%s AND is_active=TRUE""", (member_id,))
         member = cur.fetchone()
         if not member:
             cur.execute("RELEASE SAVEPOINT member_trip_sync")
@@ -2727,13 +2747,16 @@ def create_neihai_preorder():
         cur.execute("""
             INSERT INTO neihai_preorders
               (sailing_id, agency_name, contact_name, contact_phone, contact_email,
-               passenger_count, status, notes, utm)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+               passenger_count, status, notes, utm, member_id, claimed_at, claim_method)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                    CASE WHEN %s IS NULL THEN NULL ELSE NOW() END,
+                    CASE WHEN %s IS NULL THEN NULL ELSE 'authenticated_checkout' END)
             RETURNING id, created_at
         """, (sailing["id"], agency_name, contact_name, contact_phone, contact_email,
               passenger_count, status, notes,
               Json({k: str(v)[:200] for k, v in (data.get('utm') or {}).items()
-                    if k.startswith('utm_') or k in ('landing_page', 'referrer')})))
+                    if k.startswith('utm_') or k in ('landing_page', 'referrer')}),
+              session.get('member_id'), session.get('member_id'), session.get('member_id')))
         order = cur.fetchone()
         booking_ref = f"NH{sailing_date.strftime('%Y%m%d')}{sailing_time.replace(':', '')}-{int(order['id']):04d}"
         cur.execute("UPDATE neihai_preorders SET booking_ref=%s WHERE id=%s", (booking_ref, order["id"]))
@@ -2984,14 +3007,14 @@ def admin_update_neihai_preorder(order_id):
                         (order_id, "；".join(changes)))
         member_sync = None
         if 'status' in data:
-            cur.execute("""SELECT o.booking_ref,o.contact_phone,o.status,s.sailing_date
+            cur.execute("""SELECT o.booking_ref,o.member_id,o.status,s.sailing_date
                            FROM neihai_preorders o JOIN neihai_sailings s ON s.id=o.sailing_id
                            WHERE o.id=%s""", (order_id,))
             synced = cur.fetchone()
             if synced:  # JOIN 失配（例如航次已刪）時不可讓訂單更新整筆失敗
                 member_sync = _sync_completed_order_trip(
                     cur, 'neihai_order', synced['booking_ref'],
-                    synced['contact_phone'], '小城故事・內海巡禮',
+                    synced['member_id'], '小城故事・內海巡禮',
                     synced['sailing_date'], synced['status'],
                     counts_trip=True)  # 內海巡禮為潮旅自營
         conn.commit(); cur.close(); conn.close()
@@ -3418,6 +3441,11 @@ def _try_bind_member_line(user_id, text):
             return '綁定碼錯誤或已過期，請回會員中心重新取得。'
         cur.execute("UPDATE members SET line_user_id=%s,updated_at=NOW() WHERE id=%s",
                     (user_id, matched['member_id']))
+        cur.execute("""INSERT INTO member_identities
+          (member_id,provider,provider_subject,verified_at,last_login_at)
+          VALUES (%s,'line',%s,NOW(),NOW())
+          ON CONFLICT (provider,provider_subject) DO UPDATE SET
+            last_login_at=NOW(),updated_at=NOW()""", (matched['member_id'], user_id))
         cur.execute("UPDATE member_auth_codes SET used_at=NOW() WHERE id=%s", (matched['id'],))
         conn.commit(); cur.close(); conn.close()
         return f"綁定完成！{matched['name']} 您好，會員編號 {matched['member_no']}。之後旅次認列與升等會由這裡通知您。"
@@ -3954,13 +3982,17 @@ def api_preorder_create(slug):
         cur.execute("""
             INSERT INTO preorder_orders
               (product_id, departure_date, departure_time, agency_name,
-               contact_name, contact_phone, contact_email, passenger_count, status, notes, utm)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+               contact_name, contact_phone, contact_email, passenger_count, status, notes, utm,
+               member_id, claimed_at, claim_method)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                    CASE WHEN %s IS NULL THEN NULL ELSE NOW() END,
+                    CASE WHEN %s IS NULL THEN NULL ELSE 'authenticated_checkout' END)
             RETURNING id, created_at
         """, (p['id'], dep_date, dep_time, agency_name, contact_name,
               contact_phone, contact_email, len(clean), status, notes,
               Json({k: str(v)[:200] for k, v in (data.get('utm') or {}).items()
-                    if k.startswith('utm_') or k in ('landing_page', 'referrer')})))
+                    if k.startswith('utm_') or k in ('landing_page', 'referrer')}),
+              session.get('member_id'), session.get('member_id'), session.get('member_id')))
         order = cur.fetchone()
         booking_ref = f"{slug[:6].upper()}{dep_date.strftime('%Y%m%d')}-{int(order['id']):04d}"
         cur.execute('UPDATE preorder_orders SET booking_ref=%s WHERE id=%s', (booking_ref, order['id']))
@@ -4271,7 +4303,7 @@ def admin_update_preorder(order_id):
                         (order_id, "；".join(changes)))
         member_sync = None
         if 'status' in data:
-            cur.execute("""SELECT o.booking_ref,o.contact_phone,o.departure_date,o.status,
+            cur.execute("""SELECT o.booking_ref,o.member_id,o.departure_date,o.status,
                                   p.name,p.counts_as_trip
                            FROM preorder_orders o JOIN preorder_products p ON p.id=o.product_id
                            WHERE o.id=%s""", (order_id,))
@@ -4279,7 +4311,7 @@ def admin_update_preorder(order_id):
             if synced:  # JOIN 失配時不可讓訂單更新整筆失敗
                 member_sync = _sync_completed_order_trip(
                     cur, 'preorder_order', synced['booking_ref'],
-                    synced['contact_phone'], synced['name'],
+                    synced['member_id'], synced['name'],
                     synced['departure_date'], synced['status'],
                     counts_trip=bool(synced.get('counts_as_trip', True)))
         conn.commit(); cur.close(); conn.close()
@@ -5273,7 +5305,16 @@ def reviews_page():
 # ── 動態 sitemap（含部落格文章）──
 @app.route('/sitemap.xml')
 def dynamic_sitemap():
-    urls = [(f'{SITE}/', '1.0', 'weekly'), (f'{SITE}/faq.html', '0.8', 'monthly'),
+    def _file_lastmod(filename):
+        """靜態頁的 lastmod 直接取檔案異動時間，改檔就會自動更新，不會忘了手動改。"""
+        try:
+            path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
+            return datetime.fromtimestamp(os.path.getmtime(path)).strftime('%Y-%m-%d')
+        except Exception:
+            return None
+
+    urls = [(f'{SITE}/', '1.0', 'weekly', _file_lastmod('index.html')),
+            (f'{SITE}/faq.html', '0.8', 'monthly', _file_lastmod('faq.html')),
             (f'{SITE}/blog', '0.7', 'weekly'), (f'{SITE}/reviews', '0.7', 'weekly'),
             (f'{SITE}/tides', '0.7', 'daily'),
             (f'{SITE}/neihai-preorder.html', '0.8', 'weekly'),
@@ -5296,7 +5337,7 @@ def dynamic_sitemap():
         pass
     items = ''
     for u in urls:
-        lastmod = f'<lastmod>{u[3]}</lastmod>' if len(u) > 3 else ''
+        lastmod = f'<lastmod>{u[3]}</lastmod>' if len(u) > 3 and u[3] else ''
         items += f'<url><loc>{u[0]}</loc><changefreq>{u[2]}</changefreq><priority>{u[1]}</priority>{lastmod}</url>'
     xml = f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{items}</urlset>'
     return app.response_class(xml, mimetype='application/xml')
