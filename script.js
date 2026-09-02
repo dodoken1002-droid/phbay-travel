@@ -406,11 +406,26 @@ function populateTourInterest(tours) {
   });
 }
 
+/* 諮詢表單的梯次選單開關。
+   2026-08-27 暫時關閉：tour_slots.booked 是後台人工維護的已售數，
+   但諮詢表單每送出一筆就 booked+1（不論幾人），且預購訂單完全不會扣減它，
+   兩邊對不起來會造成超賣。待名額改為單一來源後再開回 true。
+   關閉後行程卡上的名額顯示不受影響，客人仍可從卡片的「預購訂位」下單。 */
+const ENABLE_SLOT_SELECTION = false;
+
 async function loadSlotOptions(selectEl) {
   const group  = document.getElementById('slot-group');
   const select = document.getElementById('slot-select');
   const hint   = document.getElementById('slot-status');
   if (!group || !select) return;
+
+  if (!ENABLE_SLOT_SELECTION) {
+    group.style.display = 'none';
+    select.innerHTML = '';       // 確保不會送出 slot_id
+    select.value = '';
+    if (hint) hint.textContent = '';
+    return;
+  }
 
   // 讀取目前選取 option 上的 data-tour-id（由動態填入時帶入）
   const opt    = selectEl && selectEl.selectedOptions ? selectEl.selectedOptions[0] : null;
