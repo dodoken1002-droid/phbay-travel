@@ -285,6 +285,10 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
           <i class="fas fa-plus"></i> 新增梯次
         </button>
       </div>
+      <!-- 超賣警示：後台匯入採「超額僅警告不阻擋」，警告需要有地方常駐顯示 -->
+      <div id="capacity-alerts"></div>
+      <!-- 線下已售人數（電話／LINE／同業）：依「預購產品＋日期」維護，共用座位只有一個數字 -->
+      <div id="manual-holds"></div>
       <div id="slots-list">載入中…</div>
     </div>
 
@@ -2453,7 +2457,89 @@ function updatePreorderStatus(id, status) {
 ══════════════════════════════════════ */
 let _tourList = [];   // 行程清單（for 梯次表單下拉）
 
+/* 超賣警示：列出目前已超過上限的船班／梯次 */
+function loadCapacityAlerts() {
+  const el = document.getElementById('capacity-alerts');
+  if (!el) return;
+  fetch(`/api/admin/capacity-alerts?key=${encodeURIComponent(ADMIN_KEY)}`)
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok || !d.count) { el.innerHTML = ''; return; }
+      el.innerHTML = `
+        <div style="background:#fff5f5;border:1px solid #feb2b2;border-left:4px solid #e53e3e;
+                    border-radius:10px;padding:14px 16px;margin-bottom:16px">
+          <p style="margin:0 0 8px;font-weight:800;color:#c53030">
+            <i class="fas fa-triangle-exclamation"></i> 超賣警示（${d.count} 筆）</p>
+          <p style="margin:0 0 10px;font-size:.84rem;color:#744">
+            後台匯入訂單時「超過上限僅警告、不阻擋」，以下是目前已超過上限的場次，請確認是否為刻意安排（例如花火專船用大船）。</p>
+          <table style="width:100%;border-collapse:collapse;font-size:.88rem">
+            ${d.alerts.map(a => `
+              <tr style="border-bottom:1px solid #fed7d7">
+                <td style="padding:6px 8px">${a.kind}</td>
+                <td style="padding:6px 8px">${a.label}</td>
+                <td style="padding:6px 8px;text-align:right">${a.pax}/${a.capacity}</td>
+                <td style="padding:6px 8px;text-align:right;color:#c53030;font-weight:700">超賣 ${a.over} 人</td>
+              </tr>`).join('')}
+          </table>
+        </div>`;
+    })
+    .catch(() => { el.innerHTML = ''; });
+}
+
+/* 線下已售人數：電話／LINE／同業等未經預購頁的訂單，依「預購產品＋日期」維護。
+   前台可用名額 = 產品上限 −（預購訂單人數 ＋ 這裡的線下已售人數）。 */
+function loadManualHolds() {
+  const el = document.getElementById('manual-holds');
+  if (!el) return;
+  fetch(`/api/admin/manual-holds?key=${encodeURIComponent(ADMIN_KEY)}`)
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) { el.innerHTML = ''; return; }
+      el.innerHTML = `
+        <div style="background:#f7fafc;border:1px solid #cbd5e0;border-radius:10px;padding:14px 16px;margin-bottom:16px">
+          <p style="margin:0 0 6px;font-weight:800;color:#2d3748">
+            <i class="fas fa-phone"></i> 線下已售人數（電話／LINE／同業）</p>
+          <p style="margin:0 0 10px;font-size:.84rem;color:#718096">
+            未經預購頁的訂單請登記在這裡。前台名額 = 產品上限 −（預購訂單 ＋ 線下已售）。
+            同一批座位由多條行程共用時，這裡只需填一個數字。</p>
+          <table style="width:100%;border-collapse:collapse;font-size:.88rem">
+            <tr style="background:#edf2f7;font-weight:700">
+              <td style="padding:6px 8px">行程</td><td style="padding:6px 8px">日期</td>
+              <td style="padding:6px 8px;text-align:right">線下已售</td>
+              <td style="padding:6px 8px">備註</td><td style="padding:6px 8px"></td>
+            </tr>
+            ${(d.holds || []).map(h => `
+              <tr style="border-bottom:1px solid #e2e8f0">
+                <td style="padding:6px 8px">${h.name}</td>
+                <td style="padding:6px 8px">${h.hold_date}</td>
+                <td style="padding:6px 8px;text-align:right">
+                  <input type="number" min="0" value="${h.pax}" style="width:64px;text-align:right"
+                         id="hold-${h.id}" /></td>
+                <td style="padding:6px 8px;color:#718096;font-size:.8rem">${h.note || ''}</td>
+                <td style="padding:6px 8px;text-align:right">
+                  <button class="btn btn-sm" onclick="saveManualHold('${h.slug}','${h.hold_date}','hold-${h.id}')">儲存</button></td>
+              </tr>`).join('')}
+          </table>
+        </div>`;
+    })
+    .catch(() => { el.innerHTML = ''; });
+}
+
+function saveManualHold(slug, date, inputId) {
+  const pax = parseInt(document.getElementById(inputId).value || '0', 10);
+  fetch(`/api/admin/manual-holds?key=${encodeURIComponent(ADMIN_KEY)}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug, date, pax })
+  }).then(r => r.json()).then(d => {
+    if (d.ok) { showToast('已更新線下已售人數'); loadSlots(); }
+    else showToast(d.error || '更新失敗', 'error');
+  });
+}
+window.saveManualHold = saveManualHold;
+
 function loadSlots() {
+  loadCapacityAlerts();
+  loadManualHolds();
   const el = document.getElementById('slots-list');
   el.innerHTML = '載入中…';
 
