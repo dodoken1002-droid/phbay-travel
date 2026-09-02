@@ -2025,8 +2025,13 @@ def admin_member_adjust_points(member_id):
         if int(member['points_balance'] or 0) + delta < 0:
             cur.close(); conn.close(); return jsonify(ok=False, error='點數餘額不可為負數'), 400
         cur.execute("""INSERT INTO member_points (member_id,delta,source,redemption)
-                       VALUES (%s,%s,%s,%s)""", (member_id, delta, source,
+                       VALUES (%s,%s,%s,%s) RETURNING id""", (member_id, delta, source,
                                                    (data.get('redemption') or '')[:500]))
+        legacy_point_id = cur.fetchone()['id']
+        cur.execute("""INSERT INTO point_transactions
+          (member_id,transaction_type,points,reason,idempotency_key)
+          VALUES (%s,'manual_adjustment',%s,%s,%s)""",
+                    (member_id, delta, source, f'legacy-member-point:{legacy_point_id}'))
         trips, points = recalculate_member(cur, member_id)
         write_audit(cur, 'update', '會員點數', member['member_no'], 1, 0, f'{delta:+d} {source}')
         conn.commit(); cur.close(); conn.close()
@@ -2059,6 +2064,13 @@ def admin_member_merge():
             cur.close(); conn.close(); return jsonify(ok=False, error='找不到來源或目標會員'), 404
         cur.execute("UPDATE member_trips SET member_id=%s WHERE member_id=%s", (target_id, source_id))
         cur.execute("UPDATE member_points SET member_id=%s WHERE member_id=%s", (target_id, source_id))
+        cur.execute("UPDATE point_transactions SET member_id=%s WHERE member_id=%s", (target_id, source_id))
+        cur.execute("UPDATE member_identities SET member_id=%s WHERE member_id=%s", (target_id, source_id))
+        cur.execute("UPDATE member_consents SET member_id=%s WHERE member_id=%s", (target_id, source_id))
+        cur.execute("UPDATE order_claims SET member_id=%s WHERE member_id=%s", (target_id, source_id))
+        cur.execute("UPDATE neihai_preorders SET member_id=%s WHERE member_id=%s", (target_id, source_id))
+        cur.execute("UPDATE preorder_orders SET member_id=%s WHERE member_id=%s", (target_id, source_id))
+        cur.execute("DELETE FROM point_wallet WHERE member_id=%s", (source_id,))
         if not rows[target_id].get('line_user_id') and rows[source_id].get('line_user_id'):
             cur.execute("UPDATE members SET line_user_id=%s WHERE id=%s",
                         (rows[source_id]['line_user_id'], target_id))
@@ -5561,9 +5573,14 @@ def conversion_summary():
 
 
 # ─── 啟動 ──────────────────────────────────────────────────
-from member_v1 import register_member_v1
-register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email,
-                   public_member, _sync_completed_order_trip)
+# member_v1 仍在開發中，模組尚未進版控；缺檔時略過註冊，不要讓整個站起不來。
+try:
+    from member_v1 import register_member_v1
+except ModuleNotFoundError:
+    print('[MEMBER V1] 找不到 member_v1 模組，略過會員 v1 路由註冊')
+else:
+    register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email,
+                       public_member, _sync_completed_order_trip, recalculate_member)
 
 
 if __name__ == '__main__':
