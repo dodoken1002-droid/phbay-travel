@@ -60,7 +60,8 @@ def public_member(row):
     row = dict(row)
     trips = int(row.get("trip_count") or 0)
     return {
-        "id": row.get("id"), "member_no": row.get("member_no"),
+        "id": row.get("id"), "member_id": row.get("member_no"),
+        "member_no": row.get("member_no"),
         "name": row.get("name"), "email": row.get("email"),
         "phone_masked": ("***" + (row.get("phone") or "")[-4:]) if row.get("phone") else "",
         "birth_month": row.get("birth_month"), "joined_at": str(row.get("joined_at") or ""),
@@ -175,7 +176,10 @@ def init_member_tables(cur):
     cur.execute("""
         CREATE TABLE IF NOT EXISTS point_wallet (
             member_id INT PRIMARY KEY REFERENCES members(id) ON DELETE CASCADE,
-            balance INT NOT NULL DEFAULT 0 CHECK (balance >= 0),
+            -- balance 刻意不加 CHECK (balance >= 0)：點數兌換後訂單才被取消／退款時，
+            -- 沖銷會讓帳本真的變成負數。如果這裡把負值 clamp 成 0，會員實際欠點但錢包
+            -- 顯示 0，members.points_balance 與 point_wallet.balance 就會永久對不起來。
+            balance INT NOT NULL DEFAULT 0,
             lifetime_earned INT NOT NULL DEFAULT 0 CHECK (lifetime_earned >= 0),
             updated_at TIMESTAMP NOT NULL DEFAULT NOW()
         )
@@ -251,12 +255,15 @@ def init_member_tables(cur):
              delta,source,'legacy-member-point:'||id,created_at
       FROM member_points WHERE delta<>0
       ON CONFLICT (idempotency_key) DO NOTHING""")
+    # 舊資料庫可能已經帶著 CHECK (balance >= 0) 建好，必須先移除，
+    # 否則沖銷造成的負餘額會讓 recalculate_member() 整筆失敗。
+    cur.execute("ALTER TABLE point_wallet DROP CONSTRAINT IF EXISTS point_wallet_balance_check")
     cur.execute("""INSERT INTO point_wallet (member_id,balance,lifetime_earned,updated_at)
-      SELECT m.id,GREATEST(COALESCE(SUM(p.delta),0),0),
+      SELECT m.id,COALESCE(SUM(p.delta),0),
              COALESCE(SUM(CASE WHEN p.delta>0 THEN p.delta ELSE 0 END),0),NOW()
       FROM members m LEFT JOIN member_points p ON p.member_id=m.id GROUP BY m.id
       ON CONFLICT (member_id) DO UPDATE SET balance=EXCLUDED.balance,
-        lifetime_earned=GREATEST(point_wallet.lifetime_earned,EXCLUDED.lifetime_earned),updated_at=NOW()""")
+        lifetime_earned=EXCLUDED.lifetime_earned,updated_at=NOW()""")
     _migrate_member_columns(cur)
 
 
@@ -264,7 +271,9 @@ def init_member_tables(cur):
 # 都必須同時在這份清單補一行，否則正式站只會拿到舊結構，而 INSERT 會整筆失敗。
 # 2026-07 的 contacts 表就是漏了這份清單，線上諮詢整整一個月每一筆送出都失敗且無人察覺。
 MEMBER_COLUMN_MIGRATIONS = [
-    # ('members', 'referrer_member_no', 'VARCHAR(40)'),   ← 之後新增欄位請照這個格式往下加
+    ('members', 'merged_into_member_id', 'INT REFERENCES members(id) ON DELETE SET NULL'),
+    ('member_merge_requests', 'challenge_id', 'BIGINT REFERENCES member_verification_challenges(id)'),
+    # 訂單欄位在 app.init_db 建立完各訂單表後遷移，避免全新 DB 的建表順序問題。
 ]
 
 
@@ -282,8 +291,22 @@ def recalculate_member(cur, member_id):
     cur.execute("SELECT COALESCE(SUM(delta),0) AS points FROM member_points WHERE member_id=%s",
                 (member_id,))
     points = int(cur.fetchone()["points"] or 0)
+    # lifetime_earned 的定義只有一個：帳本上所有正向交易的合計。
+    # 不可用「歷史最高餘額」近似——賺 100→兌換 100→再賺 100 的會員，
+    # 累積獲得是 200 但最高餘額只有 100，兩種寫法會讓同一筆資料在
+    # 「平常更新」與「部署時重跑 init_db 回填」之間跳動。
+    cur.execute("""SELECT COALESCE(SUM(delta),0) AS earned FROM member_points
+                   WHERE member_id=%s AND delta>0""", (member_id,))
+    earned = int(cur.fetchone()["earned"] or 0)
     cur.execute("UPDATE members SET trip_count=%s, points_balance=%s, updated_at=NOW() WHERE id=%s",
                 (trips, points, member_id))
+    # point_wallet 是快速讀取快取；帳本仍是餘額的唯一依據，
+    # 所以這裡寫入真實餘額（可能為負），不做 clamp。
+    cur.execute("""INSERT INTO point_wallet (member_id,balance,lifetime_earned,updated_at)
+                   VALUES (%s,%s,%s,NOW())
+                   ON CONFLICT (member_id) DO UPDATE SET balance=EXCLUDED.balance,
+                     lifetime_earned=EXCLUDED.lifetime_earned,
+                     updated_at=NOW()""", (member_id, points, earned))
     return trips, points
 
 
@@ -321,9 +344,16 @@ def sync_trip_points(cur, trip_id):
     if diff:
         label = "完成旅次" if diff > 0 else "旅次取消沖銷"
         cur.execute("""INSERT INTO member_points (member_id,trip_id,delta,source)
-                       VALUES (%s,%s,%s,%s)""",
+                       VALUES (%s,%s,%s,%s) RETURNING id""",
                     (trip["member_id"], trip_id, diff,
                      f'{label}：{(trip["tour_name"] or "")}'[:100]))
+        legacy_point_id = cur.fetchone()["id"]
+        cur.execute("""INSERT INTO point_transactions
+          (member_id,trip_id,transaction_type,points,reason,idempotency_key)
+          VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (idempotency_key) DO NOTHING""",
+                    (trip["member_id"], trip_id, 'earn' if diff > 0 else 'reversal', diff,
+                     f'{label}：{(trip["tour_name"] or "")}'[:200],
+                     f'legacy-member-point:{legacy_point_id}'))
     cur.execute("UPDATE member_trips SET points_awarded=%s,updated_at=NOW() WHERE id=%s",
                 (entitled, trip_id))
     return entitled
