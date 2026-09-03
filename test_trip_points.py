@@ -22,6 +22,7 @@ class FakeCursor:
         self.trip = dict(trip)
         self.awarded = awarded
         self.inserts = []
+        self.v1_inserts = []
         self.updates = []
         self._next = None
 
@@ -33,6 +34,9 @@ class FakeCursor:
             self._next = {'awarded': self.awarded}
         elif text.startswith('INSERT INTO member_points'):
             self.inserts.append(params)
+            self._next = {'id': 900 + len(self.inserts)}
+        elif text.startswith('INSERT INTO point_transactions'):
+            self.v1_inserts.append(params)
             self._next = None
         elif text.startswith('UPDATE member_trips SET points_awarded'):
             self.updates.append(params)
@@ -52,6 +56,7 @@ class SyncTripPointsTests(unittest.TestCase):
         cur = FakeCursor({**TRIP, 'status': 'completed', 'counts_trip': True}, awarded=0)
         self.assertEqual(sync_trip_points(cur, 7), points_per_trip())
         self.assertEqual(len(cur.inserts), 1)
+        self.assertEqual(len(cur.v1_inserts), 1)
         self.assertEqual(cur.inserts[0][2], points_per_trip())
         self.assertEqual(cur.updates[0][0], points_per_trip())
 
@@ -68,8 +73,20 @@ class SyncTripPointsTests(unittest.TestCase):
                          awarded=points_per_trip())
         self.assertEqual(sync_trip_points(cur, 7), 0)
         self.assertEqual(len(cur.inserts), 1)
+        self.assertEqual(len(cur.v1_inserts), 1)
         self.assertEqual(cur.inserts[0][2], -points_per_trip())
         self.assertEqual(cur.updates[0][0], 0)
+
+    def test_refunded_order_status_is_mapped_to_reversal(self):
+        """退款與取消都必須把已入帳點數以負向交易沖回。"""
+        app_src = (ROOT / 'app.py').read_text(encoding='utf-8')
+        self.assertIn("order_status in {'cancelled', 'refunded'}", app_src)
+        self.assertIn("'refunded'", app_src.split('PREORDER_VALID_STATUSES', 1)[1].split('\n', 1)[0])
+
+    def test_hard_delete_reverses_points_first(self):
+        app_src = (ROOT / 'app.py').read_text(encoding='utf-8')
+        self.assertIn("_reverse_order_trip_before_delete(cur, 'neihai_order'", app_src)
+        self.assertIn("_reverse_order_trip_before_delete(cur, 'preorder_order'", app_src)
 
     def test_non_countable_trip_earns_nothing(self):
         """代售行程（counts_trip=False）即使完成也不給點。"""
