@@ -18,6 +18,7 @@ import base64
 import hmac
 import hashlib
 import random
+import time
 import zlib
 import urllib.request
 import urllib.error
@@ -1551,12 +1552,43 @@ def _send_member_code_email(member, code):
 
 
 def _member_row(member_id):
-    if not member_id:
+    try:
+        member_id = int(member_id)
+    except (TypeError, ValueError):
         return None
     conn = get_db(); cur = conn.cursor()
-    cur.execute("SELECT * FROM members WHERE id=%s AND is_active=TRUE", (member_id,))
+    cur.execute("""SELECT * FROM members
+                   WHERE id=%s AND is_active=TRUE AND merged_into_member_id IS NULL""",
+                (member_id,))
     row = cur.fetchone(); cur.close(); conn.close()
     return row
+
+
+def require_member():
+    """Legacy 與 Member V1 共用的 session 授權邊界。"""
+    member = _member_row(session.get('member_id'))
+    if not member:
+        session.pop('member_id', None)
+        session.pop('member_email_otp_proof', None)
+    return member
+
+
+def _checkout_member_id(cur):
+    """下單時要寫進訂單的 member_id；沒有有效登入就回 None（訂單維持未歸戶）。
+
+    不能直接用 session['member_id']：帳號被合併或停用後，舊分頁的 cookie 還帶著舊 id。
+    直接寫進訂單的話，輕則訂單掛在一個使用者再也看不到的死帳號上，
+    重則會員已被硬刪、外鍵找不到而讓整筆下單失敗（客人以為沒訂到）。
+    """
+    try:
+        member_id = int(session.get('member_id'))
+    except (TypeError, ValueError):
+        return None
+    cur.execute("""SELECT id FROM members
+                   WHERE id=%s AND is_active=TRUE AND merged_into_member_id IS NULL""",
+                (member_id,))
+    row = cur.fetchone()
+    return row['id'] if row else None
 
 
 @app.route('/api/member/register', methods=['POST'])
@@ -1700,6 +1732,8 @@ def member_login_verify():
                     (member['id'], email, email))
         conn.commit(); cur.close(); conn.close()
         session['member_id'] = member['id']
+        session['member_email_otp_proof'] = {
+            'member_id': member['id'], 'at': int(time.time())}
         return jsonify(ok=True, member=public_member(member))
     except Exception as exc:
         print(f'[MEMBER LOGIN VERIFY] {exc}')
@@ -1709,21 +1743,18 @@ def member_login_verify():
 @app.route('/api/member/logout', methods=['POST'])
 def member_logout():
     session.pop('member_id', None)
+    session.pop('member_email_otp_proof', None)
     return jsonify(ok=True)
 
 
 @app.route('/api/member/me')
 def member_me():
-    member_id = session.get('member_id')
-    if not member_id:
+    member = require_member()
+    if not member:
         return jsonify(ok=False, error='尚未登入'), 401
+    member_id = member['id']
     try:
         conn = get_db(); cur = conn.cursor()
-        cur.execute("SELECT * FROM members WHERE id=%s AND is_active=TRUE", (member_id,))
-        member = cur.fetchone()
-        if not member:
-            cur.close(); conn.close()
-            return jsonify(ok=False, error='尚未登入'), 401
         cur.execute("""SELECT id,tour_name,tour_category,departure_date,status,counts_trip,
                               points_awarded,notes FROM member_trips WHERE member_id=%s
                        ORDER BY departure_date DESC NULLS LAST,id DESC LIMIT 100""", (member_id,))
@@ -1738,6 +1769,13 @@ def member_me():
         for row in cur.fetchall():
             row = dict(row); row['created_at'] = str(row.get('created_at') or '')
             points.append(row)
+        cur.execute("""SELECT transaction_type,points,reason,order_type,order_id,created_at
+                       FROM point_transactions WHERE member_id=%s
+                       ORDER BY created_at DESC LIMIT 100""", (member_id,))
+        point_transactions = []
+        for row in cur.fetchall():
+            row = dict(row); row['created_at'] = str(row.get('created_at') or '')
+            point_transactions.append(row)
         past_names = [row['tour_name'] for row in trips]
         cur.execute("""SELECT id,title,description,image_url,price_display FROM tours
                        WHERE is_active=TRUE AND NOT (title=ANY(%s))
@@ -1745,6 +1783,7 @@ def member_me():
         recommendations = [dict(row) for row in cur.fetchall()]
         cur.close(); conn.close()
         return jsonify(ok=True, member=public_member(member), trips=trips, points=points,
+                       point_transactions=point_transactions,
                        recommendations=recommendations, points_per_trip=points_per_trip(),
                        levels=[{'trips': t, 'name': n} for t, n in member_levels()])
     except Exception as exc:
@@ -1754,7 +1793,7 @@ def member_me():
 
 @app.route('/api/member/line-bind-code', methods=['POST'])
 def member_line_bind_code():
-    member = _member_row(session.get('member_id'))
+    member = require_member()
     if not member:
         return jsonify(ok=False, error='尚未登入'), 401
     try:
@@ -1805,7 +1844,7 @@ def _sync_completed_order_trip(cur, source_type, source_ref, member_id, tour_nam
         previous_status = previous['status'] if previous else None
         before_level = level_for_trips(member['trip_count'])
         trip_status = ('completed' if order_status == 'completed' else
-                       'cancelled' if order_status == 'cancelled' else 'planned')
+                       'cancelled' if order_status in {'cancelled', 'refunded'} else 'planned')
         cur.execute("""
             INSERT INTO member_trips
               (member_id,source_type,source_ref,tour_name,departure_date,status,counts_trip,notes)
@@ -1845,6 +1884,20 @@ def _sync_completed_order_trip(cur, source_type, source_ref, member_id, tour_nam
         cur.execute("RELEASE SAVEPOINT member_trip_sync")
         print(f'[MEMBER TRIP SYNC] {source_type}/{source_ref} 同步失敗，訂單更新不受影響：{exc}')
         return None
+
+
+def _reverse_order_trip_before_delete(cur, source_type, source_ref):
+    """硬刪訂單前先以負向交易沖回點數，避免留下無來源的點數。"""
+    cur.execute("""SELECT id,member_id FROM member_trips
+                   WHERE source_type=%s AND source_ref=%s FOR UPDATE""",
+                (source_type, source_ref))
+    trip = cur.fetchone()
+    if not trip:
+        return
+    cur.execute("UPDATE member_trips SET status='cancelled',updated_at=NOW() WHERE id=%s",
+                (trip['id'],))
+    sync_trip_points(cur, trip['id'])
+    recalculate_member(cur, trip['member_id'])
 
 
 @app.route('/api/admin/members', methods=['GET', 'POST'])
@@ -2268,7 +2321,7 @@ def _preorder_pool_usage(cur):
     caps = {r['id']: r['capacity'] for r in cur.fetchall()}
     cur.execute("""
         SELECT product_id, departure_date::text AS d,
-               COALESCE(SUM(CASE WHEN status <> 'cancelled' THEN passenger_count ELSE 0 END), 0) AS pax
+               COALESCE(SUM(CASE WHEN status NOT IN ('cancelled','refunded') THEN passenger_count ELSE 0 END), 0) AS pax
         FROM preorder_orders GROUP BY product_id, departure_date
     """)
     for r in cur.fetchall():
@@ -2397,10 +2450,10 @@ def admin_capacity_alerts():
         alerts = []
         cur.execute("""
             SELECT s.sailing_date::text AS d, s.sailing_time AS t, s.capacity,
-                   SUM(CASE WHEN p.status <> 'cancelled' THEN p.passenger_count ELSE 0 END) AS pax
+                   SUM(CASE WHEN p.status NOT IN ('cancelled','refunded') THEN p.passenger_count ELSE 0 END) AS pax
             FROM neihai_sailings s JOIN neihai_preorders p ON p.sailing_id = s.id
             GROUP BY s.id, s.sailing_date, s.sailing_time, s.capacity
-            HAVING SUM(CASE WHEN p.status <> 'cancelled' THEN p.passenger_count ELSE 0 END) > s.capacity
+            HAVING SUM(CASE WHEN p.status NOT IN ('cancelled','refunded') THEN p.passenger_count ELSE 0 END) > s.capacity
             ORDER BY s.sailing_date
         """)
         for r in cur.fetchall():
@@ -2411,7 +2464,7 @@ def admin_capacity_alerts():
             SELECT pr.name, pr.capacity, o.departure_date::text AS d, o.departure_time AS t,
                    SUM(o.passenger_count) AS pax
             FROM preorder_orders o JOIN preorder_products pr ON pr.id = o.product_id
-            WHERE o.status <> 'cancelled' AND pr.capacity IS NOT NULL
+            WHERE o.status NOT IN ('cancelled','refunded') AND pr.capacity IS NOT NULL
             GROUP BY pr.name, pr.capacity, o.departure_date, o.departure_time
             HAVING SUM(o.passenger_count) > pr.capacity
             ORDER BY o.departure_date
@@ -2466,6 +2519,7 @@ NEIHAI_VALID_STATUSES = {
     "confirmed",
     "completed",
     "cancelled",
+    "refunded",
 }
 
 
@@ -2614,7 +2668,7 @@ def _neihai_month_availability(start, end):
     cur.execute("""
         SELECT
           s.id, s.sailing_date, s.sailing_time, s.capacity, s.min_people, s.is_active, s.notes,
-          COALESCE(SUM(CASE WHEN p.status <> 'cancelled' THEN p.passenger_count ELSE 0 END), 0) AS booked
+          COALESCE(SUM(CASE WHEN p.status NOT IN ('cancelled','refunded') THEN p.passenger_count ELSE 0 END), 0) AS booked
         FROM neihai_sailings s
         LEFT JOIN neihai_preorders p ON p.sailing_id = s.id
         WHERE s.sailing_date >= %s AND s.sailing_date < %s
@@ -2746,7 +2800,7 @@ def create_neihai_preorder():
         cur.execute("""
             SELECT COALESCE(SUM(passenger_count), 0) AS booked
             FROM neihai_preorders
-            WHERE sailing_id=%s AND status <> 'cancelled'
+            WHERE sailing_id=%s AND status NOT IN ('cancelled','refunded')
         """, (sailing["id"],))
         booked = int(cur.fetchone()["booked"] or 0)
         passenger_count = len(clean_passengers)
@@ -2756,6 +2810,7 @@ def create_neihai_preorder():
             return jsonify(ok=False, error=f"此船班剩餘 {max(0, capacity - booked)} 位，不足以容納本次預購人數"), 400
 
         status = "confirmed_departure" if booked + passenger_count >= int(sailing["min_people"]) else "pending_departure"
+        checkout_member_id = _checkout_member_id(cur)
         cur.execute("""
             INSERT INTO neihai_preorders
               (sailing_id, agency_name, contact_name, contact_phone, contact_email,
@@ -2768,7 +2823,7 @@ def create_neihai_preorder():
               passenger_count, status, notes,
               Json({k: str(v)[:200] for k, v in (data.get('utm') or {}).items()
                     if k.startswith('utm_') or k in ('landing_page', 'referrer')}),
-              session.get('member_id'), session.get('member_id'), session.get('member_id')))
+              checkout_member_id, checkout_member_id, checkout_member_id))
         order = cur.fetchone()
         booking_ref = f"NH{sailing_date.strftime('%Y%m%d')}{sailing_time.replace(':', '')}-{int(order['id']):04d}"
         cur.execute("UPDATE neihai_preorders SET booking_ref=%s WHERE id=%s", (booking_ref, order["id"]))
@@ -2883,7 +2938,7 @@ def admin_neihai_preorders():
 
 NEIHAI_STATUS_LABELS = {
     "pending_departure": "待成團", "confirmed_departure": "已達發船門檻",
-    "confirmed": "人工確認", "completed": "旅程完成", "cancelled": "已取消",
+    "confirmed": "人工確認", "completed": "旅程完成", "cancelled": "已取消", "refunded": "已退款",
 }
 
 
@@ -2958,10 +3013,10 @@ def admin_update_neihai_preorder(order_id):
                                WHERE sailing_date=%s AND sailing_time=%s FOR UPDATE""",
                             (new_d, new_t))
                 target = cur.fetchone()
-                if order['status'] != 'cancelled':
+                if order['status'] not in {'cancelled', 'refunded'}:
                     cur.execute("""
                         SELECT COALESCE(SUM(passenger_count), 0) AS booked FROM neihai_preorders
-                        WHERE sailing_id=%s AND status <> 'cancelled' AND id <> %s
+                        WHERE sailing_id=%s AND status NOT IN ('cancelled','refunded') AND id <> %s
                     """, (target['id'], order_id))
                     booked = int(cur.fetchone()['booked'] or 0)
                     cap = int(target['capacity'] or NEIHAI_DEFAULT_CAPACITY)
@@ -3054,6 +3109,7 @@ def admin_delete_neihai_preorder(order_id):
         if not row:
             cur.close(); conn.close()
             return jsonify(ok=False, error='找不到訂單'), 404
+        _reverse_order_trip_before_delete(cur, 'neihai_order', row['booking_ref'])
         cur.execute("DELETE FROM neihai_preorders WHERE id=%s", (order_id,))
         conn.commit(); cur.close(); conn.close()
         return jsonify(ok=True, booking_ref=row['booking_ref'])
@@ -3159,14 +3215,14 @@ def admin_neihai_import():
             # 已訂人數（覆蓋時排除自己，避免重複計算）
             cur.execute("""
                 SELECT COALESCE(SUM(passenger_count), 0) AS booked FROM neihai_preorders
-                WHERE sailing_id=%s AND status <> 'cancelled' AND id <> %s
+                WHERE sailing_id=%s AND status NOT IN ('cancelled','refunded') AND id <> %s
             """, (sailing['id'], existing_id or 0))
             booked = int(cur.fetchone()['booked'] or 0)
             capacity = int(sailing['capacity'] or NEIHAI_DEFAULT_CAPACITY)
             status = IMPORT_STATUS_LABELS.get((o.get('status') or '').strip()) or (
                 'confirmed_departure' if booked + len(clean) >= int(sailing['min_people'])
                 else 'pending_departure')
-            if status != 'cancelled' and booked + len(clean) > capacity:
+            if status not in {'cancelled', 'refunded'} and booked + len(clean) > capacity:
                 warnings.append(f'{sailing_date} {sailing_time} 匯入後共 {booked + len(clean)} 人，超過上限 {capacity}')
                 overbooked.append(f'{sailing_date} {sailing_time}')
             agency = (o.get('agency_name') or '').strip()
@@ -3754,7 +3810,7 @@ def quiz_ai_note():
 
 
 # ─── 通用預購系統（音樂節等；每個行程一筆 preorder_products）───
-PREORDER_VALID_STATUSES = {'pending_departure', 'confirmed_departure', 'confirmed', 'completed', 'cancelled'}
+PREORDER_VALID_STATUSES = {'pending_departure', 'confirmed_departure', 'confirmed', 'completed', 'cancelled', 'refunded'}
 
 
 def _get_product(slug, cur):
@@ -3802,7 +3858,7 @@ def _slot_booked_pax(cur, product_id, dep_date, dep_time, exclude_order_id=None)
     cur.execute("""
         SELECT COALESCE(SUM(passenger_count), 0) AS booked FROM preorder_orders
         WHERE product_id=%s AND departure_date=%s AND departure_time=%s
-          AND status <> 'cancelled' AND id <> %s
+          AND status NOT IN ('cancelled','refunded') AND id <> %s
     """, (product_id, dep_date, dep_time, exclude_order_id or 0))
     online = int(cur.fetchone()['booked'] or 0)
     return online + _manual_hold_pax(cur, product_id, dep_date)
@@ -3837,7 +3893,7 @@ def _preorder_availability(product, start, end):
     conn = get_db(); cur = conn.cursor()
     cur.execute("""
         SELECT departure_date, departure_time,
-               COALESCE(SUM(CASE WHEN status <> 'cancelled' THEN passenger_count ELSE 0 END), 0) AS booked
+               COALESCE(SUM(CASE WHEN status NOT IN ('cancelled','refunded') THEN passenger_count ELSE 0 END), 0) AS booked
         FROM preorder_orders
         WHERE product_id=%s AND departure_date >= %s AND departure_date < %s
         GROUP BY departure_date, departure_time
@@ -3991,6 +4047,7 @@ def api_preorder_create(slug):
             return jsonify(ok=False, error=f'此場次剩餘 {max(0, int(p["capacity"]) - booked)} 位，不足以容納本次人數'), 400
 
         status = 'confirmed_departure' if booked + len(clean) >= int(p['min_people']) else 'pending_departure'
+        checkout_member_id = _checkout_member_id(cur)
         cur.execute("""
             INSERT INTO preorder_orders
               (product_id, departure_date, departure_time, agency_name,
@@ -4004,7 +4061,7 @@ def api_preorder_create(slug):
               contact_phone, contact_email, len(clean), status, notes,
               Json({k: str(v)[:200] for k, v in (data.get('utm') or {}).items()
                     if k.startswith('utm_') or k in ('landing_page', 'referrer')}),
-              session.get('member_id'), session.get('member_id'), session.get('member_id')))
+              checkout_member_id, checkout_member_id, checkout_member_id))
         order = cur.fetchone()
         booking_ref = f"{slug[:6].upper()}{dep_date.strftime('%Y%m%d')}-{int(order['id']):04d}"
         cur.execute('UPDATE preorder_orders SET booking_ref=%s WHERE id=%s', (booking_ref, order['id']))
@@ -4256,7 +4313,7 @@ def admin_update_preorder(order_id):
 
         # 改期＝把整筆人數搬到另一個場次，一樣可能超賣。原本這裡完全沒有容量檢查。
         # 政策同匯入：不阻擋（後台要能處理例外），但要人看見並確認，並留在修改紀錄裡。
-        if slot_moved and order['status'] != 'cancelled':
+        if slot_moved and order['status'] not in {'cancelled', 'refunded'}:
             cur.execute('SELECT pg_advisory_xact_lock(%s)',
                         (_slot_lock_key(order['product_id'], new_dep_date, new_dep_time),))
             cur.execute("SELECT capacity FROM preorder_products WHERE id=%s", (order['product_id'],))
@@ -4350,6 +4407,7 @@ def admin_delete_preorder(order_id):
         if not row:
             cur.close(); conn.close()
             return jsonify(ok=False, error='找不到訂單'), 404
+        _reverse_order_trip_before_delete(cur, 'preorder_order', row['booking_ref'])
         cur.execute("DELETE FROM preorder_orders WHERE id=%s", (order_id,))
         conn.commit(); cur.close(); conn.close()
         return jsonify(ok=True, booking_ref=row['booking_ref'])
@@ -4406,7 +4464,7 @@ def admin_preorder_import():
             status = IMPORT_STATUS_LABELS.get((o.get('status') or '').strip()) or (
                 'confirmed_departure' if booked + len(clean) >= int(prod['min_people'] or 2)
                 else 'pending_departure')
-            if status != 'cancelled' and prod['capacity'] is not None and booked + len(clean) > int(prod['capacity']):
+            if status not in {'cancelled', 'refunded'} and prod['capacity'] is not None and booked + len(clean) > int(prod['capacity']):
                 warnings.append(f"{prod['name']} {dep_date} {dep_time} 匯入後共 {booked + len(clean)} 人，超過上限 {prod['capacity']}")
                 overbooked.append(f"{prod['name']} {dep_date} {dep_time}".strip())
             agency = (o.get('agency_name') or '').strip()
@@ -5573,6 +5631,16 @@ def conversion_summary():
 
 
 # ─── 啟動 ──────────────────────────────────────────────────
+# member_v1 已隨本分支進版控；仍保留缺檔防護，避免部署時模組意外遺失讓整站起不來。
+try:
+    from member_v1 import register_member_v1
+except ModuleNotFoundError:
+    print('[MEMBER V1] 找不到 member_v1 模組，略過會員 v1 路由註冊')
+else:
+    register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email,
+                       public_member, _sync_completed_order_trip, recalculate_member,
+                       require_member)
+
 
 if __name__ == '__main__':
     try:
