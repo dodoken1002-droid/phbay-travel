@@ -659,3 +659,36 @@ class MemberV1DatabaseTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OAuthEntryVisibilityTests(unittest.TestCase):
+    """憑證還沒設定時，前台不可以顯示社群登入入口。
+
+    按鈕點下去只會拿到 503，等於把使用者送進死路；而且 V1 的社群登入
+    尚未完成端到端驗證，入口不該先對外開放。
+    """
+
+    def setUp(self):
+        app.config.update(TESTING=True)
+        self.client = app.test_client()
+
+    def test_providers_endpoint_reports_unconfigured_without_leaking_secrets(self):
+        response = self.client.get("/api/member/oauth/providers")
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        # 未設定憑證的環境一律回 False，且 facebook 永遠是 False（V1 未啟用）。
+        self.assertIn("line", payload["providers"])
+        self.assertIn("google", payload["providers"])
+        self.assertFalse(payload["providers"]["facebook"])
+        body = response.get_data(as_text=True)
+        for leaked in ("CLIENT_SECRET", "client_secret"):
+            self.assertNotIn(leaked, body)
+
+    def test_member_page_hides_oauth_entries_until_server_confirms(self):
+        page = (ROOT / "member.html").read_text(encoding="utf-8")
+        # 三個入口（註冊、登入、儀表板綁定）都必須預設隱藏。
+        self.assertEqual(page.count('class="oauth-block" hidden'), 3)
+        self.assertIn("/api/member/oauth/providers", page)
+        # 必須是「確認後才顯示」，不是「先顯示再隱藏」。
+        self.assertIn("el.hidden=false", page)

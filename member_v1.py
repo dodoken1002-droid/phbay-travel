@@ -258,6 +258,17 @@ def register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email
         return jsonify(ok=True, identities=rows,
                        available_providers={"line": True, "google": True, "facebook": False})
 
+    @app.get("/api/member/oauth/providers")
+    def member_oauth_providers():
+        """前台據此決定是否顯示社群登入入口。只回報「有沒有設定」，不外流憑證內容。"""
+        providers = {}
+        for name in OAUTH_PROVIDERS:
+            client_id = os.environ.get(f"{name.upper()}_OAUTH_CLIENT_ID", "").strip()
+            secret = os.environ.get(f"{name.upper()}_OAUTH_CLIENT_SECRET", "").strip()
+            providers[name] = bool(client_id and secret)
+        providers["facebook"] = False  # V1 保留欄位，尚未啟用。
+        return jsonify(ok=True, providers=providers)
+
     @app.get("/api/member/oauth/<provider>/start")
     def member_oauth_start(provider):
         config, error = _oauth_config(provider)
