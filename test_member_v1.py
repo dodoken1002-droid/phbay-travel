@@ -161,6 +161,11 @@ class MemberV1SchemaTests(unittest.TestCase):
         self.assertIn("email_otp_required", callback)
         self.assertIn("member_email_otp_proof", self.app_src)
 
+    def test_member_center_explains_oauth_email_step_up(self):
+        member_html = (ROOT / "member.html").read_text(encoding="utf-8")
+        self.assertIn("oauth_error')==='email_otp_required", member_html)
+        self.assertIn("請先使用 Email 驗證碼重新登入", member_html)
+
     def test_otp_is_not_logged_or_returned(self):
         self.assertNotIn("print(code", self.v1)
         phone_response = self.v1.split("def member_phone_request", 1)[1].split(
