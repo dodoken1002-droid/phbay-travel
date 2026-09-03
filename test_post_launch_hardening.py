@@ -209,3 +209,38 @@ class SchemaMigrationRunnerTests(unittest.TestCase):
         for table in ('member_identities', 'order_claims', 'point_wallet'):
             self.assertIn(table, text)
         self.assertIn('sys.exit(main())', text)
+
+
+class BlogViewCountTests(unittest.TestCase):
+    """文章瀏覽數：只給後台看，且計數失敗不可以影響讀者。"""
+
+    def test_public_apis_never_expose_view_count(self):
+        app_src = src('app.py')
+        # _post_public 同時餵給 /api/posts/<slug>（SELECT *），沒有 pop 就會外流。
+        self.assertIn("r.pop('view_count', None)", app_src)
+
+    def test_admin_list_adds_view_count_back(self):
+        app_src = src('app.py')
+        self.assertIn("row['view_count'] = int(r.get('view_count') or 0)", app_src)
+        self.assertIn('view_count', src('admin.html'))
+
+    def test_counting_failure_cannot_break_the_article_page(self):
+        app_src = src('app.py')
+        start = app_src.index('def blog_post(slug):')
+        body = app_src[start:start + 1600]
+        # UPDATE 必須包在自己的 try 裡；跟著外層 except 一起炸的話 p 會變 None → 讀者看到 404。
+        self.assertIn('[BLOG VIEW COUNT]', body)
+        self.assertIn('conn.rollback()', body)
+        self.assertLess(body.index('UPDATE posts SET view_count'), body.index('[BLOG VIEW COUNT]'))
+
+    def test_bots_and_admin_previews_are_not_counted(self):
+        app_src = src('app.py')
+        self.assertIn('_BOT_UA_MARKERS', app_src)
+        self.assertIn('return not current_admin()', app_src)
+        for marker in ('bot', 'crawler', 'spider', 'facebookexternalhit'):
+            self.assertIn(f"'{marker}'", app_src)
+
+    def test_column_is_migrated_not_only_in_create_table(self):
+        # CREATE TABLE IF NOT EXISTS 不會改既有資料表，正式站只會拿到舊結構。
+        self.assertIn('ALTER TABLE posts ADD COLUMN IF NOT EXISTS view_count',
+                      src('app.py'))

@@ -573,6 +573,8 @@ def init_db():
     cur.execute("ALTER TABLE posts ADD COLUMN IF NOT EXISTS info_box JSONB")
     # 多語系翻譯：{lang:{title,summary,content,faq,info_box}}，缺欄位回退中文（zh-tw）
     cur.execute("ALTER TABLE posts ADD COLUMN IF NOT EXISTS i18n JSONB DEFAULT '{}'")
+    # 後台用的文章瀏覽次數；公開 API 一律不回傳（見 _post_public）。
+    cur.execute("ALTER TABLE posts ADD COLUMN IF NOT EXISTS view_count INTEGER NOT NULL DEFAULT 0")
     conn.commit()
 
     # 若 tours 資料表是空的，寫入預設行程
@@ -4825,10 +4827,34 @@ def _breadcrumb_ld(trail):
         ],
     }
 
+# 明顯的爬蟲／預覽抓取／監測服務，不列入文章瀏覽數。
+_BOT_UA_MARKERS = (
+    'bot', 'crawler', 'spider', 'slurp', 'bingpreview', 'facebookexternalhit',
+    'whatsapp', 'telegram', 'line-poker', 'headless', 'curl/', 'wget/',
+    'python-requests', 'python-urllib', 'lighthouse', 'gtmetrix', 'pingdom',
+    'uptimerobot', 'ahrefs', 'semrush', 'mj12', 'dotbot', 'petalbot', 'applebot',
+    'baiduspider', 'yandex', 'go-http-client', 'okhttp',
+)
+
+
+def _countable_pageview():
+    """這次請求要不要計入文章瀏覽數。"""
+    ua = (request.headers.get('User-Agent') or '').lower()
+    if not ua:
+        return False
+    if any(marker in ua for marker in _BOT_UA_MARKERS):
+        return False
+    # 自己在後台預覽文章不該把數字灌高。
+    return not current_admin()
+
+
 def _post_public(r):
     r = dict(r)
     for k in ('created_at', 'updated_at', 'published_at'):
         if r.get(k): r[k] = str(r[k])
+    # 瀏覽數只給後台看：這個序列化函式同時餵給 /api/posts/<slug>（SELECT *），
+    # 不在這裡拿掉的話會直接對外公開。
+    r.pop('view_count', None)
     return r
 
 # ── 公開 API ──
@@ -4863,7 +4889,11 @@ def admin_get_posts():
     try:
         conn = get_db(); cur = conn.cursor()
         cur.execute("SELECT * FROM posts ORDER BY COALESCE(published_at, created_at) DESC")
-        rows = [_post_public(r) for r in cur.fetchall()]
+        rows = []
+        for r in cur.fetchall():
+            row = _post_public(r)
+            row['view_count'] = int(r.get('view_count') or 0)   # 後台限定
+            rows.append(row)
         cur.close(); conn.close()
         return jsonify(ok=True, posts=rows)
     except Exception as e:
@@ -5189,7 +5219,18 @@ def blog_post(slug):
     try:
         conn = get_db(); cur = conn.cursor()
         cur.execute("SELECT * FROM posts WHERE slug=%s AND is_published=TRUE", (slug,))
-        p = cur.fetchone(); cur.close(); conn.close()
+        p = cur.fetchone()
+        # 計數失敗絕不能連帶讓文章打不開，所以獨立成一個 try：
+        # 這裡若跟著拋例外，外層會把 p 設成 None，讀者看到的是 404。
+        if p is not None and _countable_pageview():
+            try:
+                cur.execute("UPDATE posts SET view_count=COALESCE(view_count,0)+1 WHERE id=%s",
+                            (p['id'],))
+                conn.commit()
+            except Exception as _view_exc:
+                conn.rollback()
+                print(f'[BLOG VIEW COUNT] {_view_exc}')
+        cur.close(); conn.close()
     except Exception:
         p = None
     if not p:

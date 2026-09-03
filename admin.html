@@ -2788,7 +2788,7 @@ function loadPosts() {
         return;
       }
       el.innerHTML = `<table class="tour-table" style="min-width:100%"><thead><tr>
-        <th>標題</th><th>網址</th><th>狀態</th><th>發布日</th><th style="width:150px">操作</th>
+        <th>標題</th><th>網址</th><th>狀態</th><th>瀏覽</th><th>發布日</th><th style="width:150px">操作</th>
         </tr></thead><tbody>${d.posts.map(p => {
           const badge = p.is_published
             ? '<span style="color:#38a169;font-weight:700">🟢 已發布</span>'
@@ -2799,6 +2799,7 @@ function loadPosts() {
             <td><strong>${p.title}</strong></td>
             <td style="font-size:.8rem;color:#718096">/blog/${p.slug}</td>
             <td>${badge}</td>
+            <td style="font-size:.85rem;font-variant-numeric:tabular-nums">${(p.view_count||0).toLocaleString()}</td>
             <td style="font-size:.8rem">${(p.published_at||'').slice(0,10) || '—'}</td>
             <td style="display:flex;gap:4px">
               ${view}
