@@ -18,6 +18,7 @@ import base64
 import hmac
 import hashlib
 import random
+import time
 import zlib
 import urllib.request
 import urllib.error
@@ -797,11 +798,17 @@ def _seed_tours(conn, cur):
 
 
 # gunicorn 啟動時初始化（模組層級）
-try:
-    with app.app_context():
-        init_db()
-except Exception as _e:
-    print(f'[警告] 啟動時無法初始化 DB：{_e}')
+# 正式部署由 migrate.py 在啟動前單次執行並驗證 schema，再以 SKIP_SCHEMA_INIT=1 起 gunicorn。
+# 每個 worker 各自建表會在全新資料庫上互相競爭，其中一方拿到 duplicate 錯誤，
+# 而會員資料表那段是 fail-open，於是 schema 只建到一半卻沒有人發現。
+if os.environ.get('SKIP_SCHEMA_INIT') == '1':
+    _db_initialized = True
+else:
+    try:
+        with app.app_context():
+            init_db()
+    except Exception as _e:
+        print(f'[警告] 啟動時無法初始化 DB：{_e}')
 
 
 @app.before_request
@@ -1551,12 +1558,43 @@ def _send_member_code_email(member, code):
 
 
 def _member_row(member_id):
-    if not member_id:
+    try:
+        member_id = int(member_id)
+    except (TypeError, ValueError):
         return None
     conn = get_db(); cur = conn.cursor()
-    cur.execute("SELECT * FROM members WHERE id=%s AND is_active=TRUE", (member_id,))
+    cur.execute("""SELECT * FROM members
+                   WHERE id=%s AND is_active=TRUE AND merged_into_member_id IS NULL""",
+                (member_id,))
     row = cur.fetchone(); cur.close(); conn.close()
     return row
+
+
+def require_member():
+    """Legacy 與 Member V1 共用的 session 授權邊界。"""
+    member = _member_row(session.get('member_id'))
+    if not member:
+        session.pop('member_id', None)
+        session.pop('member_email_otp_proof', None)
+    return member
+
+
+def _checkout_member_id(cur):
+    """下單時要寫進訂單的 member_id；沒有有效登入就回 None（訂單維持未歸戶）。
+
+    不能直接用 session['member_id']：帳號被合併或停用後，舊分頁的 cookie 還帶著舊 id。
+    直接寫進訂單的話，輕則訂單掛在一個使用者再也看不到的死帳號上，
+    重則會員已被硬刪、外鍵找不到而讓整筆下單失敗（客人以為沒訂到）。
+    """
+    try:
+        member_id = int(session.get('member_id'))
+    except (TypeError, ValueError):
+        return None
+    cur.execute("""SELECT id FROM members
+                   WHERE id=%s AND is_active=TRUE AND merged_into_member_id IS NULL""",
+                (member_id,))
+    row = cur.fetchone()
+    return row['id'] if row else None
 
 
 @app.route('/api/member/register', methods=['POST'])
@@ -1700,6 +1738,8 @@ def member_login_verify():
                     (member['id'], email, email))
         conn.commit(); cur.close(); conn.close()
         session['member_id'] = member['id']
+        session['member_email_otp_proof'] = {
+            'member_id': member['id'], 'at': int(time.time())}
         return jsonify(ok=True, member=public_member(member))
     except Exception as exc:
         print(f'[MEMBER LOGIN VERIFY] {exc}')
@@ -1709,21 +1749,18 @@ def member_login_verify():
 @app.route('/api/member/logout', methods=['POST'])
 def member_logout():
     session.pop('member_id', None)
+    session.pop('member_email_otp_proof', None)
     return jsonify(ok=True)
 
 
 @app.route('/api/member/me')
 def member_me():
-    member_id = session.get('member_id')
-    if not member_id:
+    member = require_member()
+    if not member:
         return jsonify(ok=False, error='尚未登入'), 401
+    member_id = member['id']
     try:
         conn = get_db(); cur = conn.cursor()
-        cur.execute("SELECT * FROM members WHERE id=%s AND is_active=TRUE", (member_id,))
-        member = cur.fetchone()
-        if not member:
-            cur.close(); conn.close()
-            return jsonify(ok=False, error='尚未登入'), 401
         cur.execute("""SELECT id,tour_name,tour_category,departure_date,status,counts_trip,
                               points_awarded,notes FROM member_trips WHERE member_id=%s
                        ORDER BY departure_date DESC NULLS LAST,id DESC LIMIT 100""", (member_id,))
@@ -1738,6 +1775,13 @@ def member_me():
         for row in cur.fetchall():
             row = dict(row); row['created_at'] = str(row.get('created_at') or '')
             points.append(row)
+        cur.execute("""SELECT transaction_type,points,reason,order_type,order_id,created_at
+                       FROM point_transactions WHERE member_id=%s
+                       ORDER BY created_at DESC LIMIT 100""", (member_id,))
+        point_transactions = []
+        for row in cur.fetchall():
+            row = dict(row); row['created_at'] = str(row.get('created_at') or '')
+            point_transactions.append(row)
         past_names = [row['tour_name'] for row in trips]
         cur.execute("""SELECT id,title,description,image_url,price_display FROM tours
                        WHERE is_active=TRUE AND NOT (title=ANY(%s))
@@ -1745,6 +1789,7 @@ def member_me():
         recommendations = [dict(row) for row in cur.fetchall()]
         cur.close(); conn.close()
         return jsonify(ok=True, member=public_member(member), trips=trips, points=points,
+                       point_transactions=point_transactions,
                        recommendations=recommendations, points_per_trip=points_per_trip(),
                        levels=[{'trips': t, 'name': n} for t, n in member_levels()])
     except Exception as exc:
@@ -1754,7 +1799,7 @@ def member_me():
 
 @app.route('/api/member/line-bind-code', methods=['POST'])
 def member_line_bind_code():
-    member = _member_row(session.get('member_id'))
+    member = require_member()
     if not member:
         return jsonify(ok=False, error='尚未登入'), 401
     try:
@@ -2762,6 +2807,7 @@ def create_neihai_preorder():
             return jsonify(ok=False, error=f"此船班剩餘 {max(0, capacity - booked)} 位，不足以容納本次預購人數"), 400
 
         status = "confirmed_departure" if booked + passenger_count >= int(sailing["min_people"]) else "pending_departure"
+        checkout_member_id = _checkout_member_id(cur)
         cur.execute("""
             INSERT INTO neihai_preorders
               (sailing_id, agency_name, contact_name, contact_phone, contact_email,
@@ -2774,7 +2820,7 @@ def create_neihai_preorder():
               passenger_count, status, notes,
               Json({k: str(v)[:200] for k, v in (data.get('utm') or {}).items()
                     if k.startswith('utm_') or k in ('landing_page', 'referrer')}),
-              session.get('member_id'), session.get('member_id'), session.get('member_id')))
+              checkout_member_id, checkout_member_id, checkout_member_id))
         order = cur.fetchone()
         booking_ref = f"NH{sailing_date.strftime('%Y%m%d')}{sailing_time.replace(':', '')}-{int(order['id']):04d}"
         cur.execute("UPDATE neihai_preorders SET booking_ref=%s WHERE id=%s", (booking_ref, order["id"]))
@@ -3997,6 +4043,7 @@ def api_preorder_create(slug):
             return jsonify(ok=False, error=f'此場次剩餘 {max(0, int(p["capacity"]) - booked)} 位，不足以容納本次人數'), 400
 
         status = 'confirmed_departure' if booked + len(clean) >= int(p['min_people']) else 'pending_departure'
+        checkout_member_id = _checkout_member_id(cur)
         cur.execute("""
             INSERT INTO preorder_orders
               (product_id, departure_date, departure_time, agency_name,
@@ -4010,7 +4057,7 @@ def api_preorder_create(slug):
               contact_phone, contact_email, len(clean), status, notes,
               Json({k: str(v)[:200] for k, v in (data.get('utm') or {}).items()
                     if k.startswith('utm_') or k in ('landing_page', 'referrer')}),
-              session.get('member_id'), session.get('member_id'), session.get('member_id')))
+              checkout_member_id, checkout_member_id, checkout_member_id))
         order = cur.fetchone()
         booking_ref = f"{slug[:6].upper()}{dep_date.strftime('%Y%m%d')}-{int(order['id']):04d}"
         cur.execute('UPDATE preorder_orders SET booking_ref=%s WHERE id=%s', (booking_ref, order['id']))
@@ -5579,6 +5626,16 @@ def conversion_summary():
 
 
 # ─── 啟動 ──────────────────────────────────────────────────
+# member_v1 已隨本分支進版控；仍保留缺檔防護，避免部署時模組意外遺失讓整站起不來。
+try:
+    from member_v1 import register_member_v1
+except ModuleNotFoundError:
+    print('[MEMBER V1] 找不到 member_v1 模組，略過會員 v1 路由註冊')
+else:
+    register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email,
+                       public_member, _sync_completed_order_trip, recalculate_member,
+                       require_member)
+
 
 if __name__ == '__main__':
     try:
