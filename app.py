@@ -798,11 +798,17 @@ def _seed_tours(conn, cur):
 
 
 # gunicorn 啟動時初始化（模組層級）
-try:
-    with app.app_context():
-        init_db()
-except Exception as _e:
-    print(f'[警告] 啟動時無法初始化 DB：{_e}')
+# 正式部署由 migrate.py 在啟動前單次執行並驗證 schema，再以 SKIP_SCHEMA_INIT=1 起 gunicorn。
+# 每個 worker 各自建表會在全新資料庫上互相競爭，其中一方拿到 duplicate 錯誤，
+# 而會員資料表那段是 fail-open，於是 schema 只建到一半卻沒有人發現。
+if os.environ.get('SKIP_SCHEMA_INIT') == '1':
+    _db_initialized = True
+else:
+    try:
+        with app.app_context():
+            init_db()
+    except Exception as _e:
+        print(f'[警告] 啟動時無法初始化 DB：{_e}')
 
 
 @app.before_request

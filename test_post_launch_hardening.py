@@ -175,3 +175,37 @@ class WorkflowGuardTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class SchemaMigrationRunnerTests(unittest.TestCase):
+    """schema DDL 必須只由 migrate.py 單次執行，而且失敗要擋下部署。
+
+    多個 gunicorn worker 各自跑 init_db() 會在全新資料庫上互相競爭，
+    其中一方拿到 duplicate 錯誤；會員資料表那段又是 fail-open，
+    結果 schema 只建到一半卻沒有人發現——members.merged_into_member_id
+    沒建起來時，每一個會員 API 都會在 _member_row() 上 500。
+    """
+
+    def test_start_command_runs_migrate_before_gunicorn(self):
+        for name in ('railway.json', 'Procfile'):
+            text = src(name)
+            self.assertIn('python migrate.py', text, name)
+            self.assertLess(text.index('python migrate.py'), text.index('gunicorn'),
+                            f'{name}：migrate 必須排在 gunicorn 之前')
+            self.assertIn('SKIP_SCHEMA_INIT=1', text, name)
+
+    def test_workers_do_not_run_ddl_on_import(self):
+        app_src = src('app.py')
+        self.assertIn("os.environ.get('SKIP_SCHEMA_INIT') == '1'", app_src)
+        # 設了旗標就必須連 before_request 的補建也一起關掉，否則第一批請求仍會競爭建表。
+        marker = app_src.index("os.environ.get('SKIP_SCHEMA_INIT') == '1'")
+        self.assertIn('_db_initialized = True', app_src[marker:marker + 400])
+
+    def test_migrate_verifies_schema_and_fails_closed(self):
+        text = src('migrate.py')
+        # init_db() 會吞掉會員資料表的錯誤，所以「跑完」不等於「建好」，一定要回查。
+        self.assertIn('information_schema', text)
+        self.assertIn('merged_into_member_id', text)
+        for table in ('member_identities', 'order_claims', 'point_wallet'):
+            self.assertIn(table, text)
+        self.assertIn('sys.exit(main())', text)
