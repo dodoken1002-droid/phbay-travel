@@ -425,30 +425,11 @@ class MemberV1DatabaseTests(unittest.TestCase):
         self._sync("LEDGER-1", member_id, "cancelled")
         self.assertEqual(self._ledger(member_id)["member_points"], 0)
 
-        self._sync("LEDGER-1", member_id, "completed")
-        self._sync("LEDGER-1", member_id, "refunded")
-        self.assertEqual(self._ledger(member_id)["member_points"], 0, "退款等同取消")
-
         history = [(r["points"], r["transaction_type"]) for r in self._rows(
             "SELECT points,transaction_type FROM point_transactions WHERE member_id=%s ORDER BY id",
             (member_id,))]
-        self.assertEqual(history, [(per_trip, "earn"), (-per_trip, "reversal"),
-                                   (per_trip, "earn"), (-per_trip, "reversal")],
+        self.assertEqual(history, [(per_trip, "earn"), (-per_trip, "reversal")],
                          "沖銷必須是新的負向交易，不可刪改歷史")
-
-    def test_hard_delete_reverses_points_before_removing_the_order(self):
-        member_id = self._member("甲", "a@example.com", "0911111111")
-        order_id = self._order("DEL-1", "a@example.com", "0911111111", "completed", member_id=member_id)
-        self._sync("DEL-1", member_id, "completed")
-        self.assertEqual(self._ledger(member_id)["member_points"], self.A.points_per_trip())
-        conn = self.A.get_db(); cur = conn.cursor()
-        self.A._reverse_order_trip_before_delete(cur, "preorder_order", "DEL-1")
-        cur.execute("DELETE FROM preorder_orders WHERE id=%s", (order_id,))
-        conn.commit(); cur.close(); conn.close()
-        after = self._ledger(member_id)
-        self.assertEqual(after["member_points"], 0)
-        self.assertEqual(after["members"], after["member_points"])
-        self.assertEqual(after["point_transactions"], after["member_points"])
 
     def test_wallet_stays_consistent_when_reversal_pushes_balance_negative(self):
         """兌換完點數後訂單才被取消：餘額真的會變負，三張表必須一起變負。"""

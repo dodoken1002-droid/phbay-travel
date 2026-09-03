@@ -1844,7 +1844,7 @@ def _sync_completed_order_trip(cur, source_type, source_ref, member_id, tour_nam
         previous_status = previous['status'] if previous else None
         before_level = level_for_trips(member['trip_count'])
         trip_status = ('completed' if order_status == 'completed' else
-                       'cancelled' if order_status in {'cancelled', 'refunded'} else 'planned')
+                       'cancelled' if order_status == 'cancelled' else 'planned')
         cur.execute("""
             INSERT INTO member_trips
               (member_id,source_type,source_ref,tour_name,departure_date,status,counts_trip,notes)
@@ -1884,20 +1884,6 @@ def _sync_completed_order_trip(cur, source_type, source_ref, member_id, tour_nam
         cur.execute("RELEASE SAVEPOINT member_trip_sync")
         print(f'[MEMBER TRIP SYNC] {source_type}/{source_ref} 同步失敗，訂單更新不受影響：{exc}')
         return None
-
-
-def _reverse_order_trip_before_delete(cur, source_type, source_ref):
-    """硬刪訂單前先以負向交易沖回點數，避免留下無來源的點數。"""
-    cur.execute("""SELECT id,member_id FROM member_trips
-                   WHERE source_type=%s AND source_ref=%s FOR UPDATE""",
-                (source_type, source_ref))
-    trip = cur.fetchone()
-    if not trip:
-        return
-    cur.execute("UPDATE member_trips SET status='cancelled',updated_at=NOW() WHERE id=%s",
-                (trip['id'],))
-    sync_trip_points(cur, trip['id'])
-    recalculate_member(cur, trip['member_id'])
 
 
 @app.route('/api/admin/members', methods=['GET', 'POST'])
@@ -2321,7 +2307,7 @@ def _preorder_pool_usage(cur):
     caps = {r['id']: r['capacity'] for r in cur.fetchall()}
     cur.execute("""
         SELECT product_id, departure_date::text AS d,
-               COALESCE(SUM(CASE WHEN status NOT IN ('cancelled','refunded') THEN passenger_count ELSE 0 END), 0) AS pax
+               COALESCE(SUM(CASE WHEN status <> 'cancelled' THEN passenger_count ELSE 0 END), 0) AS pax
         FROM preorder_orders GROUP BY product_id, departure_date
     """)
     for r in cur.fetchall():
@@ -2450,10 +2436,10 @@ def admin_capacity_alerts():
         alerts = []
         cur.execute("""
             SELECT s.sailing_date::text AS d, s.sailing_time AS t, s.capacity,
-                   SUM(CASE WHEN p.status NOT IN ('cancelled','refunded') THEN p.passenger_count ELSE 0 END) AS pax
+                   SUM(CASE WHEN p.status <> 'cancelled' THEN p.passenger_count ELSE 0 END) AS pax
             FROM neihai_sailings s JOIN neihai_preorders p ON p.sailing_id = s.id
             GROUP BY s.id, s.sailing_date, s.sailing_time, s.capacity
-            HAVING SUM(CASE WHEN p.status NOT IN ('cancelled','refunded') THEN p.passenger_count ELSE 0 END) > s.capacity
+            HAVING SUM(CASE WHEN p.status <> 'cancelled' THEN p.passenger_count ELSE 0 END) > s.capacity
             ORDER BY s.sailing_date
         """)
         for r in cur.fetchall():
@@ -2464,7 +2450,7 @@ def admin_capacity_alerts():
             SELECT pr.name, pr.capacity, o.departure_date::text AS d, o.departure_time AS t,
                    SUM(o.passenger_count) AS pax
             FROM preorder_orders o JOIN preorder_products pr ON pr.id = o.product_id
-            WHERE o.status NOT IN ('cancelled','refunded') AND pr.capacity IS NOT NULL
+            WHERE o.status <> 'cancelled' AND pr.capacity IS NOT NULL
             GROUP BY pr.name, pr.capacity, o.departure_date, o.departure_time
             HAVING SUM(o.passenger_count) > pr.capacity
             ORDER BY o.departure_date
@@ -2519,7 +2505,6 @@ NEIHAI_VALID_STATUSES = {
     "confirmed",
     "completed",
     "cancelled",
-    "refunded",
 }
 
 
@@ -2668,7 +2653,7 @@ def _neihai_month_availability(start, end):
     cur.execute("""
         SELECT
           s.id, s.sailing_date, s.sailing_time, s.capacity, s.min_people, s.is_active, s.notes,
-          COALESCE(SUM(CASE WHEN p.status NOT IN ('cancelled','refunded') THEN p.passenger_count ELSE 0 END), 0) AS booked
+          COALESCE(SUM(CASE WHEN p.status <> 'cancelled' THEN p.passenger_count ELSE 0 END), 0) AS booked
         FROM neihai_sailings s
         LEFT JOIN neihai_preorders p ON p.sailing_id = s.id
         WHERE s.sailing_date >= %s AND s.sailing_date < %s
@@ -2800,7 +2785,7 @@ def create_neihai_preorder():
         cur.execute("""
             SELECT COALESCE(SUM(passenger_count), 0) AS booked
             FROM neihai_preorders
-            WHERE sailing_id=%s AND status NOT IN ('cancelled','refunded')
+            WHERE sailing_id=%s AND status <> 'cancelled'
         """, (sailing["id"],))
         booked = int(cur.fetchone()["booked"] or 0)
         passenger_count = len(clean_passengers)
@@ -2938,7 +2923,7 @@ def admin_neihai_preorders():
 
 NEIHAI_STATUS_LABELS = {
     "pending_departure": "待成團", "confirmed_departure": "已達發船門檻",
-    "confirmed": "人工確認", "completed": "旅程完成", "cancelled": "已取消", "refunded": "已退款",
+    "confirmed": "人工確認", "completed": "旅程完成", "cancelled": "已取消",
 }
 
 
@@ -3013,10 +2998,10 @@ def admin_update_neihai_preorder(order_id):
                                WHERE sailing_date=%s AND sailing_time=%s FOR UPDATE""",
                             (new_d, new_t))
                 target = cur.fetchone()
-                if order['status'] not in {'cancelled', 'refunded'}:
+                if order['status'] != 'cancelled':
                     cur.execute("""
                         SELECT COALESCE(SUM(passenger_count), 0) AS booked FROM neihai_preorders
-                        WHERE sailing_id=%s AND status NOT IN ('cancelled','refunded') AND id <> %s
+                        WHERE sailing_id=%s AND status <> 'cancelled' AND id <> %s
                     """, (target['id'], order_id))
                     booked = int(cur.fetchone()['booked'] or 0)
                     cap = int(target['capacity'] or NEIHAI_DEFAULT_CAPACITY)
@@ -3109,7 +3094,6 @@ def admin_delete_neihai_preorder(order_id):
         if not row:
             cur.close(); conn.close()
             return jsonify(ok=False, error='找不到訂單'), 404
-        _reverse_order_trip_before_delete(cur, 'neihai_order', row['booking_ref'])
         cur.execute("DELETE FROM neihai_preorders WHERE id=%s", (order_id,))
         conn.commit(); cur.close(); conn.close()
         return jsonify(ok=True, booking_ref=row['booking_ref'])
@@ -3215,14 +3199,14 @@ def admin_neihai_import():
             # 已訂人數（覆蓋時排除自己，避免重複計算）
             cur.execute("""
                 SELECT COALESCE(SUM(passenger_count), 0) AS booked FROM neihai_preorders
-                WHERE sailing_id=%s AND status NOT IN ('cancelled','refunded') AND id <> %s
+                WHERE sailing_id=%s AND status <> 'cancelled' AND id <> %s
             """, (sailing['id'], existing_id or 0))
             booked = int(cur.fetchone()['booked'] or 0)
             capacity = int(sailing['capacity'] or NEIHAI_DEFAULT_CAPACITY)
             status = IMPORT_STATUS_LABELS.get((o.get('status') or '').strip()) or (
                 'confirmed_departure' if booked + len(clean) >= int(sailing['min_people'])
                 else 'pending_departure')
-            if status not in {'cancelled', 'refunded'} and booked + len(clean) > capacity:
+            if status != 'cancelled' and booked + len(clean) > capacity:
                 warnings.append(f'{sailing_date} {sailing_time} 匯入後共 {booked + len(clean)} 人，超過上限 {capacity}')
                 overbooked.append(f'{sailing_date} {sailing_time}')
             agency = (o.get('agency_name') or '').strip()
@@ -3810,7 +3794,7 @@ def quiz_ai_note():
 
 
 # ─── 通用預購系統（音樂節等；每個行程一筆 preorder_products）───
-PREORDER_VALID_STATUSES = {'pending_departure', 'confirmed_departure', 'confirmed', 'completed', 'cancelled', 'refunded'}
+PREORDER_VALID_STATUSES = {'pending_departure', 'confirmed_departure', 'confirmed', 'completed', 'cancelled'}
 
 
 def _get_product(slug, cur):
@@ -3858,7 +3842,7 @@ def _slot_booked_pax(cur, product_id, dep_date, dep_time, exclude_order_id=None)
     cur.execute("""
         SELECT COALESCE(SUM(passenger_count), 0) AS booked FROM preorder_orders
         WHERE product_id=%s AND departure_date=%s AND departure_time=%s
-          AND status NOT IN ('cancelled','refunded') AND id <> %s
+          AND status <> 'cancelled' AND id <> %s
     """, (product_id, dep_date, dep_time, exclude_order_id or 0))
     online = int(cur.fetchone()['booked'] or 0)
     return online + _manual_hold_pax(cur, product_id, dep_date)
@@ -3893,7 +3877,7 @@ def _preorder_availability(product, start, end):
     conn = get_db(); cur = conn.cursor()
     cur.execute("""
         SELECT departure_date, departure_time,
-               COALESCE(SUM(CASE WHEN status NOT IN ('cancelled','refunded') THEN passenger_count ELSE 0 END), 0) AS booked
+               COALESCE(SUM(CASE WHEN status <> 'cancelled' THEN passenger_count ELSE 0 END), 0) AS booked
         FROM preorder_orders
         WHERE product_id=%s AND departure_date >= %s AND departure_date < %s
         GROUP BY departure_date, departure_time
@@ -4313,7 +4297,7 @@ def admin_update_preorder(order_id):
 
         # 改期＝把整筆人數搬到另一個場次，一樣可能超賣。原本這裡完全沒有容量檢查。
         # 政策同匯入：不阻擋（後台要能處理例外），但要人看見並確認，並留在修改紀錄裡。
-        if slot_moved and order['status'] not in {'cancelled', 'refunded'}:
+        if slot_moved and order['status'] != 'cancelled':
             cur.execute('SELECT pg_advisory_xact_lock(%s)',
                         (_slot_lock_key(order['product_id'], new_dep_date, new_dep_time),))
             cur.execute("SELECT capacity FROM preorder_products WHERE id=%s", (order['product_id'],))
@@ -4407,7 +4391,6 @@ def admin_delete_preorder(order_id):
         if not row:
             cur.close(); conn.close()
             return jsonify(ok=False, error='找不到訂單'), 404
-        _reverse_order_trip_before_delete(cur, 'preorder_order', row['booking_ref'])
         cur.execute("DELETE FROM preorder_orders WHERE id=%s", (order_id,))
         conn.commit(); cur.close(); conn.close()
         return jsonify(ok=True, booking_ref=row['booking_ref'])
@@ -4464,7 +4447,7 @@ def admin_preorder_import():
             status = IMPORT_STATUS_LABELS.get((o.get('status') or '').strip()) or (
                 'confirmed_departure' if booked + len(clean) >= int(prod['min_people'] or 2)
                 else 'pending_departure')
-            if status not in {'cancelled', 'refunded'} and prod['capacity'] is not None and booked + len(clean) > int(prod['capacity']):
+            if status != 'cancelled' and prod['capacity'] is not None and booked + len(clean) > int(prod['capacity']):
                 warnings.append(f"{prod['name']} {dep_date} {dep_time} 匯入後共 {booked + len(clean)} 人，超過上限 {prod['capacity']}")
                 overbooked.append(f"{prod['name']} {dep_date} {dep_time}".strip())
             agency = (o.get('agency_name') or '').strip()
