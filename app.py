@@ -2603,6 +2603,16 @@ def tides_page():
     return send_from_directory('.', 'tides.html')
 
 
+@app.route('/privacy')
+def privacy_page():
+    return send_from_directory('.', 'privacy.html')
+
+
+@app.route('/terms')
+def terms_page():
+    return send_from_directory('.', 'terms.html')
+
+
 @app.route('/faq')
 def faq_redirect():
     # 對外分享用的短網址；正式網址（canonical）仍是 /faq.html
@@ -5029,7 +5039,7 @@ def _render_blog(title, desc, canonical, body, head_extra='', image=None, lang='
     img = image or f'{SITE}/images/festival-poster.jpg'
     nav = '''<div class="top-banner"><div class="banner-static"><span>潮旅國際旅行社</span><span class="banner-sep">｜</span><span>2026 澎湖追風音樂燈光節 官方合作旅行社</span><span class="banner-sep">｜</span><span>電話：06-9271288</span></div></div>
 <nav class="navbar" id="navbar"><div class="nav-container"><a href="/" class="nav-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a><button class="nav-toggle" id="nav-toggle" aria-label="選單"><span></span><span></span><span></span></button><ul class="nav-links" id="nav-links"><li><a href="/">首頁</a></li><li><a href="/#tours">行程介紹</a></li><li class="nav-item has-submenu"><a href="/neihai-preorder.html">預購行程 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/neihai-preorder.html">小城故事內海巡禮</a></li><li><a href="/preorder/festival">追風音樂節</a></li></ul></li><li class="nav-item has-submenu"><a href="/blog">旅遊大小事 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/tides">潮汐查詢系統</a></li><li><a href="/blog">旅遊文章分享</a></li><li><a href="/faq.html">常見問題</a></li><li><a href="/reviews">旅客評價</a></li></ul></li><li class="nav-item has-submenu"><a href="/#about">關於我們 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/#contact">聯絡資訊</a></li></ul></li></ul></div></nav>'''
-    footer = '''<footer class="footer"><div class="container"><div class="footer-bottom"><p>© 2026 潮旅國際旅行社 All Rights Reserved.｜<a href="/" style="color:inherit">官網</a>｜<a href="/blog" style="color:inherit">部落格</a>｜<a href="/reviews" style="color:inherit">旅客評價</a></p></div></div></footer>
+    footer = '''<footer class="footer"><div class="container"><div class="footer-bottom"><p>© 2026 潮旅國際旅行社 All Rights Reserved.｜<a href="/" style="color:inherit">官網</a>｜<a href="/blog" style="color:inherit">部落格</a>｜<a href="/reviews" style="color:inherit">旅客評價</a>｜<a href="/privacy" style="color:inherit">隱私權政策</a>｜<a href="/terms" style="color:inherit">使用條款</a></p></div></div></footer>
 <script>(function(){var t=document.getElementById('nav-toggle'),l=document.getElementById('nav-links');if(t)t.addEventListener('click',function(){l.classList.toggle('open')});var lb=document.getElementById('lang-btn'),lm=document.getElementById('lang-menu');if(lb)lb.addEventListener('click',function(e){e.stopPropagation();lm.classList.toggle('open')});document.addEventListener('click',function(){if(lm)lm.classList.remove('open')});})();</script>'''
     # 部落格頁語言切換鈕（只在 /blog 路徑顯示；連到同頁 ?lang=，保留 tag/page）
     if request.path.startswith('/blog'):
@@ -5431,7 +5441,9 @@ def dynamic_sitemap():
             (f'{SITE}/penghu-itinerary-recommendations', '0.9', 'monthly', PILLAR_LAST_MODIFIED),
             (f'{SITE}/penghu-food-guide', '0.8', 'monthly', PILLAR_LAST_MODIFIED),
             (f'{SITE}/penghu-100', '0.8', 'monthly'),
-            (f'{SITE}/penghu-2026-festival-guide', '0.8', 'weekly')]
+            (f'{SITE}/penghu-2026-festival-guide', '0.8', 'weekly'),
+            (f'{SITE}/privacy', '0.3', 'yearly', _file_lastmod('privacy.html')),
+            (f'{SITE}/terms', '0.3', 'yearly', _file_lastmod('terms.html'))]
     try:
         conn = get_db(); cur = conn.cursor()
         cur.execute("SELECT slug, COALESCE(updated_at,published_at,created_at) AS m FROM posts WHERE is_published=TRUE")
