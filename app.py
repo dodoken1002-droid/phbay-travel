@@ -420,6 +420,15 @@ def init_db():
             created_at   TIMESTAMP DEFAULT NOW()
         )
     """)
+    # 乞龜活動整體中獎率（%，連續3聖筊）——後台可調整，5% 為刻度；單列 id=1
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS qigui_config (
+            id            INT PRIMARY KEY DEFAULT 1,
+            win_rate_pct  INT NOT NULL DEFAULT 40,
+            updated_at    TIMESTAMP DEFAULT NOW()
+        )
+    """)
+    cur.execute("INSERT INTO qigui_config (id, win_rate_pct) VALUES (1, 40) ON CONFLICT (id) DO NOTHING")
 
     # LINE 官方帳號互動用戶（webhook 記錄，用於取得 userId 與對照訂單）
     cur.execute("""
@@ -888,8 +897,26 @@ def qigui_redirect():
 
 # ─── 乞龜擲筊活動：後端權威判定（含每日禮物庫存硬上限）───────────
 QIGUI_DAILY_LIMIT = 125           # 每日禮物名額（500 份 ÷ 4 天）
-QIGUI_HOLY_PROB = 0.4642           # 單次擲筊「聖筊」機率，連續3次約 10%（0.4642^3 ≈ 0.10）
-                                    # 2026-07-16：70%→55%→35%→50%；2026-07-19：回到70%；2026-07-20：降至60%；2026-09-09：降至10%
+QIGUI_DEFAULT_WIN_RATE_PCT = 40   # 整體中獎率（%，連續3聖筊）預設值；實際以 DB qigui_config 為準，後台可調
+                                  # 歷史：2026-07~09 曾在 70/60/50/35/10% 間多次調整（見 git log）；
+                                  # 2026-09-10 起改為後台可調（qigui_config 表），此常數僅作 DB 無資料時的後備預設。
+
+
+def _qigui_win_rate_pct(cur):
+    """讀取目前設定的整體中獎率（%）；無資料列時建立預設並回傳。"""
+    cur.execute("SELECT win_rate_pct FROM qigui_config WHERE id=1")
+    row = cur.fetchone()
+    if not row:
+        cur.execute("INSERT INTO qigui_config (id, win_rate_pct) VALUES (1, %s) ON CONFLICT (id) DO NOTHING",
+                    (QIGUI_DEFAULT_WIN_RATE_PCT,))
+        return QIGUI_DEFAULT_WIN_RATE_PCT
+    return int(row['win_rate_pct'])
+
+
+def _qigui_holy_prob(win_rate_pct):
+    """整體中獎率(%) → 單次擲筊「聖筊」機率（連續3次 = 該機率^3）。"""
+    r = max(0.0, min(100.0, float(win_rate_pct))) / 100.0
+    return r ** (1.0 / 3.0)
 
 
 def _qigui_get_or_create_quota(cur, d):
@@ -935,7 +962,7 @@ def qigui_throw():
             return jsonify(ok=True, locked=True, sold_out=True,
                            message='今日禮物名額已全數送出，感謝您的參與，請明日再來挑戰！')
 
-        holy = random.random() < QIGUI_HOLY_PROB
+        holy = random.random() < _qigui_holy_prob(_qigui_win_rate_pct(cur))
         if not holy:
             session['qigui_played'] = True
             session['qigui_streak'] = 0
@@ -989,11 +1016,40 @@ def admin_qigui_status():
         total_wins = cur.fetchone()['c']
         cur.execute("SELECT COUNT(*) AS c FROM qigui_wins WHERE claimed=TRUE")
         total_claimed = cur.fetchone()['c']
-        cur.close(); conn.close()
+        win_rate_pct = _qigui_win_rate_pct(cur)
+        conn.commit(); cur.close(); conn.close()
         total_given = sum(d['given_out'] for d in days)
         total_limit = sum(d['daily_limit'] for d in days)
         return jsonify(ok=True, days=days, total_given=total_given, total_limit=total_limit,
-                       total_wins=total_wins, total_claimed=total_claimed)
+                       total_wins=total_wins, total_claimed=total_claimed,
+                       win_rate_pct=win_rate_pct)
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.route('/api/admin/qigui/win-rate', methods=['PATCH'])
+def admin_qigui_win_rate():
+    """調整乞龜活動整體中獎率（僅 owner）。以 5% 為刻度，範圍 5–100。"""
+    if not is_admin():
+        return jsonify(ok=False, error='未授權'), 401
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        pct = int(data.get('win_rate_pct'))
+    except (TypeError, ValueError):
+        return jsonify(ok=False, error='請提供正確的機率數字'), 400
+    if pct < 5 or pct > 100 or pct % 5 != 0:
+        return jsonify(ok=False, error='中獎率需為 5 的倍數，範圍 5–100'), 400
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO qigui_config (id, win_rate_pct, updated_at)
+            VALUES (1, %s, NOW())
+            ON CONFLICT (id) DO UPDATE SET win_rate_pct = EXCLUDED.win_rate_pct, updated_at = NOW()
+            RETURNING win_rate_pct
+        """, (pct,))
+        row = cur.fetchone()
+        conn.commit(); cur.close(); conn.close()
+        return jsonify(ok=True, win_rate_pct=int(row['win_rate_pct']))
     except Exception as e:
         return jsonify(ok=False, error=str(e)), 500
 
