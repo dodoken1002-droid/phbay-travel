@@ -11,6 +11,8 @@
 金鑰路徑從環境變數 GSC_KEY_FILE 讀（建議放 .env，不要 commit 金鑰檔）。
 """
 
+import hashlib
+import json
 import os
 import sys
 from datetime import date, timedelta
@@ -19,6 +21,7 @@ from datetime import date, timedelta
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
+import requests
 from dotenv import load_dotenv
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -44,14 +47,13 @@ KEY_URLS = [
 def _latest_post_urls(n: int = 3) -> list:
     """從 content/posts/*.json 取最新 n 篇文章網址（檔名含日期，排序即時序）。"""
     import glob
-    import json as _json
 
     posts_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                              "content", "posts")
     urls = []
     for path in sorted(glob.glob(os.path.join(posts_dir, "*.json")), reverse=True)[:n]:
         try:
-            slug = _json.load(open(path, encoding="utf-8")).get("slug", "")
+            slug = json.load(open(path, encoding="utf-8")).get("slug", "")
             if slug:
                 urls.append(f"{SITE}/blog/{slug}")
         except Exception:
@@ -62,6 +64,7 @@ BRAND_TERMS = ["潮旅", "phbay"]
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MONEY_KEYWORDS_FILE = os.path.join(ROOT, "content", "seo-money-keywords.json")
 SNAPSHOT_DIR = os.path.join(ROOT, "content", "seo-money-snapshots")
+SITEMAP_STATE_FILE = os.path.join(ROOT, "content", "gsc-sitemap-state.json")
 
 
 def _service():
@@ -85,16 +88,59 @@ def _service():
     return build("searchconsole", "v1", credentials=creds, cache_discovery=False)
 
 
+def _sitemap_hash() -> str | None:
+    """抓目前 sitemap.xml 內容算雜湊，用來判斷內容是否真的有變更。"""
+    try:
+        resp = requests.get(SITEMAP_URL, timeout=15)
+        resp.raise_for_status()
+        return hashlib.sha256(resp.content).hexdigest()
+    except Exception as e:
+        print(f"  ⚠️ 無法取得 sitemap 內容以比對雜湊：{e}")
+        return None
+
+
+def _load_sitemap_state() -> dict:
+    if os.path.exists(SITEMAP_STATE_FILE):
+        try:
+            return json.load(open(SITEMAP_STATE_FILE, encoding="utf-8"))
+        except Exception:
+            return {}
+    return {}
+
+
+def _save_sitemap_state(state: dict) -> None:
+    with open(SITEMAP_STATE_FILE, "w", encoding="utf-8") as f:
+        json.dump(state, f, ensure_ascii=False, indent=2)
+
+
 def report_sitemaps(svc) -> None:
     print("== Sitemap 狀態 ==")
     entries = svc.sitemaps().list(siteUrl=PROPERTY).execute().get("sitemap", [])
     mine = next((s for s in entries if s.get("path") == SITEMAP_URL), None)
-    # 沒提交過、或 Google 從未成功下載 → (重新)提交以觸發重抓
-    if mine is None or not mine.get("lastDownloaded"):
-        print(f"  {SITEMAP_URL} {'尚未提交' if mine is None else 'Google 尚未成功抓取'}，(重新)提交…")
+
+    state = _load_sitemap_state()
+    known_hash = state.get("hash")
+    current_hash = _sitemap_hash()
+
+    # 只在「從未提交過」或「內容真的有變更」時才提交，避免每週空跑洗掉 lastSubmitted 時間
+    if mine is None:
+        print(f"  {SITEMAP_URL} 尚未提交，提交中…")
         svc.sitemaps().submit(siteUrl=PROPERTY, feedpath=SITEMAP_URL).execute()
         print("  已提交，Google 會在數小時～數天內排程抓取。")
         entries = svc.sitemaps().list(siteUrl=PROPERTY).execute().get("sitemap", [])
+    elif known_hash is None:
+        print(f"  {SITEMAP_URL} 已提交過，本次先記錄目前內容雜湊，之後內容有變更才會重新提交。")
+    elif current_hash is not None and current_hash != known_hash:
+        print(f"  {SITEMAP_URL} 內容已變更，重新提交…")
+        svc.sitemaps().submit(siteUrl=PROPERTY, feedpath=SITEMAP_URL).execute()
+        print("  已提交，Google 會在數小時～數天內排程抓取。")
+        entries = svc.sitemaps().list(siteUrl=PROPERTY).execute().get("sitemap", [])
+    elif not mine.get("lastDownloaded"):
+        print(f"  {SITEMAP_URL} Google 仍未成功抓取（內容未變更，本次不重複提交）。")
+
+    if current_hash is not None:
+        _save_sitemap_state({"hash": current_hash, "checked_at": date.today().isoformat()})
+
     for s in entries:
         counts = s.get("contents", [{}])[0]
         pending = "｜⏳ 提交排隊中" if s.get("isPending") else ""
