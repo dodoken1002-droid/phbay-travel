@@ -63,7 +63,7 @@ app.permanent_session_lifetime = timedelta(hours=12)
 # ─── 靜態資源快取 ──────────────────────────────────────────
 # CSS/JS/圖片長快取；改動 css/js 時必須同步調整各 HTML 引用的 ?v= 版本字串，
 # 否則使用者會拿到快取的舊資源（版本字串統一用 ASSET_VERSION）。
-ASSET_VERSION = '20260917'
+ASSET_VERSION = '20260917d'
 _LONG_CACHE_EXT = ('.css', '.js', '.png', '.jpg', '.jpeg', '.webp', '.avif',
                    '.gif', '.svg', '.ico', '.woff', '.woff2')
 
@@ -5502,8 +5502,31 @@ _PILLAR_OG_IMAGE = {
 def pillar_page():
     slug = request.path.strip('/')
     p = PILLAR_PAGES[slug]
+    head_extra = p['head_extra']
+    if slug == 'penghu-itinerary-recommendations':
+        head_extra += (
+            f'<link rel="stylesheet" href="/itinerary-quiz.css?v={ASSET_VERSION}">'
+            f'<script defer src="/itinerary-analytics.js?v={ASSET_VERSION}"></script>'
+            f'<script defer src="/itinerary-quiz.js?v={ASSET_VERSION}"></script>'
+        )
     return _render_blog(p['title'], p['desc'], p['canonical'], p['body'],
-                        p['head_extra'], image=_PILLAR_OG_IMAGE.get(slug))
+                        head_extra, image=_PILLAR_OG_IMAGE.get(slug))
+
+
+@app.route('/penghu-itinerary-recommendations/result')
+def itinerary_recommendation_result():
+    """P0 診斷結果頁；答案只留在瀏覽器 sessionStorage，不送到後端。"""
+    title = '你的澎湖行程推薦｜潮旅國際旅行社'
+    desc = '依天數、同行者、玩法與避雷偏好產生的澎湖行程建議。'
+    head = (
+        '<meta name="robots" content="noindex,follow">'
+        f'<link rel="stylesheet" href="/itinerary-quiz.css?v={ASSET_VERSION}">'
+        f'<script defer src="/itinerary-analytics.js?v={ASSET_VERSION}"></script>'
+        f'<script defer src="/itinerary-quiz.js?v={ASSET_VERSION}"></script>'
+    )
+    body = '<div class="ir-shell" id="itinerary-result-v1" aria-live="polite"></div>'
+    return _render_blog(title, desc, f'{SITE}/penghu-itinerary-recommendations/result',
+                        body, head, image=_PILLAR_OG_IMAGE['penghu-itinerary-recommendations'])
 
 # ── 行程獨立頁面（渲染在 tour_pages.py；資料來自後台維護的 tours 資料表）──
 import tour_pages

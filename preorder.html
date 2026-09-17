@@ -6,6 +6,7 @@
   <!-- Google Analytics 4 -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-47DV1VPF9J"></script>
   <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-47DV1VPF9J');</script>
+  <script src="/itinerary-analytics.js?v=20260917"></script>
   <!-- Meta Pixel -->
   <script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init', '25643845041980148');fbq('track', 'PageView');</script>
   <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=25643845041980148&ev=PageView&noscript=1"/></noscript>
@@ -270,6 +271,7 @@
       btn.disabled = true;
       btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 送出中...';
       if (typeof gtag === 'function') gtag('event','preorder_submit_attempt',{method:'preorder',product_slug:SLUG});
+      if (window.PhbayAnalytics) PhbayAnalytics.track('checkout_start',{method:'preorder',item_id:SLUG});
       try {
         const res = await fetch(`/api/preorder/${encodeURIComponent(SLUG)}/orders`, {
           method:'POST',
@@ -288,7 +290,7 @@
         if (!json.ok) throw new Error(json.error || '送出失敗');
         resultBox.className = 'result ok';
         resultBox.innerHTML = `預購已送出！<br>訂單編號：<strong>${esc(json.booking_ref)}</strong><br>${esc(json.message)}。潮旅將再與您確認行程細節與付款方式。<br>
-          <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" rel="noopener noreferrer"
+          <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" rel="noopener noreferrer" onclick="window.PhbayAnalytics&&PhbayAnalytics.track('line_click',{source:'preorder_success',item_id:SLUG})"
              style="display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:#06c755;color:#fff;font-weight:800;padding:12px 22px;border-radius:30px;text-decoration:none">
             <i class="fab fa-line" style="font-size:1.3rem"></i> 加入官方 LINE（@phbay2018），行程通知不漏接
           </a><br>
@@ -303,6 +305,10 @@
         }
         if (typeof gtag === 'function') gtag('event','generate_lead',{
           method:'preorder',product_slug:SLUG,booking_ref:json.booking_ref
+        });
+        if (window.PhbayAnalytics) PhbayAnalytics.track('purchase',{
+          transaction_id:json.booking_ref,currency:'TWD',affiliation:'phbay_travel_preorder',
+          items:[{item_id:SLUG,item_name:product ? product.name : SLUG}]
         });
         e.target.reset();
         passengerCount.value = 1;
@@ -332,6 +338,9 @@
       }
       product = json.product;
       renderProduct();
+      if (window.PhbayAnalytics) PhbayAnalytics.track('product_view',{
+        item_id:SLUG,item_name:product.name,source:'preorder_page'
+      });
       renderPassengers();
       loadSlots();
     })();

@@ -23,6 +23,7 @@ PILLAR_STYLE = (
     '.pp-kicker{color:var(--blue-main);font-weight:800;letter-spacing:.08em;font-size:.85rem;margin-bottom:8px}'
     '.pp-intro{color:var(--text-mid);line-height:1.9;font-size:1.02rem;margin-bottom:18px}'
     '.pp-cta-row{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0 30px}'
+    '.pp-cta-row a.btn-primary,.pp-bottom-cta a.btn-primary{color:#fff;text-decoration:none}'
     '.pp-wrap h2{font-size:1.4rem;color:var(--blue-dark);font-weight:800;margin:34px 0 14px}'
     '.pp-wrap h3{font-size:1.12rem;color:var(--blue-main);font-weight:700;margin:20px 0 8px}'
     '.pp-wrap p{line-height:1.9;color:var(--text-dark);margin-bottom:14px}'
@@ -64,13 +65,13 @@ def _cta_row(extra=''):
             f'{extra}</div>')
 
 
-def _bottom_cta(lead):
+def _bottom_cta(lead, quiz_href='/#quiz'):
     return ('<div class="pp-bottom-cta"><h2>想把行程交給在地人排？</h2>'
             f'<p>{lead}</p>'
             f'<a href="{_LINE_URL}" target="_blank" rel="noopener noreferrer" class="btn btn-primary"><i class="fab fa-line"></i> LINE @phbay2018</a> '
             '<a href="tel:06-9271288" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-phone"></i> 電話 06-9271288</a> '
             '<a href="/#contact" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-comment-dots"></i> 線上諮詢表單</a> '
-            '<a href="/#quiz" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-compass"></i> 30 秒行程診斷</a>'
+            f'<a href="{quiz_href}" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-compass"></i> 30 秒行程診斷</a>'
             '</div>')
 
 
@@ -414,7 +415,7 @@ def _page_itinerary_recommendations():
         ('3 天 2 夜', '第一次來澎湖首選；本島精華＋一個跳島或海上體驗，適合多數旅客'),
         ('4 天 3 夜', '親子、長輩、三代同堂或深度旅遊；可保留雨天備案與第二個海域'),
         ('5 天以上', '慢旅、攝影、潛水或跨兩個以上離島；每天保留半天空白更舒服'),
-        ('規劃工具', '<a href="/#quiz">30 秒行程診斷</a>、<a href="/tides">潮汐查詢</a>、<a href="/faq.html#cat-season">季節天氣 FAQ</a>'),
+        ('規劃工具', '<a href="#itinerary-quiz-v1">30 秒行程診斷</a>、<a href="/tides">潮汐查詢</a>、<a href="/faq.html#cat-season">季節天氣 FAQ</a>'),
     ])
     plans = _plan_cards([
         ('第一次來', '經典三天兩夜',
@@ -487,14 +488,17 @@ def _page_itinerary_recommendations():
         '幫你先選對澎湖旅遊行程的骨架，再決定跳島、玩水或深度聚落，'
         '自由行與套裝行程的差別也一次講清楚。</p>'
         '<img class="pp-hero-image" src="/images/neihai-cruise-hero-2026.webp" alt="澎湖行程推薦中的內海巡禮船遊與沙洲體驗" width="1400" height="788" loading="eager">'
-        + _cta_row('<a href="/#quiz" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-compass"></i> 30 秒行程診斷</a>')
+        + _cta_row('<a href="#itinerary-quiz-v1" class="btn btn-primary"><i class="fas fa-compass"></i> 開始 30 秒行程診斷</a>')
+        + '<section class="iq-shell" id="itinerary-quiz-v1" aria-live="polite">'
+          '<noscript>請開啟 JavaScript 使用行程診斷；也可以透過 LINE @phbay2018 請顧問協助。</noscript>'
+          '</section>'
         + '<section class="pp-conclusion"><h2 style="margin:0 0 10px">先講結論</h2><p>' + conclusion + '</p></section>'
         + '<h2>澎湖行程天數比較</h2>' + table
         + '<h2>三種最常見的推薦行程</h2>' + plans
         + chooser
         + '<h2>延伸閱讀</h2>' + links
         + _faq_html(faq)
-        + _bottom_cta('把日期、人數與最想玩的三件事傳給我們，收到不繞路的澎湖行程建議。')
+        + _bottom_cta('把日期、人數與最想玩的三件事傳給我們，收到不繞路的澎湖行程建議。', '#itinerary-quiz-v1')
         + '</div>')
     trip_ld = {
         "@context": "https://schema.org", "@type": "TouristTrip",
