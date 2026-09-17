@@ -643,8 +643,42 @@ function refreshTourCategories() {
   if (catBar) catBar.style.display = visibleCats.length > 1 ? '' : 'none';
 }
 
-// 語言切換時由 i18n.js 呼叫 → 重新渲染動態行程
-window.onLangChange = function () { renderAllTours(); };
+// 語言切換時由 i18n.js 呼叫 → 重新渲染動態行程（活動區塊的文字也會被換掉，要重標過期場次）
+window.onLangChange = function () { renderAllTours(); markPastEvents(); };
+
+function imgPlaceholder(extraClass = '') {
+  return `<div class="img-placeholder ${extraClass}" aria-hidden="true"><i class="fas fa-water"></i><span>潮旅國際旅行社</span></div>`;
+}
+
+/* 首頁活動快訊：卡片 data-event-end 過了就隱藏；卡片內 <strong> 的單場日期過了加刪除線。
+   日期一律以台灣時間判斷，全部過期就收起整個區塊。 */
+const EVENT_MONTHS = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12 };
+function markPastEvents() {
+  const section = document.getElementById('events-2026');
+  if (!section) return;
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
+  const year = today.slice(0, 4);
+  const cards = section.querySelectorAll('[data-event-end]');
+  let visible = 0;
+  cards.forEach(card => {
+    const past = card.dataset.eventEnd < today;
+    card.style.display = past ? 'none' : '';
+    if (!past) visible++;
+    card.querySelectorAll('p strong').forEach(el => {
+      const t = el.textContent.trim();
+      let m = t.match(/^(\d{1,2})\/(\d{1,2})$/);
+      if (!m) {
+        const e = t.match(/^([A-Za-z]{3})\s+(\d{1,2})$/);
+        if (e && EVENT_MONTHS[e[1].toLowerCase()]) m = [t, EVENT_MONTHS[e[1].toLowerCase()], e[2]];
+      }
+      if (!m) return;
+      const d = `${year}-${String(m[1]).padStart(2, '0')}-${String(m[2]).padStart(2, '0')}`;
+      el.classList.toggle('event-past', d < today);
+    });
+  });
+  if (cards.length) section.style.display = visible ? '' : 'none';
+}
+document.addEventListener('DOMContentLoaded', markPastEvents);
 
 // 行程卡片／彈窗的固定 UI 字串（依語言）
 const TOUR_UI = {
@@ -687,9 +721,10 @@ function renderTourCard(tour) {
   const badgeHtml = tour.badge_text
     ? `<div class="tour-badge ${tour.badge_class || ''}">${tour.badge_text}</div>` : '';
 
+  // 沒有實拍照時用品牌預設封面，不再拿圖庫海景照充數（客人會以為是行程實景）
   const imgHtml = tour.image_url
     ? `<img src="${tour.image_url}" alt="${L.title}" loading="lazy" />`
-    : `<img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80" alt="${L.title}" loading="lazy" />`;
+    : imgPlaceholder();
 
   // 多出發地價格列（DB 格式：{label, value}）
   const pricesHtml = Array.isArray(L.prices) && L.prices.length
@@ -940,12 +975,12 @@ const QUIZ_RESULTS = {
   family: {
     type: '親子海島守護者 👨‍👩‍👧',
     desc: '家人的笑容是旅途中最美的風景！安全、溫馨又有趣的親子澎湖 3 天 2 夜，讓孩子與海洋親密接觸，留下一家人最珍貴的回憶。',
-    tour: { name:'親子澎湖 3 天 2 夜', duration:'3天2夜', price:'NT$ 9,500 起', img:'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=400&q=80', interest:'family3d', cta:'立即諮詢這個行程' },
+    tour: { name:'親子澎湖 3 天 2 夜', duration:'3天2夜', price:'NT$ 9,500 起', img:'', interest:'family3d', cta:'立即諮詢這個行程' },
   },
   island: {
     type: '跳島冒險家 🏝️',
     desc: '你熱愛海洋與探索，望安七美跳島最適合你！雙心石滬、綠蠵龜故鄉、大菓葉玄武岩，一次收集澎湖最經典的離島秘境。',
-    tour: { name:'望安七美跳島', duration:'3–4天', price:'NT$ 6,999 起', img:'https://images.unsplash.com/photo-1583212292454-1fe6229603b7?w=400&q=80', interest:'turtle4d', cta:'立即諮詢這個行程' },
+    tour: { name:'望安七美跳島', duration:'3–4天', price:'NT$ 6,999 起', img:'', interest:'turtle4d', cta:'立即諮詢這個行程' },
   },
   tides: {
     type: '潮汐秘境獵人 🌅',
@@ -1034,7 +1069,7 @@ function renderQuizResult(forcedKey, fromShare = false) {
       <p class="quiz-result-desc">${r.desc}</p>
       <div id="quiz-ai-note" style="display:none;background:#f0f7ff;border-left:3px solid var(--blue-main);border-radius:8px;padding:12px 16px;margin:0 0 14px;text-align:left;font-size:.94rem;line-height:1.8;color:var(--text-dark)"></div>
       <div class="quiz-result-tour">
-        <img src="${r.tour.img}" alt="${r.tour.name}" />
+        ${r.tour.img ? `<img src="${r.tour.img}" alt="${r.tour.name}" />` : imgPlaceholder()}
         <div class="quiz-result-tour-info">
           <div class="tour-recommend-label">✦ 推薦行程</div>
           <div class="tour-recommend-name">${r.tour.name}</div>

@@ -41,3 +41,12 @@ Google 可能在搜尋結果顯示星等，AI 引擎也會引用來回答「澎�
 ```
 
 只放真實內容；空陣列時 `/reviews` 會顯示邀稿狀態、且不輸出星等 schema。
+
+## 目前狀態：入口已隱藏（2026-09-17）
+
+`reviews` 是空陣列時，`/reviews` 會輸出 `noindex`、不進 sitemap，伺服器端頁面
+（部落格、行程、攻略頁）的導覽列與頁尾也不會出現「旅客評價」。
+
+加入第一筆真實評價後，伺服器端頁面會自動恢復入口，但**靜態頁要手動加回**：
+`index.html`（導覽列「旅遊大小事」子選單＋頁尾快速連結）、`faq.html`、`tides.html`、
+`privacy.html`、`terms.html`、`preorder.html`、`neihai-preorder.html`，以及 `llms.txt`、`llms-full.txt`。

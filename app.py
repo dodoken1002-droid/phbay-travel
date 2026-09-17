@@ -610,6 +610,14 @@ def init_db():
     cur.execute("ALTER TABLE posts ADD COLUMN IF NOT EXISTS i18n JSONB DEFAULT '{}'")
     # 後台用的文章瀏覽次數；公開 API 一律不回傳（見 _post_public）。
     cur.execute("ALTER TABLE posts ADD COLUMN IF NOT EXISTS view_count INTEGER NOT NULL DEFAULT 0")
+    # 資料修正：早期 repo 文章的 tags 若寫成 JSON 陣列，入庫會變成 PostgreSQL 陣列字面值
+    # {"a","b"}，前台顯示成一整顆帶大括號的標籤。還原成逗號字串；已修正的列不會再被比對到。
+    cur.execute("""UPDATE posts SET tags = replace(btrim(tags, '{}'), '"', '')
+                   WHERE tags LIKE '{%}'""")
+    # 行程封面不用圖庫照片（客人會以為是行程實景）：清空後前台顯示品牌預設封面，
+    # 有實拍照再從後台填回 /images/tours/ 路徑。
+    cur.execute("""UPDATE tours SET image_url = '', updated_at = NOW()
+                   WHERE image_url LIKE 'https://images.unsplash.com/%'""")
     conn.commit()
 
     # 若 tours 資料表是空的，寫入預設行程
@@ -630,7 +638,7 @@ def _seed_tours(conn, cur):
             'tabs': ['featured', '4d3n'],
             'badge_text': '2026 主打',
             'badge_class': 'badge-2026',
-            'image_url': 'https://images.unsplash.com/photo-1583212292454-1fe6229603b7?w=600&q=80',
+            'image_url': '',
             'title': '🐢 跟著海龜漫旅',
             'description': '今年夏天，把自己交給海。4天3夜望安深度 × 海島體驗 × 永續旅遊，兩人成行說走就走！',
             'suitable_for': '兩人成行 / 親子 / 情侶',
@@ -679,7 +687,7 @@ def _seed_tours(conn, cur):
             'tabs': ['featured', '3d2n'],
             'badge_text': '最受歡迎',
             'badge_class': 'popular',
-            'image_url': 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80',
+            'image_url': '',
             'title': '澎湖經典三日遊',
             'description': '走訪北寮奎壁山、跨海大橋、七美雙心石滬，感受澎湖最具代表性的自然與人文風景。',
             'suitable_for': '親子 / 情侶 / 家庭',
@@ -704,7 +712,7 @@ def _seed_tours(conn, cur):
             'tabs': ['featured', '3d2n'],
             'badge_text': '親子首選',
             'badge_class': 'family',
-            'image_url': 'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=600&q=80',
+            'image_url': '',
             'title': '親子海島體驗行程',
             'description': '專為家庭設計，包含潮間帶生態導覽、DIY貝殼彩繪、淺水浮潛等，讓孩子與海洋親密接觸。',
             'suitable_for': '親子家庭 / 小孩友善',
@@ -729,7 +737,7 @@ def _seed_tours(conn, cur):
             'tabs': ['featured', '4d3n'],
             'badge_text': '生態特色',
             'badge_class': 'eco',
-            'image_url': 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=600&q=80',
+            'image_url': '',
             'title': '望安永續生態旅行',
             'description': '前往望安島探索綠蠵龜產卵保護區、花宅聚落古厝文化，深入感受離島純樸的生命力。',
             'suitable_for': '自然愛好者 / 生態旅遊',
@@ -755,7 +763,7 @@ def _seed_tours(conn, cur):
             'tabs': ['featured', '2d1n'],
             'badge_text': '冒險首選',
             'badge_class': 'adventure',
-            'image_url': 'https://images.unsplash.com/photo-1506953823976-52e1fdc0149a?w=600&q=80',
+            'image_url': '',
             'title': 'SUP × 浮潛 × 海洋體驗',
             'description': '站上SUP立槳衝浪板，探索清澈珊瑚礁，浮潛看魚群，用最直接的方式與澎湖海洋相遇。',
             'suitable_for': '年輕族群 / 運動愛好者',
@@ -779,7 +787,7 @@ def _seed_tours(conn, cur):
             'tabs': ['2d1n'],
             'badge_text': '',
             'badge_class': '',
-            'image_url': 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80',
+            'image_url': '',
             'title': '澎湖日出快閃之旅',
             'description': '搭早班船出發，抵達澎湖後直奔秘境沙灘，看星空日出，隔日輕鬆返台。',
             'suitable_for': '情侶 / 朋友揪團',
@@ -799,7 +807,7 @@ def _seed_tours(conn, cur):
             'tabs': ['4d3n'],
             'badge_text': '',
             'badge_class': '',
-            'image_url': 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80',
+            'image_url': '',
             'title': '澎湖深度探索之旅',
             'description': '從本島到離島，北海玄武岩、南海七美，再加入夜釣體驗，把澎湖玩透透。',
             'suitable_for': '深度旅遊愛好者',
@@ -5174,6 +5182,11 @@ def _render_blog(title, desc, canonical, body, head_extra='', image=None, lang='
 <nav class="navbar" id="navbar"><div class="nav-container"><a href="/" class="nav-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a><button class="nav-toggle" id="nav-toggle" aria-label="選單"><span></span><span></span><span></span></button><ul class="nav-links" id="nav-links"><li><a href="/">首頁</a></li><li><a href="/#tours">行程介紹</a></li><li class="nav-item has-submenu"><a href="/neihai-preorder.html">預購行程 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/neihai-preorder.html">小城故事內海巡禮</a></li><li><a href="/preorder/festival">追風音樂節</a></li></ul></li><li class="nav-item has-submenu"><a href="/blog">旅遊大小事 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/tides">潮汐查詢系統</a></li><li><a href="/blog">旅遊文章分享</a></li><li><a href="/faq.html">常見問題</a></li><li><a href="/reviews">旅客評價</a></li></ul></li><li class="nav-item has-submenu"><a href="/#about">關於我們 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/#contact">聯絡資訊</a></li></ul></li></ul></div></nav>'''
     footer = '''<footer class="footer"><div class="container"><div class="footer-bottom"><p>© 2026 潮旅國際旅行社 All Rights Reserved.｜<a href="/" style="color:inherit">官網</a>｜<a href="/blog" style="color:inherit">部落格</a>｜<a href="/reviews" style="color:inherit">旅客評價</a>｜<a href="/privacy" style="color:inherit">隱私權政策</a>｜<a href="/terms" style="color:inherit">使用條款</a></p></div></div></footer>
 <script>(function(){var t=document.getElementById('nav-toggle'),l=document.getElementById('nav-links');if(t)t.addEventListener('click',function(){l.classList.toggle('open')});var lb=document.getElementById('lang-btn'),lm=document.getElementById('lang-menu');if(lb)lb.addEventListener('click',function(e){e.stopPropagation();lm.classList.toggle('open')});document.addEventListener('click',function(){if(lm)lm.classList.remove('open')});})();</script>'''
+    # 還沒有真實評價時不放「旅客評價」入口：一個點進去只寫「整理中」的頁面比沒有更扣信任感。
+    # 靜態頁（index.html 等）的入口已移除；content/reviews.json 有資料後要一併加回，見 content/REVIEWS.md。
+    if not load_reviews():
+        nav = nav.replace('<li><a href="/reviews">旅客評價</a></li>', '')
+        footer = footer.replace('｜<a href="/reviews" style="color:inherit">旅客評價</a>', '')
     # 部落格頁語言切換鈕（只在 /blog 路徑顯示；連到同頁 ?lang=，保留 tag/page）
     if request.path.startswith('/blog'):
         from urllib.parse import urlencode
@@ -5547,6 +5560,9 @@ def reviews_page():
         })
     graph.append(_breadcrumb_ld([("首頁", f"{SITE}/"), ("旅客評價", canonical)]))
     head_extra = ''.join('<script type="application/ld+json">' + json.dumps(g, ensure_ascii=False) + '</script>' for g in graph)
+    if not items:
+        # 空頁不該被索引；有第一筆真實評價後自動解除
+        head_extra += '<meta name="robots" content="noindex,follow"/>'
     return _render_blog('旅客評價｜真實澎湖旅程心得 - 潮旅國際旅行社',
                         '潮旅國際旅行社真實旅客評價：望安綠蠵龜生態、親子海島、跳島與音樂節行程的旅程心得與推薦。',
                         canonical, body, head_extra)
@@ -5566,7 +5582,7 @@ def dynamic_sitemap():
 
     urls = [(f'{SITE}/', '1.0', 'weekly', _file_lastmod('index.html')),
             (f'{SITE}/faq.html', '0.8', 'monthly', _file_lastmod('faq.html')),
-            (f'{SITE}/blog', '0.7', 'weekly'), (f'{SITE}/reviews', '0.7', 'weekly'),
+            (f'{SITE}/blog', '0.7', 'weekly'),
             (f'{SITE}/tides', '0.7', 'daily'),
             (f'{SITE}/neihai-preorder.html', '0.8', 'weekly'),
             (f'{SITE}/penghu-3days-itinerary', '0.8', 'monthly', PILLAR_LAST_MODIFIED),
@@ -5577,6 +5593,8 @@ def dynamic_sitemap():
             (f'{SITE}/penghu-2026-festival-guide', '0.8', 'weekly'),
             (f'{SITE}/privacy', '0.3', 'yearly', _file_lastmod('privacy.html')),
             (f'{SITE}/terms', '0.3', 'yearly', _file_lastmod('terms.html'))]
+    if load_reviews():  # 空的評價頁是 noindex，不送進 sitemap
+        urls.append((f'{SITE}/reviews', '0.7', 'weekly'))
     try:
         conn = get_db(); cur = conn.cursor()
         cur.execute("SELECT slug, COALESCE(updated_at,published_at,created_at) AS m FROM posts WHERE is_published=TRUE")

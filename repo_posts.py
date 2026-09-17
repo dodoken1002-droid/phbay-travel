@@ -33,6 +33,11 @@ def load_repo_posts(posts_dir: Path | str = POSTS_DIR) -> list[dict]:
         if not isinstance(post, dict):
             raise ValueError(f"Invalid post file {path.name}: root must be an object")
 
+        # tags 也接受 JSON 陣列：一律轉成逗號字串再入庫。直接把 list 丟給 psycopg2
+        # 會變成 PostgreSQL 陣列字面值 "{a,b}"，前台就顯示成一整顆帶大括號的標籤。
+        if isinstance(post.get("tags"), list):
+            post["tags"] = ",".join(str(t).strip() for t in post["tags"] if str(t).strip())
+
         missing = [field for field in REQUIRED_FIELDS if not str(post.get(field, "")).strip()]
         if missing:
             raise ValueError(f"Invalid post file {path.name}: missing {', '.join(missing)}")

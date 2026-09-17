@@ -20,7 +20,7 @@ PAYLOAD = {
     "tabs": ["north-sea"],                      # 單一行程 → 北海海域
     "badge_text": "熱門",
     "badge_class": "popular",
-    "image_url": "https://images.unsplash.com/photo-1505228395891-9a51e7e86bf6?w=600&q=80",
+    "image_url": "",
     "title": "北海跳島一日遊・吉貝水上活動",
     "description": "從赤崁碼頭出發航向北海，登上吉貝沙尾踏浪戲水，暢玩多項水上活動，半天就能收藏澎湖最美的海色。",
     "suitable_for": "親子 / 全年齡 / 揪團出遊",

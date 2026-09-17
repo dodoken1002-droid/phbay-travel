@@ -54,6 +54,18 @@ class SyncRepoPostsTests(unittest.TestCase):
             self.assertNotIn("DO UPDATE", sql)
             self.assertNotIn("cover_image=", sql)
 
+    def test_list_tags_are_stored_as_comma_string(self):
+        with tempfile.TemporaryDirectory() as directory:
+            post = {
+                "slug": "list-tags-post", "title": "測試", "summary": "摘要",
+                "content": "<p>內容</p>", "tags": ["澎湖景點", " 馬公市區 ", ""],
+                "author": "潮旅國際旅行社", "is_published": True,
+            }
+            Path(directory, "post.json").write_text(json.dumps(post, ensure_ascii=False), encoding="utf-8")
+            cursor = FakeCursor()
+            sync_repo_posts(cursor, directory)
+            self.assertEqual(cursor.calls[0][1][5], "澎湖景點,馬公市區")
+
 
 if __name__ == "__main__":
     unittest.main()
