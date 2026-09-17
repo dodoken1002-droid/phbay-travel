@@ -10,6 +10,11 @@
 >
 > `load_dotenv()` 不會覆蓋已存在的環境變數，這樣就不會碰到正式庫。
 >
+> **已加上自動防護**：`app.py` 在 `load_dotenv()` 前呼叫 `safe_test_env.apply_if_testing()`。
+> 由測試（unittest／pytest／`test_*.py`）載入時會強制 `SKIP_SCHEMA_INIT=1`、`DATABASE_URL`
+> 沒設就用上面的本機庫，設了但不是 localhost 就拋例外拒絕載入。上面的 export 現在不是必要，
+> 但要指到別的本機庫時仍可自己設。其他執行器可設 `PHBAY_TESTING=1` 強制套用。
+>
 > rhuser 這台（C 槽）的本機庫在 `C:/Users/rhuser/phbay-devdb/data`（同樣 port 55432，trust 認證、免密碼），
 > 行程資料是從正式站公開的 `/api/tours` 匯入的。
 

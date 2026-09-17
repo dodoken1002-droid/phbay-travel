@@ -36,7 +36,11 @@ from dotenv import load_dotenv
 from member_program import (init_member_tables, level_for_trips, levels as member_levels,
                             next_level, next_member_no, normalize_phone, points_per_trip,
                             public_member, recalculate_member, sync_trip_points, valid_email)
+import safe_test_env
 
+# 必須在 load_dotenv() 之前：由測試載入時強制 SKIP_SCHEMA_INIT=1、DATABASE_URL 只准 localhost，
+# 避免 `.env` 的正式庫網址被讀進來後在 import 時跑 init_db()。非測試情境（gunicorn/migrate.py）不做事。
+safe_test_env.apply_if_testing()
 load_dotenv()
 
 app = Flask(__name__, static_folder='.', static_url_path='')
