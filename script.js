@@ -404,6 +404,8 @@ function populateTourInterest(tours) {
     o.textContent = t.title;
     sel.insertBefore(o, otherOpt);     // 插在「其他」之前
   });
+  // P1 診斷結果以 sessionStorage 帶回；等動態商品選項就緒後再套用 tour_id。
+  window.dispatchEvent(new Event('phbay:tours-ready'));
 }
 
 /* 諮詢表單的梯次選單開關。
