@@ -1,5 +1,18 @@
 # 本機開發環境（2026-09-02 建）
 
+> ⚠️ **跑測試前必讀（2026-09-17）**：根目錄 `.env` 的 `DATABASE_URL` 目前指向 **Railway 正式資料庫**
+> （不是下面說的佔位字串）。`import app` 時若沒設 `SKIP_SCHEMA_INIT=1`，會對它執行 `init_db()`
+> ——包含建表與資料修正。跑 `python -m unittest` 前一律先把環境變數指到本機庫：
+>
+> ```bash
+> export DATABASE_URL=postgresql://phbay_dev@localhost:55432/phbay_dev SKIP_SCHEMA_INIT=1
+> ```
+>
+> `load_dotenv()` 不會覆蓋已存在的環境變數，這樣就不會碰到正式庫。
+>
+> rhuser 這台（C 槽）的本機庫在 `C:/Users/rhuser/phbay-devdb/data`（同樣 port 55432，trust 認證、免密碼），
+> 行程資料是從正式站公開的 `/api/tours` 匯入的。
+
 線上驗證只能測到公開的 GET；**後台的流程（匯入、改期、超額確認）不可能在正式站練**——
 會寫進真資料。這份是本機可安全實跑全部流程的環境。
 
