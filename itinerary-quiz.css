@@ -13,6 +13,9 @@
 .iq-option input { position:absolute; opacity:0; pointer-events:none; }
 .iq-option span { display:flex; align-items:center; min-height:54px; padding:12px 15px; border:2px solid #dce9ee; border-radius:14px; color:#234b5e; font-weight:700; cursor:pointer; background:#fff; }
 .iq-option input:checked+span { border-color:#0c89a8; background:#eafaff; box-shadow:0 0 0 3px rgba(12,137,168,.1); }
+/* 真正的 input 是透明的，鍵盤焦點要畫在看得到的選項上 */
+.iq-option input:focus-visible+span { outline:3px solid #0b7899; outline-offset:2px; }
+.iq-card h2:focus { outline:none; }
 .iq-date { display:grid; gap:12px; }
 .iq-date>input,.iq-counts input { width:100%; padding:13px; border:2px solid #dce9ee; border-radius:12px; font:inherit; }
 .iq-counts { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
@@ -23,15 +26,15 @@
 .iq-nav button,.iq-primary,.iq-secondary,.iq-line,.iq-link { border:0; border-radius:999px; padding:12px 20px; font-weight:800; text-decoration:none; text-align:center; cursor:pointer; }
 .iq-next,.iq-primary { background:#0b7899; color:#fff; }
 .iq-back,.iq-secondary { background:#eef7fa; color:#16647f; }
-.iq-line { background:#06c755; color:#fff; }
+.iq-line { background:#00833e; color:#fff; } /* #06c755 配白字對比僅 2.26:1 */
 .iq-link { background:transparent; color:#0b7899; text-decoration:underline; }
 .ir-shell { max-width:1080px; margin:36px auto 70px; padding:0 20px; }
-.ir-hero { background:linear-gradient(135deg,#075d82,#139a9a); color:#fff; border-radius:24px; padding:clamp(26px,6vw,52px); margin-bottom:22px; }
+.ir-hero { background:linear-gradient(135deg,#075d82,#0f7f86); color:#fff; border-radius:24px; padding:clamp(26px,6vw,52px); margin-bottom:22px; }
 .ir-hero p,.ir-hero h1,.ir-hero div { margin:0 0 10px; }
-.ir-hero>p { color:#d8ffff; }
+.ir-hero>p { color:#fff; }
 .ir-hero h1 { font-size:clamp(2rem,6vw,3.4rem); }
 .ir-hero strong { display:block; font-size:1.35rem; margin-top:22px; }
-.ir-hero small { display:block; opacity:.85; margin-top:4px; }
+.ir-hero small { display:block; margin-top:4px; }
 .ir-grid { display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:22px; align-items:start; }
 .ir-grid main { display:grid; gap:20px; }
 .ir-card h2 { margin:0 0 18px; color:#153f52; }

@@ -6,7 +6,7 @@
   <!-- Google Analytics 4 -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-47DV1VPF9J"></script>
   <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-47DV1VPF9J');</script>
-  <script src="/itinerary-analytics.js?v=20260917"></script>
+  <script src="/itinerary-analytics.js?v=20260917d"></script>
   <!-- Meta Pixel -->
   <script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init', '25643845041980148');fbq('track', 'PageView');</script>
   <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=25643845041980148&ev=PageView&noscript=1"/></noscript>
@@ -306,8 +306,10 @@
         if (typeof gtag === 'function') gtag('event','generate_lead',{
           method:'preorder',product_slug:SLUG,booking_ref:json.booking_ref
         });
-        if (window.PhbayAnalytics) PhbayAnalytics.track('purchase',{
-          transaction_id:json.booking_ref,currency:'TWD',affiliation:'phbay_travel_preorder',
+        // 預購成立≠已付款：不用 GA4 的 purchase（會進營收／電商報表與廣告轉換）。
+        // 也不帶訂位代號：代號內含出發日期。付款上線後，purchase 改在付款成功時送出。
+        if (window.PhbayAnalytics) PhbayAnalytics.track('preorder_created',{
+          currency:'TWD',affiliation:'phbay_travel_preorder',
           items:[{item_id:SLUG,item_name:product ? product.name : SLUG}]
         });
         e.target.reset();

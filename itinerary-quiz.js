@@ -69,13 +69,17 @@
     const base = [
       {day:'Day 1',title:'抵達・馬公慢慢進入狀態',detail:'依抵達時間走中央老街、天后宮與觀音亭，晚上安排在地海味。'},
       {day:'Day 2',title:middle,detail:key === 'family_slow' ? '上午體驗、午後休息；主要活動不超過兩個。' : '把完整一天留給同一個海域，避免折返趕船。'},
-      {day:'Day 3',title:'北環精華・伴手禮',detail:'通梁古榕、跨海大橋、小門或二崁擇重點停留，再依班次前往機場或港口。'},
+      {day:'Day 3',title:'北環精華・伴手禮',detail:'通梁古榕、跨海大橋、小門或二崁擇重點停留。'},
       {day:'Day 4',title:'南環／聚落深度日',detail:'風櫃、山水或湖西聚落擇一，為天候與體力保留彈性。'},
       {day:'Day 5',title:'留白與雨天備案',detail:'自由補上最喜歡的海邊、美食或室內文化景點。'}
     ];
     const count = { '2d1n':2, '3d2n':3, '4d3n':4, '5dplus':5 }[days] || 3;
     if (count === 2) return [base[0], {day:'Day 2',title:'北環或海上體驗二選一',detail:'只選一條主線，預留回程交通緩衝。'}];
-    return base.slice(0, count);
+    // 前往機場／港口只能出現在最後一天（4 天以上時第 3 天還不能離島）
+    const plan = base.slice(0, count);
+    const last = plan[plan.length - 1];
+    plan[plan.length - 1] = Object.assign({}, last, { detail: last.detail + '最後依班次前往機場或港口。' });
+    return plan;
   }
 
   function priceFor(budget) {
@@ -92,6 +96,12 @@
     };
   }
 
+  // toISOString() 是 UTC：台灣 00:00–08:00 會把「昨天」當成最早可選日期
+  function localToday() {
+    const d = new Date();
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  }
+
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function track(name, params) { return root.PhbayAnalytics && root.PhbayAnalytics.track(name, params); }
   function saveState(state) { try { root.sessionStorage.setItem('phbay_itinerary_answers_v1', JSON.stringify(state)); } catch (_) {} }
@@ -101,9 +111,9 @@
     const q = QUESTIONS[idx];
     const options = (q.options || []).map(o => `<label class="iq-option"><input type="${q.type === 'multi' ? 'checkbox' : 'radio'}" name="${q.key}" value="${o[0]}"><span>${o[1]}</span></label>`).join('');
     let field = `<div class="iq-options">${options}</div>`;
-    if (q.type === 'date') field = `<div class="iq-date"><input type="date" name="travel_date" min="${new Date().toISOString().slice(0,10)}"><label class="iq-option"><input type="checkbox" name="travel_date_undecided" value="1"><span>還沒決定日期</span></label></div>`;
+    if (q.type === 'date') field = `<div class="iq-date"><input type="date" name="travel_date" min="${localToday()}"><label class="iq-option"><input type="checkbox" name="travel_date_undecided" value="1"><span>還沒決定日期</span></label></div>`;
     if (q.type === 'party') field = `<div class="iq-counts"><label>成人<input type="number" name="adults" min="1" max="50" value="2" inputmode="numeric"></label><label>兒童<input type="number" name="children" min="0" max="30" value="0" inputmode="numeric"></label></div>`;
-    container.innerHTML = `<div class="iq-progress"><span>第 ${idx+1} / ${QUESTIONS.length} 題</span><div><i style="width:${Math.round((idx/QUESTIONS.length)*100)}%"></i></div></div><section class="iq-card"><p class="iq-eyebrow">30 秒澎湖行程診斷</p><h2>${q.title}</h2>${field}<p class="iq-error" role="alert"></p><div class="iq-nav">${idx ? '<button type="button" class="iq-back">上一步</button>' : '<span></span>'}<button type="button" class="iq-next">${idx === QUESTIONS.length-1 ? '看我的推薦' : '下一題'}</button></div></section>`;
+    container.innerHTML = `<div class="iq-progress"><span>第 ${idx+1} / ${QUESTIONS.length} 題</span><div><i style="width:${Math.round((idx/QUESTIONS.length)*100)}%"></i></div></div><section class="iq-card"><p class="iq-eyebrow">30 秒澎湖行程診斷</p><h2 tabindex="-1">${q.title}</h2>${field}<p class="iq-error" role="alert"></p><div class="iq-nav">${idx ? '<button type="button" class="iq-back">上一步</button>' : '<span></span>'}<button type="button" class="iq-next">${idx === QUESTIONS.length-1 ? '看我的推薦' : '下一題'}</button></div></section>`;
     if (answers[q.key] != null) {
       const vals = list(answers[q.key]);
       container.querySelectorAll(`[name="${q.key}"]`).forEach(el => { el.checked = vals.includes(el.value); });
@@ -123,9 +133,11 @@
   function initQuiz() {
     const container = root.document && root.document.getElementById('itinerary-quiz-v1');
     if (!container) return;
-    let idx = 0, answers = {};
-    function draw() {
+    let idx = 0, answers = {}, started = false;
+    function draw(moveFocus) {
       renderQuestion(container, idx, answers);
+      // 題目整塊重畫後焦點會掉回頁首；鍵盤與報讀器使用者要回到新題目
+      if (moveFocus) container.querySelector('h2').focus({ preventScroll: true });
       container.querySelector('.iq-next').addEventListener('click', function () {
         const q = QUESTIONS[idx], value = readAnswer(container, q);
         const invalid = q.type === 'party' ? (!value.adults || value.children < 0) : (!value[q.key] || (Array.isArray(value[q.key]) && !value[q.key].length));
@@ -134,8 +146,9 @@
         if (q.key === 'party_size' && Number(answers.children) === 0) answers.children_age = ['none'];
         if (q.key === 'children_age' && Number(answers.children) > 0 && has(answers.children_age, 'none')) { container.querySelector('.iq-error').textContent = '有兒童同行時，請選擇實際年齡區間。'; return; }
         if (q.key === 'children_age' && Number(answers.children) === 0) answers.children_age = ['none'];
-        if (idx === 0) track('quiz_start', { quiz_version:'p0_v1' });
-        if (idx < QUESTIONS.length - 1) { idx++; draw(); container.scrollIntoView({behavior:'smooth',block:'start'}); return; }
+        // 回到第 1 題再按下一題不能再算一次開始
+        if (idx === 0 && !started) { started = true; track('quiz_start', { quiz_version:'p0_v1' }); }
+        if (idx < QUESTIONS.length - 1) { idx++; draw(true); container.scrollIntoView({behavior:'smooth',block:'start'}); return; }
         const result = recommend(answers);
         saveState(answers);
         if (root.PhbayAnalytics) root.PhbayAnalytics.saveProfile(result.analytics);
@@ -143,7 +156,7 @@
         root.location.href = '/penghu-itinerary-recommendations/result';
       });
       const back = container.querySelector('.iq-back');
-      if (back) back.addEventListener('click', function () { idx--; draw(); });
+      if (back) back.addEventListener('click', function () { idx--; draw(true); });
     }
     draw();
   }
@@ -157,7 +170,8 @@
     container.innerHTML = `<header class="ir-hero"><p>你的澎湖旅行類型</p><h1>${esc(r.profile.type)}</h1><div>${esc(r.profile.summary)}</div><strong>預估 ${esc(r.price)}</strong><small>依日期、出發地、住宿與實際可訂狀況調整，以正式報價為準。</small></header><div class="ir-grid"><main><section class="ir-card"><h2>推薦行程</h2>${r.itinerary.map(x=>`<article class="ir-day"><b>${esc(x.day)}</b><div><h3>${esc(x.title)}</h3><p>${esc(x.detail)}</p></div></article>`).join('')}</section><section class="ir-card"><h2>為什麼適合你</h2><ul>${r.reasons.map(x=>`<li>✓ ${esc(x)}</li>`).join('')}</ul></section><section class="ir-card ir-warn"><h2>出發前注意</h2><ul>${r.warnings.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></section></main><aside class="ir-card ir-product"><p>可直接預訂的推薦體驗</p><h2>${esc(r.profile.product.name)}</h2><strong>${esc(r.profile.product.price)}</strong><a class="iq-primary" id="ir-book" href="${r.profile.product.url}">直接預訂</a><a class="iq-secondary" id="ir-adjust" href="/#contact">請潮旅幫我微調</a><a class="iq-line" id="ir-line" href="https://line.me/R/ti/p/@phbay2018" target="_blank" rel="noopener noreferrer">LINE 諮詢</a><button class="iq-link" id="ir-redo" type="button">重新診斷</button></aside></div>`;
     track('itinerary_view',{itinerary_type:r.key,quiz_version:'p0_v1'});
     track('product_view',{item_id:'neihai_cruise',item_name:r.profile.product.name,itinerary_type:r.key});
-    container.querySelector('#ir-book').addEventListener('click',()=>track('checkout_start',{item_id:'neihai_cruise',source:'itinerary_result'}));
+    // checkout_start 由預購頁送出表單時觸發；這裡若也送，同一位使用者會被算兩次
+    container.querySelector('#ir-book').addEventListener('click',()=>track('book_now_click',{item_id:'neihai_cruise',source:'itinerary_result',itinerary_type:r.key}));
     container.querySelector('#ir-adjust').addEventListener('click',()=>track('itinerary_adjust_click',{itinerary_type:r.key}));
     container.querySelector('#ir-line').addEventListener('click',()=>track('line_click',{source:'itinerary_result',itinerary_type:r.key}));
     container.querySelector('#ir-redo').addEventListener('click',()=>{ try{root.sessionStorage.removeItem('phbay_itinerary_answers_v1');}catch(_){} root.location.href='/penghu-itinerary-recommendations#itinerary-quiz-v1'; });

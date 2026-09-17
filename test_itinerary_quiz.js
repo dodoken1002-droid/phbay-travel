@@ -44,4 +44,28 @@ assert(!JSON.stringify(safe).includes('王小明'));
 assert(!JSON.stringify(safe).includes('0912345678'));
 assert(!JSON.stringify(safe).includes('2026-10-10'));
 
+// 前往機場／港口只能出現在最後一天
+['3d2n','4d3n','5dplus'].forEach(days => {
+  const plan = quiz.recommend(base({ travel_days:days })).itinerary;
+  plan.forEach((d, i) => {
+    const leaves = /機場|港口/.test(d.detail);
+    assert.strictEqual(leaves, i === plan.length - 1, `${days} 的 ${d.day} 不該${leaves ? '' : '不'}安排離島`);
+  });
+});
+
+// track() 不論呼叫端傳什麼，都不能把個資或內含日期的訂位代號送進 GA4
+const sent = [];
+global.gtag = function () { sent.push(Array.from(arguments)); };
+const payload = analytics.track('preorder_created', {
+  transaction_id:'NH202610031630-0012', booking_ref:'FESTIV20260919-0005', name:'王小明',
+  phone:'0912345678', email:'a@b.c', travel_date:'2026-10-10', adults:2, children:1,
+  travel_style:['water','island'], item_id:'neihai_cruise'
+});
+delete global.gtag;
+['transaction_id','booking_ref','name','phone','email','travel_date','adults','children']
+  .forEach(k => assert(!(k in payload), `${k} 不能送 GA4`));
+assert(!JSON.stringify(sent).includes('2026'), '事件內容不能含日期');
+assert.strictEqual(payload.travel_style, 'water|island', '診斷維度要與 sessionStorage 格式一致');
+assert.strictEqual(payload.item_id, 'neihai_cruise');
+
 console.log('itinerary quiz rule tests: ok');

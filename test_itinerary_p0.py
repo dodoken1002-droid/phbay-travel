@@ -49,7 +49,7 @@ class ItineraryP0AnalyticsContractTests(unittest.TestCase):
         combined = '\n'.join(src(x) for x in (
             'itinerary-quiz.js', 'preorder.html', 'neihai-preorder.html'))
         for event in ('quiz_start', 'quiz_complete', 'itinerary_view', 'product_view',
-                      'checkout_start', 'line_click', 'purchase'):
+                      'checkout_start', 'line_click', 'preorder_created'):
             self.assertIn("'" + event + "'", combined)
 
     def test_only_anonymous_quiz_dimensions_are_allowlisted(self):
@@ -61,13 +61,20 @@ class ItineraryP0AnalyticsContractTests(unittest.TestCase):
         for pii in ('name', 'phone', 'email', 'travel_date', 'adults', 'children'):
             self.assertNotIn("'" + pii + "'", allowlist)
 
-    def test_preorders_keep_existing_lead_tracking_and_add_purchase_funnel(self):
+    def test_preorders_keep_existing_lead_tracking_and_add_preorder_funnel(self):
         for filename in ('preorder.html', 'neihai-preorder.html'):
             text = src(filename)
             self.assertIn('preorder_submit_attempt', text)
             self.assertIn("gtag('event','generate_lead'", text)
             self.assertIn("track('checkout_start'", text)
-            self.assertIn("track('purchase'", text)
+            self.assertIn("track('preorder_created'", text)
+            # 預購成立不是付款；purchase 留給日後付款成功時使用
+            self.assertNotIn("track('purchase'", text)
+            self.assertNotIn('transaction_id:json.booking_ref', text)
+
+    def test_checkout_start_is_only_sent_from_preorder_pages(self):
+        # 結果頁的「直接預訂」若也送 checkout_start，走完流程的人會被算兩次
+        self.assertNotIn("'checkout_start'", src('itinerary-quiz.js'))
 
 
 if __name__ == '__main__':
