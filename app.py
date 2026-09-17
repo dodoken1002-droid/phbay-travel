@@ -59,7 +59,7 @@ app.permanent_session_lifetime = timedelta(hours=12)
 # ─── 靜態資源快取 ──────────────────────────────────────────
 # CSS/JS/圖片長快取；改動 css/js 時必須同步調整各 HTML 引用的 ?v= 版本字串，
 # 否則使用者會拿到快取的舊資源（版本字串統一用 ASSET_VERSION）。
-ASSET_VERSION = '20260827'
+ASSET_VERSION = '20260917'
 _LONG_CACHE_EXT = ('.css', '.js', '.png', '.jpg', '.jpeg', '.webp', '.avif',
                    '.gif', '.svg', '.ico', '.woff', '.woff2')
 
@@ -5179,7 +5179,7 @@ def _blog_hreflang(path_no_lang, avail):
 def _render_blog(title, desc, canonical, body, head_extra='', image=None, lang='zh-tw', alt_links=''):
     img = image or f'{SITE}/images/festival-poster.jpg'
     nav = '''<div class="top-banner"><div class="banner-static"><span>潮旅國際旅行社</span><span class="banner-sep">｜</span><span>2026 澎湖追風音樂燈光節 官方合作旅行社</span><span class="banner-sep">｜</span><span>電話：06-9271288</span></div></div>
-<nav class="navbar" id="navbar"><div class="nav-container"><a href="/" class="nav-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a><button class="nav-toggle" id="nav-toggle" aria-label="選單"><span></span><span></span><span></span></button><ul class="nav-links" id="nav-links"><li><a href="/">首頁</a></li><li><a href="/#tours">行程介紹</a></li><li class="nav-item has-submenu"><a href="/neihai-preorder.html">預購行程 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/neihai-preorder.html">小城故事內海巡禮</a></li><li><a href="/preorder/festival">追風音樂節</a></li></ul></li><li class="nav-item has-submenu"><a href="/blog">旅遊大小事 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/tides">潮汐查詢系統</a></li><li><a href="/blog">旅遊文章分享</a></li><li><a href="/faq.html">常見問題</a></li><li><a href="/reviews">旅客評價</a></li></ul></li><li class="nav-item has-submenu"><a href="/#about">關於我們 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/#contact">聯絡資訊</a></li></ul></li></ul></div></nav>'''
+<nav class="navbar" id="navbar"><div class="nav-container"><a href="/" class="nav-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a><button class="nav-toggle" id="nav-toggle" aria-label="選單"><span></span><span></span><span></span></button><ul class="nav-links" id="nav-links"><li><a href="/">首頁</a></li><li><a href="/tours">行程介紹</a></li><li class="nav-item has-submenu"><a href="/neihai-preorder.html">預購行程 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/neihai-preorder.html">小城故事內海巡禮</a></li><li><a href="/preorder/festival">追風音樂節</a></li></ul></li><li class="nav-item has-submenu"><a href="/blog">旅遊大小事 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/tides">潮汐查詢系統</a></li><li><a href="/blog">旅遊文章分享</a></li><li><a href="/faq.html">常見問題</a></li><li><a href="/reviews">旅客評價</a></li></ul></li><li class="nav-item has-submenu"><a href="/#about">關於我們 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/#contact">聯絡資訊</a></li></ul></li></ul></div></nav>'''
     footer = '''<footer class="footer"><div class="container"><div class="footer-bottom"><p>© 2026 潮旅國際旅行社 All Rights Reserved.｜<a href="/" style="color:inherit">官網</a>｜<a href="/blog" style="color:inherit">部落格</a>｜<a href="/reviews" style="color:inherit">旅客評價</a>｜<a href="/privacy" style="color:inherit">隱私權政策</a>｜<a href="/terms" style="color:inherit">使用條款</a></p></div></div></footer>
 <script>(function(){var t=document.getElementById('nav-toggle'),l=document.getElementById('nav-links');if(t)t.addEventListener('click',function(){l.classList.toggle('open')});var lb=document.getElementById('lang-btn'),lm=document.getElementById('lang-menu');if(lb)lb.addEventListener('click',function(e){e.stopPropagation();lm.classList.toggle('open')});document.addEventListener('click',function(){if(lm)lm.classList.remove('open')});})();</script>'''
     # 還沒有真實評價時不放「旅客評價」入口：一個點進去只寫「整理中」的頁面比沒有更扣信任感。
@@ -5501,6 +5501,65 @@ def pillar_page():
     return _render_blog(p['title'], p['desc'], p['canonical'], p['body'],
                         p['head_extra'], image=_PILLAR_OG_IMAGE.get(slug))
 
+# ── 行程獨立頁面（渲染在 tour_pages.py；資料來自後台維護的 tours 資料表）──
+import tour_pages
+
+
+def _active_tours():
+    conn = get_db(); cur = conn.cursor()
+    try:
+        cur.execute("SELECT * FROM tours WHERE is_active=TRUE ORDER BY sort_order, id")
+        return [dict(r) for r in cur.fetchall()]
+    finally:
+        cur.close(); conn.close()
+
+
+def _tour_page_error(status, heading, text):
+    body = (f'<div class="blog-wrap"><h1>{heading}</h1><p>{text}</p>'
+            '<p><a class="btn btn-primary" href="/tours">看全部行程</a></p></div>')
+    html = _render_blog(f'{heading} - 潮旅國際旅行社', text, f'{SITE}/tours', body,
+                        '<meta name="robots" content="noindex">')
+    return html, status
+
+
+@app.route('/tours')
+def tours_index():
+    try:
+        tours = _active_tours()
+    except Exception as exc:
+        print(f'[TOURS] {exc}')
+        return _tour_page_error(503, '行程暫時無法載入', '系統忙碌中，請稍後再試，或直接 LINE @phbay2018 詢問。')
+    title, desc, canonical, body, head_extra = tour_pages.render_tours_index(tours, request.args.get('type'))
+    return _render_blog(title, desc, canonical, body, head_extra)
+
+
+def _published_posts_brief():
+    conn = get_db(); cur = conn.cursor()
+    try:
+        cur.execute("""SELECT slug,title,summary,tags FROM posts WHERE is_published=TRUE
+                       ORDER BY published_at DESC NULLS LAST, id DESC""")
+        return [dict(r) for r in cur.fetchall()]
+    finally:
+        cur.close(); conn.close()
+
+
+@app.route('/tours/<int:tour_id>')
+def tour_detail(tour_id):
+    try:
+        tours = _active_tours()
+        posts = _published_posts_brief()
+    except Exception as exc:
+        print(f'[TOUR DETAIL] {exc}')
+        return _tour_page_error(503, '行程暫時無法載入', '系統忙碌中，請稍後再試，或直接 LINE @phbay2018 詢問。')
+    tour = next((t for t in tours if t['id'] == tour_id), None)
+    if not tour:
+        # 下架或刪除的行程回真正的 404，搜尋引擎才會把舊網址移除
+        return _tour_page_error(404, '這個行程目前沒有上架', '它可能已經結束或暫停報名，看看其他澎湖行程吧。')
+    title, desc, canonical, body, head_extra, og_image = tour_pages.render_tour_page(
+        tour, tour_pages.related_posts(tour, posts), tour_pages.sibling_tours(tour, tours))
+    return _render_blog(title, desc, canonical, body, head_extra, image=og_image)
+
+
 @app.route('/reviews')
 def reviews_page():
     items = load_reviews()
@@ -5524,7 +5583,7 @@ def reviews_page():
                 f'{intro}<div class="rv-grid">{cards}</div>'
                 f'<div class="blog-cta"><h3 style="color:var(--blue-dark);margin-bottom:10px">想擁有同樣的澎湖體驗？</h3>'
                 f'<a href="/#contact" class="btn btn-primary"><i class="fas fa-comment-dots"></i> 線上諮詢</a> '
-                f'<a href="/#tours" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-map-marked-alt"></i> 看推薦行程</a>'
+                f'<a href="/tours" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-map-marked-alt"></i> 看推薦行程</a>'
                 f'</div></div>')
     else:
         body = ('<div class="blog-wrap"><h1>旅客評價</h1>'
@@ -5593,6 +5652,7 @@ def dynamic_sitemap():
             (f'{SITE}/penghu-2026-festival-guide', '0.8', 'weekly'),
             (f'{SITE}/privacy', '0.3', 'yearly', _file_lastmod('privacy.html')),
             (f'{SITE}/terms', '0.3', 'yearly', _file_lastmod('terms.html'))]
+    urls.append((f'{SITE}/tours', '0.9', 'weekly'))
     if load_reviews():  # 空的評價頁是 noindex，不送進 sitemap
         urls.append((f'{SITE}/reviews', '0.7', 'weekly'))
     try:
@@ -5600,6 +5660,9 @@ def dynamic_sitemap():
         cur.execute("SELECT slug, COALESCE(updated_at,published_at,created_at) AS m FROM posts WHERE is_published=TRUE")
         for r in cur.fetchall():
             urls.append((f'{SITE}/blog/{r["slug"]}', '0.6', 'monthly', str(r['m'])[:10]))
+        cur.execute("SELECT id, updated_at FROM tours WHERE is_active=TRUE ORDER BY sort_order, id")
+        for r in cur.fetchall():
+            urls.append((f'{SITE}/tours/{r["id"]}', '0.8', 'weekly', str(r['updated_at'] or '')[:10]))
         cur.execute("SELECT slug FROM preorder_products WHERE is_active=TRUE")
         for r in cur.fetchall():
             urls.append((f'{SITE}/preorder/{r["slug"]}', '0.8', 'weekly'))

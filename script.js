@@ -575,6 +575,11 @@ async function loadTours() {
     });
     uniqueTours.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
     populateTourInterest(uniqueTours);
+    // 從 /tours/<id> 的「詢問這個行程」過來（/?tour_id=N#contact）：預選該行程
+    const wantId = new URLSearchParams(location.search).get('tour_id');
+    const sel = document.getElementById('tour-interest');
+    const opt = wantId && sel && sel.querySelector(`option[data-tour-id="${CSS.escape(wantId)}"]`);
+    if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event('change')); }
   } catch (err) {
     console.error('loadTours 失敗:', err);
     document.querySelectorAll('.tours-loading').forEach(el => {
@@ -682,26 +687,27 @@ document.addEventListener('DOMContentLoaded', markPastEvents);
 
 // 行程卡片／彈窗的固定 UI 字串（依語言）
 const TOUR_UI = {
-  'zh-tw':{detail:'查看詳情',priceHdr:'出發地 × 價格',suitable:'適合',duration:'天數',notice:'注意事項',includes:'費用包含',notes:'備註',highlights:'行程亮點',dates:'出發日期',
+  'zh-tw':{detail:'查看詳情',fullPage:'完整行程頁（可分享連結）',priceHdr:'出發地 × 價格',suitable:'適合',duration:'天數',notice:'注意事項',includes:'費用包含',notes:'備註',highlights:'行程亮點',dates:'出發日期',
            poster:'行程海報',posterHint:'點擊可看大圖',contact:'行程提供單位與聯絡方式',cAgency:'主辦旅行社',cPartner:'合作夥伴',cPhone:'電話',cLine:'LINE',cEmail:'Email',cWeb:'網站',cLicense:'證號',cNote:'也可直接洽潮旅國際旅行社協助報名',memberBadge:'經潮旅報名完成後可累積澎湖旅次'},
-  'en':{detail:'View Details',priceHdr:'Departure × Price',suitable:'For',duration:'Duration',notice:'Note',includes:'Includes',notes:'Notes',highlights:'Highlights',dates:'Departure Dates',
+  'en':{detail:'View Details',fullPage:'Full tour page (shareable link)',priceHdr:'Departure × Price',suitable:'For',duration:'Duration',notice:'Note',includes:'Includes',notes:'Notes',highlights:'Highlights',dates:'Departure Dates',
         poster:'Itinerary Poster',posterHint:'Click to enlarge',contact:'Operator & Contact',cAgency:'Operating Agency',cPartner:'Partners',cPhone:'Phone',cLine:'LINE',cEmail:'Email',cWeb:'Website',cLicense:'License',cNote:'You may also book through Phbay Travel',memberBadge:'Completed bookings through Phbay count toward Penghu journeys'},
-  'ja':{detail:'詳細を見る',priceHdr:'出発地 × 料金',suitable:'対象',duration:'日数',notice:'ご注意',includes:'料金に含む',notes:'備考',highlights:'ハイライト',dates:'出発日',
+  'ja':{detail:'詳細を見る',fullPage:'ツアー詳細ページ（共有用リンク）',priceHdr:'出発地 × 料金',suitable:'対象',duration:'日数',notice:'ご注意',includes:'料金に含む',notes:'備考',highlights:'ハイライト',dates:'出発日',
         poster:'ツアーポスター',posterHint:'クリックで拡大',contact:'主催会社とお問い合わせ',cAgency:'主催旅行会社',cPartner:'協力',cPhone:'電話',cLine:'LINE',cEmail:'メール',cWeb:'ウェブ',cLicense:'許可番号',cNote:'潮旅国際旅行社経由でのお申し込みも可能です',memberBadge:'潮旅経由で予約・完了すると旅回数に加算'},
-  'ko':{detail:'상세 보기',priceHdr:'출발지 × 요금',suitable:'대상',duration:'일수',notice:'유의사항',includes:'포함 사항',notes:'비고',highlights:'하이라이트',dates:'출발일',
+  'ko':{detail:'상세 보기',fullPage:'전체 투어 페이지(공유 링크)',priceHdr:'출발지 × 요금',suitable:'대상',duration:'일수',notice:'유의사항',includes:'포함 사항',notes:'비고',highlights:'하이라이트',dates:'출발일',
         poster:'여행 포스터',posterHint:'클릭하면 확대',contact:'주최사 및 연락처',cAgency:'주최 여행사',cPartner:'협력사',cPhone:'전화',cLine:'LINE',cEmail:'이메일',cWeb:'웹사이트',cLicense:'등록번호',cNote:'Phbay 여행사를 통해서도 예약하실 수 있습니다',memberBadge:'차오뤼를 통해 예약·완료하면 펑후 여행 횟수 적립'},
-  'zh-cn':{detail:'查看详情',priceHdr:'出发地 × 价格',suitable:'适合',duration:'天数',notice:'注意事项',includes:'费用包含',notes:'备注',highlights:'行程亮点',dates:'出发日期',
+  'zh-cn':{detail:'查看详情',fullPage:'完整行程页（可分享链接）',priceHdr:'出发地 × 价格',suitable:'适合',duration:'天数',notice:'注意事项',includes:'费用包含',notes:'备注',highlights:'行程亮点',dates:'出发日期',
            poster:'行程海报',posterHint:'点击可看大图',contact:'行程提供单位与联络方式',cAgency:'主办旅行社',cPartner:'合作伙伴',cPhone:'电话',cLine:'LINE',cEmail:'Email',cWeb:'网站',cLicense:'证号',cNote:'也可直接洽潮旅国际旅行社协助报名',memberBadge:'经潮旅报名完成后可累积澎湖旅次'}
 };
 function tourUI(k){ return (TOUR_UI[window.__lang || 'zh-tw'] || TOUR_UI['zh-tw'])[k]; }
 
-/* 行程標題 → 預購表單對照表；之後有新預購行程在此加一行即可 */
-const PREORDER_LINKS = [
-  { pattern: /小城故事|內海巡禮|内海巡礼|Inner-Sea Cruise/i, url: '/neihai-preorder.html', icon: 'fa-ship' },
-  { pattern: /追風|音樂燈光節|音楽祭|Music Festival/i,        url: '/preorder/festival',    icon: 'fa-music' },
-];
-function preorderLinkFor(title) {
-  return PREORDER_LINKS.find(m => m.pattern.test(title || '')) || null;
+/* 行程 → 預購表單。只認後台設定的 tours.preorder_slug 與「小城故事」本身（內海巡禮走舊表）。
+   不再用標題關鍵字猜：別家旅行社的主題遊程標題也有「追風」「內海巡禮」，會被誤導到潮旅的預購頁。
+   規則與 tour_pages.booking_link() 相同，改一邊要同步另一邊。 */
+function preorderLinkFor(tour) {
+  if (tour.preorder_slug && /^[a-z0-9-]+$/.test(tour.preorder_slug))
+    return { url: `/preorder/${tour.preorder_slug}`, icon: tour.preorder_slug === 'festival' ? 'fa-music' : 'fa-ticket' };
+  if ((tour.title || '').startsWith('小城故事')) return { url: '/neihai-preorder.html', icon: 'fa-ship' };
+  return null;
 }
 
 function renderTourCard(tour) {
@@ -736,7 +742,7 @@ function renderTourCard(tour) {
     ? `<span class="meta-item price"><i class="fas fa-tag"></i> ${L.price_display}</span>` : '';
 
   const btnClass = isHero ? 'btn btn-card btn-card--hero' : 'btn btn-card';
-  const cardPreorder = preorderLinkFor(L.title);
+  const cardPreorder = preorderLinkFor(tour);
   const neihaiCardCta = cardPreorder
     ? `<a href="${cardPreorder.url}" class="${btnClass}" style="margin-top:10px;text-decoration:none;text-align:center">
         <i class="fas ${cardPreorder.icon}"></i> 預購訂位
@@ -769,7 +775,7 @@ function renderTourCard(tour) {
     </div>
     <div class="tour-body">
       ${isHero ? '<div class="tour-year-badge">2026</div>' : ''}
-      <h3 class="tour-title">${L.title}</h3>
+      <h3 class="tour-title"><a href="/tours/${tour.id}" style="color:inherit">${L.title}</a></h3>
       <p class="tour-desc">${L.description || ''}</p>
       <p style="font-size:.78rem;color:#9a6b16;font-weight:700"><i class="fas fa-passport"></i> ${tourUI('memberBadge')}</p>
       ${slotHtml}
@@ -876,7 +882,7 @@ function renderTourModal(tour) {
        </div>`
     : `<h2>${title}</h2>
        <span class="modal-tag">${dur || ''}${pdisp ? '｜' + pdisp : ''}</span>`;
-  const modalPreorder = preorderLinkFor(title);
+  const modalPreorder = preorderLinkFor(tour);
   const neihaiModalCta = modalPreorder
     ? `<a href="${modalPreorder.url}" class="btn btn-primary">
         <i class="fas ${modalPreorder.icon}"></i> 前往預購訂位
@@ -897,6 +903,7 @@ function renderTourModal(tour) {
       ${posterHtml}
       ${contactHtml}
       ${notesHtml}
+      <p style="margin:14px 0"><a href="/tours/${tour.id}" style="color:var(--blue-main);font-weight:700"><i class="fas fa-up-right-from-square"></i> ${tourUI('fullPage')}</a></p>
       <div style="background:#fff7df;border-left:4px solid #c99535;padding:12px 14px;margin:16px 0"><i class="fas fa-passport"></i> <strong>${tourUI('memberBadge')}</strong></div>
       ${neihaiModalCta}
     </div>`;

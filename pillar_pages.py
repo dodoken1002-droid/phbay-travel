@@ -60,7 +60,7 @@ _LINE_URL = 'https://line.me/R/ti/p/@phbay2018'
 def _cta_row(extra=''):
     return ('<div class="pp-cta-row">'
             f'<a href="{_LINE_URL}" target="_blank" rel="noopener noreferrer" class="btn btn-primary"><i class="fab fa-line"></i> LINE 諮詢 @phbay2018</a>'
-            '<a href="/#tours" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-map-marked-alt"></i> 看推薦行程</a>'
+            '<a href="/tours" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-map-marked-alt"></i> 看推薦行程</a>'
             f'{extra}</div>')
 
 
