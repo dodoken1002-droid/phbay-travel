@@ -63,7 +63,7 @@ app.permanent_session_lifetime = timedelta(hours=12)
 # ─── 靜態資源快取 ──────────────────────────────────────────
 # CSS/JS/圖片長快取；改動 css/js 時必須同步調整各 HTML 引用的 ?v= 版本字串，
 # 否則使用者會拿到快取的舊資源（版本字串統一用 ASSET_VERSION）。
-ASSET_VERSION = '20260917f'
+ASSET_VERSION = '20260918a'
 _LONG_CACHE_EXT = ('.css', '.js', '.png', '.jpg', '.jpeg', '.webp', '.avif',
                    '.gif', '.svg', '.ico', '.woff', '.woff2')
 
@@ -5191,8 +5191,19 @@ def _render_blog(title, desc, canonical, body, head_extra='', image=None, lang='
     if not load_reviews():
         nav = nav.replace('<li><a href="/reviews">旅客評價</a></li>', '')
         footer = footer.replace('｜<a href="/reviews" style="color:inherit">旅客評價</a>', '')
-    # 部落格頁語言切換鈕（只在 /blog 路徑顯示；連到同頁 ?lang=，保留 tag/page）
-    if request.path.startswith('/blog'):
+    if lang in SHELL_REPLACEMENTS:
+        for _source, _translated in SHELL_REPLACEMENTS[lang].items():
+            nav = nav.replace(_source, _translated)
+            footer = footer.replace(_source, _translated)
+        # Keep visitors in their selected language when using shared navigation.
+        _lang_query = f'?lang={lang}'
+        for _path in ('/tours', '/blog', '/tides'):
+            nav = nav.replace(f'href="{_path}"', f'href="{_path}{_lang_query}"')
+            footer = footer.replace(f'href="{_path}"', f'href="{_path}{_lang_query}"')
+        nav = nav.replace('href="/"', f'href="/{_lang_query}"')
+        footer = footer.replace('href="/"', f'href="/{_lang_query}"')
+    # 部落格與行程頁語言切換鈕（連到同頁 ?lang=，保留篩選／分頁參數）
+    if request.path.startswith(('/blog', '/tours')):
         from urllib.parse import urlencode
         _other = {k: v for k, v in request.args.items() if k != 'lang'}
         _menu = ''
@@ -5218,7 +5229,7 @@ def _render_blog(title, desc, canonical, body, head_extra='', image=None, lang='
         f'<link rel="canonical" href="{canonical}"/>{alt_links}'
         f'<meta property="og:type" content="article"/><meta property="og:title" content="{_html.escape(title)}"/>'
         f'<meta property="og:description" content="{_html.escape(desc)}"/><meta property="og:url" content="{canonical}"/>'
-        f'<meta property="og:site_name" content="潮旅國際旅行社"/><meta property="og:locale" content="{BLOG_OG_LOCALE.get(lang, "zh_TW")}"/>'
+        f'<meta property="og:site_name" content="{_html.escape(SHELL_REPLACEMENTS.get(lang, {}).get("潮旅國際旅行社", "潮旅國際旅行社"))}"/><meta property="og:locale" content="{BLOG_OG_LOCALE.get(lang, "zh_TW")}"/>'
         f'<meta property="og:image" content="{_html.escape(img)}"/>'
         '<meta name="twitter:card" content="summary_large_image"/>'
         f'<meta name="twitter:title" content="{_html.escape(title)}"/>'
@@ -5234,7 +5245,7 @@ def _render_blog(title, desc, canonical, body, head_extra='', image=None, lang='
         '.post-infobox{border:1px solid #e6edf3;border-radius:12px;padding:6px 18px;margin:0 0 20px;background:#fff}.post-info-row{display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #f0f4f7;font-size:.95rem}.post-info-row:last-child{border-bottom:none}.post-info-k{flex:0 0 auto;min-width:96px;font-weight:700;color:var(--blue-dark)}.post-info-v{color:var(--text-mid);line-height:1.7}'
         '.post-faq{margin-top:36px}.post-faq h2{font-size:1.4rem;color:var(--blue-dark);font-weight:800;margin-bottom:14px}.post-faq details{background:#fff;border:1px solid #e6edf3;border-radius:12px;margin-bottom:10px;padding:0 18px}.post-faq summary{cursor:pointer;font-weight:700;color:var(--blue-dark);padding:14px 0;list-style-position:inside}.post-faq details[open] summary{border-bottom:1px solid #eef2f5}.post-faq details p{padding:12px 0 16px;color:var(--text-mid);line-height:1.8}</style>'
         f'{head_extra}</head><body>{nav}<main>{body}</main>{footer}'
-        '<a href="https://wa.me/886912151788" class="wa-float" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp 諮詢" title="WhatsApp 諮詢"><i class="fab fa-whatsapp"></i></a>'
+        f'<a href="https://wa.me/886912151788" class="wa-float" target="_blank" rel="noopener noreferrer" aria-label="{_html.escape(SHELL_REPLACEMENTS.get(lang, {}).get("WhatsApp 諮詢", "WhatsApp 諮詢"))}" title="{_html.escape(SHELL_REPLACEMENTS.get(lang, {}).get("WhatsApp 諮詢", "WhatsApp 諮詢"))}"><i class="fab fa-whatsapp"></i></a>'
         '</body></html>')
 
 @app.route('/blog')
@@ -5541,29 +5552,63 @@ def _active_tours():
         cur.close(); conn.close()
 
 
-def _tour_page_error(status, heading, text):
+_TOUR_ERROR_UI = {
+    'zh-tw': {'all': '看全部行程', 'brand': '潮旅國際旅行社'},
+    'en': {'all': 'View all tours', 'brand': 'PH Bay Travel',
+           '503': ('Tours are temporarily unavailable', 'The system is busy. Please try again later or message LINE @phbay2018.'),
+           '404': ('This tour is not currently available', 'It may have ended or paused bookings. Browse our other Penghu tours.')},
+    'ja': {'all': 'すべてのツアーを見る', 'brand': '潮旅国際旅行社',
+           '503': ('ツアーを一時的に読み込めません', 'しばらくしてから再度お試しいただくか、LINE @phbay2018へお問い合わせください。'),
+           '404': ('このツアーは現在販売されていません', '終了または受付休止中の可能性があります。ほかの澎湖ツアーをご覧ください。')},
+    'ko': {'all': '전체 투어 보기', 'brand': 'PH Bay Travel',
+           '503': ('현재 투어를 불러올 수 없습니다', '잠시 후 다시 시도하거나 LINE @phbay2018로 문의해 주세요.'),
+           '404': ('현재 판매 중인 투어가 아닙니다', '종료되었거나 예약이 일시 중지되었을 수 있습니다. 다른 펑후 투어를 확인해 주세요.')},
+    'zh-cn': {'all': '查看全部行程', 'brand': '潮旅国际旅行社',
+              '503': ('行程暂时无法加载', '系统忙碌中，请稍后再试，或通过 LINE @phbay2018 咨询。'),
+              '404': ('这个行程目前没有上架', '它可能已经结束或暂停报名，请查看其他澎湖行程。')},
+}
+
+SHELL_REPLACEMENTS = {
+    'en': {'潮旅國際旅行社': 'PH Bay Travel', '2026 澎湖追風音樂燈光節 官方合作旅行社': 'Official travel partner of the 2026 Penghu Music & Light Festival', '電話：': 'Tel: ', '選單': 'Menu', '首頁': 'Home', '行程介紹': 'Tours', '預購行程': 'Pre-order', '小城故事內海巡禮': 'Inner-Sea Cruise', '追風音樂節': 'Music Festival', '旅遊大小事': 'Travel Info', '潮汐查詢系統': 'Tide Forecast', '旅遊文章分享': 'Travel Blog', '常見問題': 'FAQ', '旅客評價': 'Reviews', '關於我們': 'About Us', '聯絡資訊': 'Contact', '官網': 'Website', '部落格': 'Blog', '隱私權政策': 'Privacy', '使用條款': 'Terms', 'WhatsApp 諮詢': 'WhatsApp enquiry'},
+    'ja': {'潮旅國際旅行社': '潮旅国際旅行社', '2026 澎湖追風音樂燈光節 官方合作旅行社': '2026澎湖音楽・ライトフェスティバル公式旅行会社', '選單': 'メニュー', '首頁': 'ホーム', '行程介紹': 'ツアー', '預購行程': '事前予約', '小城故事內海巡禮': '内海クルーズ', '追風音樂節': '音楽祭', '旅遊大小事': '旅行情報', '潮汐查詢系統': '潮汐情報', '旅遊文章分享': '旅行ブログ', '常見問題': 'よくある質問', '旅客評價': '旅行者レビュー', '關於我們': '会社案内', '聯絡資訊': 'お問い合わせ', '官網': '公式サイト', '部落格': 'ブログ', '隱私權政策': 'プライバシー', '使用條款': '利用規約', 'WhatsApp 諮詢': 'WhatsAppで相談'},
+    'ko': {'潮旅國際旅行社': 'PH Bay Travel', '2026 澎湖追風音樂燈光節 官方合作旅行社': '2026 펑후 음악·빛 축제 공식 여행사', '電話：': '전화: ', '選單': '메뉴', '首頁': '홈', '行程介紹': '투어', '預購行程': '사전 예약', '小城故事內海巡禮': '내해 크루즈', '追風音樂節': '음악 축제', '旅遊大小事': '여행 정보', '潮汐查詢系統': '조석 정보', '旅遊文章分享': '여행 블로그', '常見問題': '자주 묻는 질문', '旅客評價': '여행자 후기', '關於我們': '회사 소개', '聯絡資訊': '문의', '官網': '공식 사이트', '部落格': '블로그', '隱私權政策': '개인정보 처리방침', '使用條款': '이용약관', 'WhatsApp 諮詢': 'WhatsApp 문의'},
+    'zh-cn': {'潮旅國際旅行社': '潮旅国际旅行社', '2026 澎湖追風音樂燈光節 官方合作旅行社': '2026 澎湖追风音乐灯光节 官方合作旅行社', '電話：': '电话：', '選單': '菜单', '首頁': '首页', '行程介紹': '行程介绍', '預購行程': '预购行程', '小城故事內海巡禮': '小城故事内海巡礼', '追風音樂節': '追风音乐节', '旅遊大小事': '旅游资讯', '潮汐查詢系統': '潮汐查询系统', '旅遊文章分享': '旅游文章分享', '常見問題': '常见问题', '旅客評價': '旅客评价', '關於我們': '关于我们', '聯絡資訊': '联系信息', '官網': '官网', '部落格': '博客', '隱私權政策': '隐私权政策', '使用條款': '使用条款', 'WhatsApp 諮詢': 'WhatsApp 咨询'},
+}
+
+
+def _tour_page_error(status, heading, text, lang='zh-tw'):
+    lang = tour_pages.normalize_lang(lang)
+    ui = _TOUR_ERROR_UI[lang]
+    if str(status) in ui:
+        heading, text = ui[str(status)]
+    see_all, brand = ui['all'], ui['brand']
+    tours_href = '/tours' + (f'?lang={lang}' if lang != 'zh-tw' else '')
     body = (f'<div class="blog-wrap"><h1>{heading}</h1><p>{text}</p>'
-            '<p><a class="btn btn-primary" href="/tours">看全部行程</a></p></div>')
-    html = _render_blog(f'{heading} - 潮旅國際旅行社', text, f'{SITE}/tours', body,
-                        '<meta name="robots" content="noindex">')
+            f'<p><a class="btn btn-primary" href="{tours_href}">{see_all}</a></p></div>')
+    html = _render_blog(f'{heading} - {brand}', text, f'{SITE}{tours_href}', body,
+                        '<meta name="robots" content="noindex">', lang=lang)
     return html, status
 
 
 @app.route('/tours')
 def tours_index():
+    lang = _req_lang()
     try:
         tours = _active_tours()
     except Exception as exc:
         print(f'[TOURS] {exc}')
-        return _tour_page_error(503, '行程暫時無法載入', '系統忙碌中，請稍後再試，或直接 LINE @phbay2018 詢問。')
-    title, desc, canonical, body, head_extra = tour_pages.render_tours_index(tours, request.args.get('type'))
-    return _render_blog(title, desc, canonical, body, head_extra)
+        return _tour_page_error(503, '行程暫時無法載入', '系統忙碌中，請稍後再試，或直接 LINE @phbay2018 詢問。', lang)
+    selected = tour_pages.normalize_filter(request.args.get('type'))
+    title, desc, canonical, body, head_extra = tour_pages.render_tours_index(tours, selected, lang)
+    path = '/tours' + (f'?type={selected}' if selected else '')
+    alt_links = _blog_hreflang(path, list(BLOG_LANGS))
+    return _render_blog(title, desc, canonical, body, head_extra, lang=lang, alt_links=alt_links)
 
 
 def _published_posts_brief():
     conn = get_db(); cur = conn.cursor()
     try:
-        cur.execute("""SELECT slug,title,summary,tags FROM posts WHERE is_published=TRUE
+        cur.execute("""SELECT slug,title,summary,tags,i18n FROM posts WHERE is_published=TRUE
                        ORDER BY published_at DESC NULLS LAST, id DESC""")
         return [dict(r) for r in cur.fetchall()]
     finally:
@@ -5572,19 +5617,24 @@ def _published_posts_brief():
 
 @app.route('/tours/<int:tour_id>')
 def tour_detail(tour_id):
+    lang = _req_lang()
     try:
         tours = _active_tours()
         posts = _published_posts_brief()
     except Exception as exc:
         print(f'[TOUR DETAIL] {exc}')
-        return _tour_page_error(503, '行程暫時無法載入', '系統忙碌中，請稍後再試，或直接 LINE @phbay2018 詢問。')
+        return _tour_page_error(503, '行程暫時無法載入', '系統忙碌中，請稍後再試，或直接 LINE @phbay2018 詢問。', lang)
     tour = next((t for t in tours if t['id'] == tour_id), None)
     if not tour:
         # 下架或刪除的行程回真正的 404，搜尋引擎才會把舊網址移除
-        return _tour_page_error(404, '這個行程目前沒有上架', '它可能已經結束或暫停報名，看看其他澎湖行程吧。')
+        return _tour_page_error(404, '這個行程目前沒有上架', '它可能已經結束或暫停報名，看看其他澎湖行程吧。', lang)
+    related = tour_pages.related_posts(tour, posts)
+    related = [_localize_post(p, lang) for p in related]
     title, desc, canonical, body, head_extra, og_image = tour_pages.render_tour_page(
-        tour, tour_pages.related_posts(tour, posts), tour_pages.sibling_tours(tour, tours))
-    return _render_blog(title, desc, canonical, body, head_extra, image=og_image)
+        tour, related, tour_pages.sibling_tours(tour, tours), lang=lang)
+    alt_links = _blog_hreflang(f'/tours/{tour_id}', tour_pages.available_languages(tour))
+    return _render_blog(title, desc, canonical, body, head_extra, image=og_image,
+                        lang=lang, alt_links=alt_links)
 
 
 @app.route('/reviews')

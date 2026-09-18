@@ -726,8 +726,9 @@ function renderTourCard(tour) {
     prices: getLocPrices(tour),
   };
 
-  const badgeHtml = tour.badge_text
-    ? `<div class="tour-badge ${tour.badge_class || ''}">${tour.badge_text}</div>` : '';
+  const badgeText = getLoc(tour, 'badge_text');
+  const badgeHtml = badgeText
+    ? `<div class="tour-badge ${tour.badge_class || ''}">${badgeText}</div>` : '';
 
   // 沒有實拍照時用品牌預設封面，不再拿圖庫海景照充數（客人會以為是行程實景）
   const imgHtml = tour.image_url

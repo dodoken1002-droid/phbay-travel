@@ -758,7 +758,10 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
           <button type="button" class="btn btn-sm btn-ghost i18n-lang-btn" data-lang="zh-cn" onclick="switchI18nLang('zh-cn')">简体</button>
           <span id="i18n-cur-label" style="margin-left:8px;align-self:center;font-size:.85rem;color:#4a5568"></span>
         </div>
-        <input id="fi-title" placeholder="行程名稱（翻譯）" style="width:100%;margin-bottom:6px;padding:7px;border:1px solid #e2e8f0;border-radius:6px" />
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:6px">
+          <input id="fi-title" placeholder="行程名稱（翻譯）" style="width:100%;margin-bottom:6px;padding:7px;border:1px solid #e2e8f0;border-radius:6px" />
+          <input id="fi-badge" placeholder="標籤文字（翻譯）" style="width:100%;margin-bottom:6px;padding:7px;border:1px solid #e2e8f0;border-radius:6px" />
+        </div>
         <textarea id="fi-desc" rows="2" placeholder="描述（翻譯）" style="width:100%;margin-bottom:6px;padding:7px;border:1px solid #e2e8f0;border-radius:6px"></textarea>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:6px">
           <input id="fi-suitable" placeholder="適合對象（翻譯）" style="padding:7px;border:1px solid #e2e8f0;border-radius:6px" />
@@ -825,11 +828,13 @@ function collectI18nFields(){
   if (nt)  md.notes = nt;
   const obj = {};
   const title = _fiVal('fi-title').trim();
+  const badge = _fiVal('fi-badge').trim();
   const desc  = _fiVal('fi-desc').trim();
   const suit  = _fiVal('fi-suitable').trim();
   const dur   = _fiVal('fi-duration').trim();
   const price = _fiVal('fi-price').trim();
   if (title) obj.title = title;
+  if (badge) obj.badge_text = badge;
   if (desc)  obj.description = desc;
   if (suit)  obj.suitable_for = suit;
   if (dur)   obj.duration = dur;
@@ -842,6 +847,7 @@ function collectI18nFields(){
 function loadI18nFields(obj){
   obj = obj || {};
   _fiSet('fi-title', obj.title);
+  _fiSet('fi-badge', obj.badge_text);
   _fiSet('fi-desc', obj.description);
   _fiSet('fi-suitable', obj.suitable_for);
   _fiSet('fi-duration', obj.duration);
