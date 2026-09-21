@@ -43,6 +43,15 @@ def require(condition, message):
         raise AssertionError(message)
 
 
+def header_value(headers, name):
+    """Read an HTTP header without relying on the server's letter casing."""
+    expected = name.lower()
+    for key, value in headers.items():
+        if key.lower() == expected:
+            return value
+    return ""
+
+
 def validate_authorize_redirect(provider, location, expected_redirect_base):
     parsed = urllib.parse.urlparse(location)
     expected_host, expected_path = PROVIDERS[provider]
@@ -88,12 +97,13 @@ def run(base_url, expected_redirect_base, allow_disabled=False):
 
         status, headers, _ = request(opener, f"{base_url}/api/member/oauth/{provider}/start")
         require(status == 302, f"{provider}: start returned HTTP {status}")
-        state = validate_authorize_redirect(provider, headers.get("Location", ""), expected_redirect_base)
+        state = validate_authorize_redirect(
+            provider, header_value(headers, "Location"), expected_redirect_base)
         cancel_query = urllib.parse.urlencode({"state": state, "error": "access_denied"})
         status, headers, _ = request(
             opener, f"{base_url}/api/member/oauth/{provider}/callback?{cancel_query}")
         require(status == 302, f"{provider}: cancel callback returned HTTP {status}")
-        cancel_location = headers.get("Location", "")
+        cancel_location = header_value(headers, "Location")
         require(cancel_location.endswith("/member/dashboard?oauth_error=denied"),
                 f"{provider}: cancel callback did not fail safely")
         print(f"{provider}: authorize + PKCE/state/nonce + cancel callback OK")
