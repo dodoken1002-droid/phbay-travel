@@ -57,9 +57,9 @@ class ItineraryP1ContractTests(unittest.TestCase):
         self.assertIn('preview?null:track(name,params)', text)
 
     def test_cache_versions_are_updated_together(self):
-        self.assertIn("ASSET_VERSION = '20260917f'", src('app.py'))
+        self.assertIn("ASSET_VERSION = '20260918a'", src('app.py'))
         for filename in ('index.html', 'neihai-preorder.html', 'preorder.html'):
-            self.assertIn('20260917f', src(filename))
+            self.assertIn('20260918a', src(filename))
 
 
 if __name__ == '__main__':
