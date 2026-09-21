@@ -18,6 +18,7 @@
 import os
 import time
 import unittest
+import urllib.parse
 from pathlib import Path
 from unittest import mock
 
@@ -49,6 +50,66 @@ class MemberV1RouteTests(unittest.TestCase):
     def test_facebook_is_reserved_but_not_enabled(self):
         response = self.client.get("/api/member/oauth/facebook/start")
         self.assertEqual(response.status_code, 404)
+
+    def test_line_and_google_start_use_state_nonce_and_pkce(self):
+        provider_hosts = {
+            "line": "access.line.me",
+            "google": "accounts.google.com",
+        }
+        configured = {
+            "LINE_OAUTH_CLIENT_ID": "line-test-client",
+            "LINE_OAUTH_CLIENT_SECRET": "line-test-secret",
+            "LINE_OAUTH_REDIRECT_URI": "https://www.phbay.info/api/member/oauth/line/callback",
+            "GOOGLE_OAUTH_CLIENT_ID": "google-test-client",
+            "GOOGLE_OAUTH_CLIENT_SECRET": "google-test-secret",
+            "GOOGLE_OAUTH_REDIRECT_URI": "https://www.phbay.info/api/member/oauth/google/callback",
+        }
+        with mock.patch.dict(os.environ, configured, clear=False):
+            for provider, expected_host in provider_hosts.items():
+                with self.subTest(provider=provider):
+                    response = self.client.get(f"/api/member/oauth/{provider}/start")
+                    self.assertEqual(response.status_code, 302)
+                    parsed = urllib.parse.urlparse(response.location)
+                    query = urllib.parse.parse_qs(parsed.query)
+                    self.assertEqual(parsed.scheme, "https")
+                    self.assertEqual(parsed.hostname, expected_host)
+                    self.assertEqual(query["response_type"], ["code"])
+                    self.assertEqual(query["code_challenge_method"], ["S256"])
+                    self.assertEqual(
+                        query["redirect_uri"],
+                        [f"https://www.phbay.info/api/member/oauth/{provider}/callback"])
+                    self.assertTrue({"openid", "email"}.issubset(
+                        set(query["scope"][0].split())))
+                    self.assertGreaterEqual(len(query["state"][0]), 32)
+                    self.assertGreaterEqual(len(query["nonce"][0]), 32)
+                    with self.client.session_transaction() as sess:
+                        saved = dict(sess["member_oauth_state"])
+                    self.assertEqual(saved["provider"], provider)
+                    self.assertEqual(saved["state"], query["state"][0])
+                    self.assertEqual(saved["nonce"], query["nonce"][0])
+                    self.assertNotEqual(saved["verifier"], query["code_challenge"][0])
+
+    def test_oauth_callback_rejects_invalid_state_and_handles_cancel(self):
+        configured = {
+            "LINE_OAUTH_CLIENT_ID": "line-test-client",
+            "LINE_OAUTH_CLIENT_SECRET": "line-test-secret",
+        }
+        with mock.patch.dict(os.environ, configured, clear=False):
+            invalid = self.client.get(
+                "/api/member/oauth/line/callback?state=attacker&code=unused")
+            self.assertEqual(invalid.status_code, 302)
+            self.assertIn("oauth_error=state", invalid.location)
+
+            started = self.client.get("/api/member/oauth/line/start")
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(started.location).query)
+            cancelled = self.client.get(
+                "/api/member/oauth/line/callback",
+                query_string={"state": query["state"][0], "error": "access_denied"})
+            self.assertEqual(cancelled.status_code, 302)
+            self.assertIn("oauth_error=denied", cancelled.location)
+            with self.client.session_transaction() as sess:
+                self.assertNotIn("member_oauth_state", sess,
+                                 "OAuth state must be single-use after a callback")
 
     def test_legacy_member_regression_routes_remain_registered(self):
         """P0 修正不可移除既有正式會員、綁定、點數、合併或認領入口。"""
@@ -163,8 +224,20 @@ class MemberV1SchemaTests(unittest.TestCase):
 
     def test_member_center_explains_oauth_email_step_up(self):
         member_html = (ROOT / "member.html").read_text(encoding="utf-8")
-        self.assertIn("oauth_error')==='email_otp_required", member_html)
+        self.assertIn("oauthError==='email_otp_required'", member_html)
         self.assertIn("請先使用 Email 驗證碼重新登入", member_html)
+
+    def test_member_center_explains_every_oauth_callback_error(self):
+        member_html = (ROOT / "member.html").read_text(encoding="utf-8")
+        self.assertIn("const oauthError=params.get('oauth_error')", member_html)
+        self.assertIn('id="oauth-status"', member_html)
+        self.assertIn("status.textContent=text", member_html)
+        self.assertIn("if(oauthError!=='email_otp_required')loadDashboard()", member_html)
+        for error in ("state", "denied", "config", "provider", "profile",
+                      "belongs_to_other_member", "email_otp_required"):
+            self.assertIn(error, member_html)
+        self.assertIn("textContent=text", member_html,
+                      "OAuth errors must be rendered as text, never injected HTML")
 
     def test_otp_is_not_logged_or_returned(self):
         self.assertNotIn("print(code", self.v1)
