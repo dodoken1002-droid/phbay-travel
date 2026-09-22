@@ -50,6 +50,21 @@ class MemberCampaignContractTests(unittest.TestCase):
         self.assertLess(self.html.index("await api('/api/member/orders/claim/verify'"),
                         self.html.index("memberTrack('member_order_claim_complete'"))
 
+    def test_member_language_normalizes_uppercase_values(self):
+        self.assertIn("String(value||'').toLowerCase()", self.html)
+        self.assertIn("MEMBER_LANGS.includes(normalized)", self.html)
+
+    def test_member_language_rejects_unknown_values_without_persisting_them(self):
+        self.assertIn("{lang:'zh-tw',valid:false}", self.html)
+        self.assertIn("applyLang(lang,normalizedLang.valid)", self.html)
+        self.assertIn("if(persist)try{localStorage.setItem('phbay_lang',l)}", self.html)
+
+    def test_member_language_accepts_supported_values_and_uses_html_codes(self):
+        self.assertIn("const MEMBER_LANGS=['zh-tw','en','ja','ko','zh-cn']", self.html)
+        self.assertIn("'zh-tw':'zh-TW'", self.html)
+        self.assertIn("'zh-cn':'zh-CN'", self.html)
+        self.assertIn("document.documentElement.lang=LANG_HTML[l]||'zh-TW'", self.html)
+
 
 if __name__ == '__main__':
     unittest.main()
