@@ -73,8 +73,11 @@ Object.assign(I.ja,{campaignKicker:'旅行パスポート開始プログラム',
 Object.assign(I.ko,{campaignKicker:'여행 여권 시작 프로그램',campaignTitle:'지나온 펑후 여행을 여행 여권에 담으세요',campaignText:'처음이라면 회원을 만들고, 차오뤼를 통해 여행한 기존 고객은 로그인 후 과거 주문을 인증할 수 있습니다. 모든 여행은 시스템 또는 직원 확인 후 인정됩니다.',campaignStep1Title:'회원 만들기',campaignStep1Text:'이메일로 본인을 확인하고 회원 번호와 여행 여권을 만듭니다.',campaignStep2Title:'과거 여행 찾기',campaignStep2Text:'로그인 후 차오뤼 주문 번호를 입력하고 인증해 신청합니다.',campaignStep3Title:'다음 여행 적립',campaignStep3Text:'차오뤼를 통해 예약하고 완료한 인정 대상 여행은 당시 포인트와 함께 기록됩니다.',campaignJoin:'내 여행 여권 만들기',campaignClaim:'로그인하고 과거 주문 인증',campaignNote:'포인트 사용과 회원 행사는 당시 공지를 따르며 고정 현금 가치나 미공개 혜택을 약속하지 않습니다.'});
 Object.assign(I['zh-cn'],{campaignKicker:'旅行护照启程计划',campaignTitle:'把走过的澎湖，收进你的旅行护照',campaignText:'新朋友可以建立会员；曾经通过潮旅完成旅程的老朋友，登录后可认领过去订单。每一趟都需经系统或客服确认后才会认列。',campaignStep1Title:'建立会员',campaignStep1Text:'用 Email 验证身份，建立专属会员编号与旅行护照。',campaignStep2Title:'找回旧旅程',campaignStep2Text:'登录后输入潮旅订单编号，通过验证即可申请认领。',campaignStep3Title:'累积下一趟',campaignStep3Text:'经潮旅报名并完成的可认列旅程，会留下旅次与当期积分记录。',campaignJoin:'建立我的旅行护照',campaignClaim:'登录并认领过去订单',campaignNote:'积分用途与会员活动依当期公告；本计划不预先承诺固定现金折抵或未公告优惠。'});
 const base={};document.querySelectorAll('[data-t]').forEach(x=>base[x.dataset.t]=x.textContent);
-const params=new URLSearchParams(location.search),lang=params.get('lang')||localStorage.getItem('phbay_lang')||'zh-tw';document.getElementById('lang').value=lang;
-function applyLang(l){document.documentElement.lang=l;document.querySelectorAll('[data-t]').forEach(x=>x.textContent=(I[l]||{})[x.dataset.t]||base[x.dataset.t]||x.textContent);localStorage.setItem('phbay_lang',l)}applyLang(lang);
+const MEMBER_LANGS=['zh-tw','en','ja','ko','zh-cn'];
+const LANG_HTML={'zh-tw':'zh-TW',en:'en',ja:'ja',ko:'ko','zh-cn':'zh-CN'};
+function normalizeMemberLang(value){const normalized=String(value||'').toLowerCase();return MEMBER_LANGS.includes(normalized)?{lang:normalized,valid:true}:{lang:'zh-tw',valid:false}}
+const params=new URLSearchParams(location.search);let rawLang=params.get('lang');if(rawLang===null){try{rawLang=localStorage.getItem('phbay_lang')}catch(e){}}if(!rawLang)rawLang='zh-tw';const normalizedLang=normalizeMemberLang(rawLang),lang=normalizedLang.lang;document.getElementById('lang').value=lang;
+function applyLang(l,persist=true){document.documentElement.lang=LANG_HTML[l]||'zh-TW';document.querySelectorAll('[data-t]').forEach(x=>x.textContent=(I[l]||{})[x.dataset.t]||base[x.dataset.t]||x.textContent);if(persist)try{localStorage.setItem('phbay_lang',l)}catch(e){}}applyLang(lang,normalizedLang.valid);
 document.getElementById('lang').onchange=e=>{params.set('lang',e.target.value);location.search=params.toString()};
 const MEMBER_CAMPAIGN_ID='passport_launch_2026q4';
 let memberAuthState='guest';
