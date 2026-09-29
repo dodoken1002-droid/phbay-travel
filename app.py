@@ -860,10 +860,22 @@ else:
         print(f'[警告] 啟動時無法初始化 DB：{_e}')
 
 
+def _is_prod_railway_host(host):
+    """正式環境的 *.up.railway.app 預設網域也要導回 www。
+    Googlebot 幾乎只爬這個預設網域、把 www 晾著，www 的 sitemap 因此三個月都沒被下載。
+    只導 GET/HEAD 且避開 /api/：LINE webhook 等 POST 呼叫方不一定會跟著轉址。
+    staging 也跑同一份程式、用自己的 up.railway.app 網域，所以限定 production。"""
+    return (host.endswith('.up.railway.app')
+            and os.environ.get('RAILWAY_ENVIRONMENT_NAME', '').strip() == 'production'
+            and request.method in ('GET', 'HEAD')
+            and not request.path.startswith('/api/'))
+
+
 @app.before_request
 def ensure_db():
     # 將裸網域永久集中到 canonical 主機，避免 phbay.info 與 www.phbay.info 分散訊號。
-    if request.host.split(':', 1)[0].lower() == 'phbay.info':
+    host = request.host.split(':', 1)[0].lower()
+    if host == 'phbay.info' or _is_prod_railway_host(host):
         path = request.full_path[:-1] if request.full_path.endswith('?') else request.full_path
         return redirect(f'https://www.phbay.info{path}', code=308)
     global _db_initialized
@@ -5706,18 +5718,10 @@ def reviews_page():
 # ── 動態 sitemap（含部落格文章）──
 @app.route('/sitemap.xml')
 def dynamic_sitemap():
-    def _file_lastmod(filename):
-        """靜態頁的 lastmod 直接取檔案異動時間，改檔就會自動更新，不會忘了手動改。
-        主機時區是 UTC，換算成台灣時間才會跟站上其他日期一致。"""
-        try:
-            path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
-            mtime = datetime.utcfromtimestamp(os.path.getmtime(path)) + timedelta(hours=8)
-            return mtime.strftime('%Y-%m-%d')
-        except Exception:
-            return None
-
-    urls = [(f'{SITE}/', '1.0', 'weekly', _file_lastmod('index.html')),
-            (f'{SITE}/faq.html', '0.8', 'monthly', _file_lastmod('faq.html')),
+    # 靜態頁不給 lastmod：Railway 每次建置都把檔案 mtime 重設成建置時間，
+    # 以前用 mtime 會讓首頁等天天顯示「今天更新」，Google 會因此不再相信整份 lastmod。
+    urls = [(f'{SITE}/', '1.0', 'weekly'),
+            (f'{SITE}/faq.html', '0.8', 'monthly'),
             (f'{SITE}/blog', '0.7', 'weekly'),
             (f'{SITE}/tides', '0.7', 'daily'),
             (f'{SITE}/neihai-preorder.html', '0.8', 'weekly'),
@@ -5727,8 +5731,8 @@ def dynamic_sitemap():
             (f'{SITE}/penghu-food-guide', '0.8', 'monthly', PILLAR_LAST_MODIFIED),
             (f'{SITE}/penghu-100', '0.8', 'monthly'),
             (f'{SITE}/penghu-2026-festival-guide', '0.8', 'weekly'),
-            (f'{SITE}/privacy', '0.3', 'yearly', _file_lastmod('privacy.html')),
-            (f'{SITE}/terms', '0.3', 'yearly', _file_lastmod('terms.html'))]
+            (f'{SITE}/privacy', '0.3', 'yearly'),
+            (f'{SITE}/terms', '0.3', 'yearly')]
     urls.append((f'{SITE}/tours', '0.9', 'weekly'))
     if load_reviews():  # 空的評價頁是 noindex，不送進 sitemap
         urls.append((f'{SITE}/reviews', '0.7', 'weekly'))
