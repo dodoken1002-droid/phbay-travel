@@ -21,7 +21,8 @@ ROOT = Path(__file__).resolve().parents[1]
 SITE = "https://www.phbay.info"
 CORE_PATHS = ["/", "/blog", "/faq.html", "/penghu-3days-itinerary",
               "/penghu-family-travel", "/penghu-itinerary-recommendations", "/penghu-food-guide",
-              "/penghu-2026-festival-guide", "/reviews", "/penghu-100"]
+              "/penghu-2026-festival-guide", "/penghu-100"]
+OPTIONAL_PATHS = ["/reviews"]
 
 
 @dataclass
@@ -148,7 +149,8 @@ def audit_repository_content():
 
 def run(site):
     findings, sitemap_urls = audit_sitemap(site)
-    for path in CORE_PATHS + latest_post_paths():
+    optional_paths = [path for path in OPTIONAL_PATHS if site + path in sitemap_urls]
+    for path in CORE_PATHS + optional_paths + latest_post_paths():
         findings.extend(audit_page(site, path))
     findings.extend(audit_repository_content())
     errors = sum(row.severity == "error" for row in findings)
