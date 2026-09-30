@@ -8,13 +8,13 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import http.client
 import json
 import os
 import random
 import base64
 import secrets
 import time
-import urllib.error
 import urllib.parse
 import urllib.request
 from email.mime.text import MIMEText
@@ -214,6 +214,39 @@ def register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email
                     (purpose, channel, destination, digest))
         return cur.fetchone()["id"], code
 
+    def claim_hint_failure_key(booking_ref):
+        """訂單編號只用 HMAC 後的穩定鍵計次，不把原值存進 challenge destination。"""
+        return _digest(app.secret_key, "order_claim_hint", booking_ref)
+
+    def claim_hint_rate_limited(cur, member_id, booking_key):
+        # 同時到達的請求也必須共用同一上限；固定排序避免兩個 scope 反向取鎖造成 deadlock。
+        lock_keys = sorted({
+            int.from_bytes(bytes.fromhex(_digest(
+                app.secret_key, "claim_hint_member_lock", member_id))[:8], "big", signed=True),
+            int.from_bytes(bytes.fromhex(_digest(
+                app.secret_key, "claim_hint_booking_lock", booking_key))[:8], "big", signed=True),
+        })
+        for lock_key in lock_keys:
+            cur.execute("SELECT pg_advisory_xact_lock(%s)", (lock_key,))
+        cur.execute("""SELECT
+            COUNT(*) FILTER (WHERE member_id=%s) AS member_failures,
+            COUNT(*) FILTER (WHERE destination_normalized=%s) AS booking_failures
+          FROM member_verification_challenges
+          WHERE purpose='order_claim_hint_failure'
+            AND created_at>NOW()-INTERVAL '1 hour'""", (member_id, booking_key))
+        counts = cur.fetchone()
+        return (int(counts["member_failures"] or 0) >= 10
+                or int(counts["booking_failures"] or 0) >= 10)
+
+    def record_claim_hint_failure(cur, member_id, channel, booking_key, verification_hint):
+        digest = _digest(app.secret_key, member_id, "order_claim_hint_failure",
+                         channel, booking_key, verification_hint)
+        cur.execute("""INSERT INTO member_verification_challenges
+          (member_id,purpose,channel,destination_normalized,code_hash,expires_at,used_at)
+          VALUES (%s,'order_claim_hint_failure',%s,%s,%s,
+                  NOW()+INTERVAL '1 hour',NOW())""",
+                    (member_id, channel, booking_key, digest))
+
     def verify_anonymous_challenge(cur, challenge_id, purpose, destination, code):
         cur.execute("""SELECT * FROM member_verification_challenges
           WHERE id=%s AND member_id IS NULL AND purpose=%s AND destination_normalized=%s
@@ -327,7 +360,7 @@ def register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email
             else:
                 profile = _get_json(config["userinfo"], token["access_token"])
                 email_verified = bool(profile.get(config["email_verified"]))
-        except (KeyError, ValueError, TimeoutError, urllib.error.URLError) as exc:
+        except (KeyError, ValueError, OSError, http.client.HTTPException) as exc:
             app.logger.warning("OAuth callback failed for %s: %s", provider, type(exc).__name__)
             return redirect("/member/dashboard?oauth_error=provider")
         subject = str(profile.get(config["subject"]) or "")[:255]
@@ -531,20 +564,29 @@ def register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email
                 or not booking_ref or not verification_hint):
             return jsonify(ok=False, error=claim_error), 400
         conn = get_db(); cur = conn.cursor()
+        booking_key = claim_hint_failure_key(booking_ref)
+        if claim_hint_rate_limited(cur, member_id, booking_key):
+            cur.close(); conn.close()
+            return jsonify(ok=False, error="嘗試次數過多，請稍後再試"), 429
+
+        def claim_failure_response():
+            record_claim_hint_failure(
+                cur, member_id, channel, booking_key, verification_hint)
+            conn.commit(); cur.close(); conn.close()
+            return jsonify(ok=False, error=claim_error), 400
+
         cur.execute(f"SELECT id,member_id,contact_email,contact_phone FROM {tables[order_type]} WHERE booking_ref=%s FOR UPDATE",
                     (booking_ref,))
         order = cur.fetchone()
         if not order or order.get("member_id") is not None:
-            cur.close(); conn.close()
-            return jsonify(ok=False, error=claim_error), 400
+            return claim_failure_response()
         destination = ((order.get("contact_email") or "").strip().lower() if channel == "email"
                        else normalize_phone(order.get("contact_phone")))
         expected_hint = ((destination.split("@", 1)[0][:3].lower()) if channel == "email"
                          else destination[-4:])
         if not destination or not expected_hint or not hmac.compare_digest(
                 expected_hint.encode("utf-8"), verification_hint.encode("utf-8")):
-            cur.close(); conn.close()
-            return jsonify(ok=False, error=claim_error), 400
+            return claim_failure_response()
         try:
             challenge_id, code = issue_challenge(cur, member_id, "order_claim", channel, destination)
         except ChallengeRateLimit:
@@ -556,7 +598,11 @@ def register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email
           ON CONFLICT (order_type,order_id) DO UPDATE SET member_id=EXCLUDED.member_id,
             channel=EXCLUDED.channel,destination_normalized=EXCLUDED.destination_normalized,
             challenge_id=EXCLUDED.challenge_id,claimed_at=NULL,created_at=NOW()
-          WHERE order_claims.member_id=EXCLUDED.member_id AND order_claims.claimed_at IS NULL
+          WHERE order_claims.claimed_at IS NULL AND
+            (order_claims.member_id=EXCLUDED.member_id OR EXISTS (
+              SELECT 1 FROM member_verification_challenges old_challenge
+              WHERE old_challenge.id=order_claims.challenge_id AND
+                (old_challenge.expires_at<=NOW() OR old_challenge.used_at IS NOT NULL)))
           RETURNING id""", (member_id, order_type, order["id"], channel, destination, challenge_id))
         claim = cur.fetchone()
         if not claim:

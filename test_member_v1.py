@@ -16,6 +16,7 @@
 """
 
 import os
+import http.client
 import time
 import unittest
 import urllib.parse
@@ -111,7 +112,7 @@ class MemberV1RouteTests(unittest.TestCase):
                 self.assertNotIn("member_oauth_state", sess,
                                  "OAuth state must be single-use after a callback")
 
-    def test_oauth_callback_handles_non_ascii_state_and_provider_timeout(self):
+    def test_oauth_callback_handles_non_ascii_state_and_provider_network_errors(self):
         configured = {
             "LINE_OAUTH_CLIENT_ID": "line-test-client",
             "LINE_OAUTH_CLIENT_SECRET": "line-test-secret",
@@ -124,13 +125,17 @@ class MemberV1RouteTests(unittest.TestCase):
             self.assertEqual(non_ascii.status_code, 302)
             self.assertIn("oauth_error=state", non_ascii.location)
 
-            started = self.client.get("/api/member/oauth/line/start")
-            state = urllib.parse.parse_qs(urllib.parse.urlparse(started.location).query)["state"][0]
-            with mock.patch.object(member_v1, "_post_form", side_effect=TimeoutError):
-                timed_out = self.client.get(
-                    "/api/member/oauth/line/callback", query_string={"state": state, "code": "x"})
-            self.assertEqual(timed_out.status_code, 302)
-            self.assertIn("oauth_error=provider", timed_out.location)
+            for error in (ConnectionResetError(), http.client.IncompleteRead(b""), TimeoutError()):
+                with self.subTest(error=type(error).__name__):
+                    started = self.client.get("/api/member/oauth/line/start")
+                    state = urllib.parse.parse_qs(
+                        urllib.parse.urlparse(started.location).query)["state"][0]
+                    with mock.patch.object(member_v1, "_post_form", side_effect=error):
+                        failed = self.client.get(
+                            "/api/member/oauth/line/callback",
+                            query_string={"state": state, "code": "x"})
+                    self.assertEqual(failed.status_code, 302)
+                    self.assertIn("oauth_error=provider", failed.location)
 
     def test_member_email_codes_use_the_shared_delivery_entrypoint(self):
         delivered = []
@@ -526,6 +531,10 @@ class MemberV1DatabaseTests(unittest.TestCase):
         ]
         self.assertEqual({response.status_code for response in responses}, {400})
         self.assertEqual(len({response.get_json()["error"] for response in responses}), 1)
+        failures = self._rows("""SELECT COUNT(*) AS n FROM member_verification_challenges
+                                 WHERE member_id=%s AND purpose='order_claim_hint_failure'""",
+                              (owner,))[0]["n"]
+        self.assertEqual(failures, 3, "不存在、已認領、比對碼錯誤都必須累計")
 
     def test_pending_claim_cannot_be_overwritten_by_another_member(self):
         first = self._member("甲", "a@example.com", "0911111111")
@@ -538,6 +547,120 @@ class MemberV1DatabaseTests(unittest.TestCase):
         audit = self._rows("SELECT member_id FROM order_claims WHERE id=%s",
                            (first_payload["claim_id"],))[0]
         self.assertEqual(audit["member_id"], first)
+
+    def test_expired_pending_claim_can_be_taken_over_and_keeps_old_challenge(self):
+        first = self._member("甲", "a@example.com", "0911111111")
+        second = self._member("乙", "b@example.com", "0922222222")
+        self._order("CLAIM-EXPIRED-PENDING", "a@example.com", "0911111111")
+        _, first_payload = self._claim(self._client(first), "CLAIM-EXPIRED-PENDING")
+        old_challenge = self._rows("SELECT challenge_id FROM order_claims WHERE id=%s",
+                                   (first_payload["claim_id"],))[0]["challenge_id"]
+        conn = self.A.get_db(); cur = conn.cursor()
+        cur.execute("""UPDATE member_verification_challenges
+                       SET expires_at=NOW()-INTERVAL '1 minute' WHERE id=%s""",
+                    (old_challenge,))
+        conn.commit(); cur.close(); conn.close()
+
+        response, payload = self._claim(self._client(second), "CLAIM-EXPIRED-PENDING")
+        self.assertEqual(response.status_code, 200, payload)
+        audit = self._rows("SELECT member_id,claimed_at,challenge_id FROM order_claims WHERE id=%s",
+                           (first_payload["claim_id"],))[0]
+        self.assertEqual(audit["member_id"], second)
+        self.assertIsNone(audit["claimed_at"])
+        self.assertNotEqual(audit["challenge_id"], old_challenge)
+        self.assertEqual(self._rows(
+            "SELECT COUNT(*) AS n FROM member_verification_challenges WHERE id=%s",
+            (old_challenge,))[0]["n"], 1, "舊 challenge 必須保留作為稽核紀錄")
+
+    def test_used_pending_claim_can_be_taken_over(self):
+        first = self._member("甲", "a@example.com", "0911111111")
+        second = self._member("乙", "b@example.com", "0922222222")
+        self._order("CLAIM-USED-PENDING", "a@example.com", "0911111111")
+        _, first_payload = self._claim(self._client(first), "CLAIM-USED-PENDING")
+        conn = self.A.get_db(); cur = conn.cursor()
+        cur.execute("""UPDATE member_verification_challenges SET used_at=NOW()
+                       WHERE id=(SELECT challenge_id FROM order_claims WHERE id=%s)""",
+                    (first_payload["claim_id"],))
+        conn.commit(); cur.close(); conn.close()
+        response, payload = self._claim(self._client(second), "CLAIM-USED-PENDING")
+        self.assertEqual(response.status_code, 200, payload)
+        self.assertEqual(self._rows("SELECT member_id FROM order_claims WHERE id=%s",
+                                    (first_payload["claim_id"],))[0]["member_id"], second)
+
+    def test_same_member_can_refresh_a_pending_claim(self):
+        member_id = self._member("甲", "a@example.com", "0911111111")
+        self._order("CLAIM-REFRESH", "a@example.com", "0911111111")
+        client = self._client(member_id)
+        _, first_payload = self._claim(client, "CLAIM-REFRESH")
+        first_challenge = self._rows("SELECT challenge_id FROM order_claims WHERE id=%s",
+                                     (first_payload["claim_id"],))[0]["challenge_id"]
+        second_response, second_payload = self._claim(client, "CLAIM-REFRESH")
+        self.assertEqual(second_response.status_code, 200, second_payload)
+        refreshed = self._rows("SELECT id,challenge_id FROM order_claims WHERE id=%s",
+                               (first_payload["claim_id"],))[0]
+        self.assertEqual(refreshed["id"], first_payload["claim_id"])
+        self.assertNotEqual(refreshed["challenge_id"], first_challenge)
+
+    def test_completed_claim_cannot_be_overwritten(self):
+        first = self._member("甲", "a@example.com", "0911111111")
+        second = self._member("乙", "b@example.com", "0922222222")
+        self._order("CLAIM-COMPLETE", "a@example.com", "0911111111")
+        first_client = self._client(first)
+        _, payload = self._claim(first_client, "CLAIM-COMPLETE")
+        first_client.post("/api/member/orders/claim/verify", json={
+            "claim_id": payload["claim_id"], "code": self.sent[-1][1]})
+        blocked, _ = self._claim(self._client(second), "CLAIM-COMPLETE")
+        self.assertEqual(blocked.status_code, 400)
+        audit = self._rows("SELECT member_id,claimed_at FROM order_claims WHERE id=%s",
+                           (payload["claim_id"],))[0]
+        self.assertEqual(audit["member_id"], first)
+        self.assertIsNotNone(audit["claimed_at"])
+
+    def test_claim_hint_failures_rate_limit_member_before_correct_attempt(self):
+        member_id = self._member("甲", "a@example.com", "0911111111")
+        self._order("CLAIM-MEMBER-LIMIT", "a@example.com", "0911111111")
+        client = self._client(member_id)
+        for _ in range(10):
+            response, _ = self._claim(
+                client, "CLAIM-MEMBER-LIMIT", verification_hint="wrong")
+            self.assertEqual(response.status_code, 400)
+        before_rows = self._rows("SELECT COUNT(*) AS n FROM member_verification_challenges")[0]["n"]
+        before_sent = len(self.sent)
+        blocked, payload = self._claim(client, "CLAIM-MEMBER-LIMIT")
+        self.assertEqual(blocked.status_code, 429, payload)
+        self.assertEqual(payload["error"], "嘗試次數過多，請稍後再試")
+        self.assertEqual(
+            self._rows("SELECT COUNT(*) AS n FROM member_verification_challenges")[0]["n"],
+            before_rows, "被限流後不得建立 challenge")
+        self.assertEqual(len(self.sent), before_sent, "被限流後不得寄信")
+
+    def test_claim_hint_failures_rate_limit_booking_across_members(self):
+        first = self._member("甲", "a@example.com", "0911111111")
+        second = self._member("乙", "b@example.com", "0922222222")
+        third = self._member("丙", "c@example.com", "0933333333")
+        self._order("CLAIM-BOOKING-LIMIT", "a@example.com", "0911111111")
+        for client in (self._client(first), self._client(second)):
+            for _ in range(5):
+                response, _ = self._claim(
+                    client, "CLAIM-BOOKING-LIMIT", verification_hint="wrong")
+                self.assertEqual(response.status_code, 400)
+        blocked, payload = self._claim(self._client(third), "CLAIM-BOOKING-LIMIT")
+        self.assertEqual(blocked.status_code, 429, payload)
+
+    def test_claim_hint_failure_window_expires_after_one_hour(self):
+        member_id = self._member("甲", "a@example.com", "0911111111")
+        self._order("CLAIM-WINDOW", "a@example.com", "0911111111")
+        client = self._client(member_id)
+        for _ in range(10):
+            self._claim(client, "CLAIM-WINDOW", verification_hint="wrong")
+        conn = self.A.get_db(); cur = conn.cursor()
+        cur.execute("""UPDATE member_verification_challenges
+                       SET created_at=NOW()-INTERVAL '61 minutes'
+                       WHERE purpose='order_claim_hint_failure' AND member_id=%s""",
+                    (member_id,))
+        conn.commit(); cur.close(); conn.close()
+        response, payload = self._claim(client, "CLAIM-WINDOW")
+        self.assertEqual(response.status_code, 200, payload)
 
     def test_repeated_claim_does_not_double_credit(self):
         owner = self._member("甲", "a@example.com", "0911111111")
