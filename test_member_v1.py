@@ -429,6 +429,16 @@ class MemberV1DatabaseTests(unittest.TestCase):
                                      "verification_hint": verification_hint})
         return response, (response.get_json() or {})
 
+    def _claim_hint_lock_keys(self, member_id, booking_ref):
+        """Mirror the production lock-key derivation without changing production code."""
+        secret = self.A.app.secret_key
+        booking_key = self.V1._digest(secret, "order_claim_hint", booking_ref)
+        member_lock = int.from_bytes(bytes.fromhex(self.V1._digest(
+            secret, "claim_hint_member_lock", member_id))[:8], "big", signed=True)
+        booking_lock = int.from_bytes(bytes.fromhex(self.V1._digest(
+            secret, "claim_hint_booking_lock", booking_key))[:8], "big", signed=True)
+        return member_lock, booking_lock, booking_key
+
     # ── 五、訂單認領 ──
     def test_legacy_register_login_member_center_and_line_binding(self):
         """正式站既有註冊→Email OTP→會員中心→LINE OA 綁定不可退化。"""
@@ -650,54 +660,99 @@ class MemberV1DatabaseTests(unittest.TestCase):
         self.assertEqual(blocked.status_code, 429, payload)
 
     def test_concurrent_claim_hint_failures_cannot_bypass_member_limit(self):
-        member_id = self._member("甲", "a@example.com", "0911111111")
-        self._order("CLAIM-CONCURRENT-MEMBER", "a@example.com", "0911111111")
-        barrier = threading.Barrier(30)
+        for round_no in range(5):
+            member_id = self._member(
+                f"甲{round_no}", f"same-member-{round_no}@example.com", f"0911111{round_no:03d}")
+            booking_ref = f"CLAIM-CONCURRENT-MEMBER-{round_no}"
+            self._order(booking_ref, "owner@example.com", "0911111111")
+            barrier = threading.Barrier(30)
 
-        def guess_wrong(_):
-            client = self._client(member_id)
-            barrier.wait()
-            return self._claim(
-                client, "CLAIM-CONCURRENT-MEMBER", verification_hint="wrong")[0].status_code
+            def guess_wrong(_):
+                client = self._client(member_id)
+                barrier.wait(timeout=30)
+                return self._claim(
+                    client, booking_ref, verification_hint="wrong")[0].status_code
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
-            statuses = list(executor.map(guess_wrong, range(30)))
+            with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
+                statuses = list(executor.map(guess_wrong, range(30)))
 
-        self.assertEqual(statuses.count(400), 10, statuses)
-        self.assertEqual(statuses.count(429), 20, statuses)
-        failures = self._rows("""SELECT COUNT(*) AS n
-                                 FROM member_verification_challenges
-                                 WHERE member_id=%s
-                                   AND purpose='order_claim_hint_failure'""",
-                              (member_id,))[0]["n"]
-        self.assertLessEqual(failures, 10)
+            self.assertEqual(statuses.count(400), 10, (round_no, statuses))
+            self.assertEqual(statuses.count(429), 20, (round_no, statuses))
+            failures = self._rows("""SELECT COUNT(*) AS n
+                                     FROM member_verification_challenges
+                                     WHERE member_id=%s
+                                       AND purpose='order_claim_hint_failure'""",
+                                  (member_id,))[0]["n"]
+            self.assertLessEqual(failures, 10)
 
     def test_concurrent_claim_hint_failures_cannot_bypass_booking_limit(self):
-        members = [
-            self._member(f"會員{i}", f"member{i}@example.com", f"09{i:08d}")
-            for i in range(30)
-        ]
-        booking_ref = "CLAIM-CONCURRENT-BOOKING"
-        self._order(booking_ref, "owner@example.com", "0911111111")
-        barrier = threading.Barrier(30)
+        for round_no in range(5):
+            members = [
+                self._member(f"會員{round_no}-{i}", f"member-{round_no}-{i}@example.com",
+                             f"09{round_no:01d}{i:07d}")
+                for i in range(30)
+            ]
+            booking_ref = f"CLAIM-CONCURRENT-BOOKING-{round_no}"
+            self._order(booking_ref, "owner@example.com", "0911111111")
+            barrier = threading.Barrier(30)
 
-        def guess_wrong(member_id):
-            client = self._client(member_id)
-            barrier.wait()
-            return self._claim(
-                client, booking_ref, verification_hint="wrong")[0].status_code
+            def guess_wrong(member_id):
+                client = self._client(member_id)
+                barrier.wait(timeout=30)
+                return self._claim(
+                    client, booking_ref, verification_hint="wrong")[0].status_code
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
-            statuses = list(executor.map(guess_wrong, members))
+            with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
+                statuses = list(executor.map(guess_wrong, members))
 
-        self.assertEqual(statuses.count(400), 10, statuses)
-        self.assertEqual(statuses.count(429), 20, statuses)
-        failure_summary = self._rows("""SELECT COUNT(*) AS n,
-                                        COUNT(DISTINCT destination_normalized) AS booking_keys
-                                 FROM member_verification_challenges
-                                 WHERE purpose='order_claim_hint_failure'""")[0]
-        self.assertEqual(failure_summary["booking_keys"], 1)
-        self.assertLessEqual(failure_summary["n"], 10)
+            self.assertEqual(statuses.count(400), 10, (round_no, statuses))
+            self.assertEqual(statuses.count(429), 20, (round_no, statuses))
+            booking_key = self._claim_hint_lock_keys(members[0], booking_ref)[2]
+            failure_summary = self._rows("""SELECT COUNT(*) AS n,
+                                            COUNT(DISTINCT destination_normalized) AS booking_keys
+                                     FROM member_verification_challenges
+                                     WHERE purpose='order_claim_hint_failure'
+                                       AND destination_normalized=%s""", (booking_key,))[0]
+            self.assertEqual(failure_summary["booking_keys"], 1)
+            self.assertLessEqual(failure_summary["n"], 10)
+
+    def test_claim_hint_member_and_booking_advisory_locks_block_requests(self):
+        for scope in ("member", "booking"):
+            with self.subTest(scope=scope):
+                suffix = scope.upper()
+                member_id = self._member(
+                    f"鎖{scope}", f"lock-{scope}@example.com",
+                    "0977000001" if scope == "member" else "0977000002")
+                booking_ref = f"CLAIM-LOCK-{suffix}"
+                self._order(booking_ref, "owner@example.com", "0911111111")
+                member_lock, booking_lock, _ = self._claim_hint_lock_keys(
+                    member_id, booking_ref)
+                held_lock = member_lock if scope == "member" else booking_lock
+                lock_conn = self.A.get_db(); lock_cur = lock_conn.cursor()
+                lock_cur.execute("SELECT pg_advisory_xact_lock(%s)", (held_lock,))
+                started = threading.Event()
+                finished = threading.Event()
+
+                def guess_wrong():
+                    started.set()
+                    try:
+                        return self._claim(
+                            self._client(member_id), booking_ref,
+                            verification_hint="wrong")[0].status_code
+                    finally:
+                        finished.set()
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(guess_wrong)
+                    try:
+                        self.assertTrue(started.wait(timeout=5))
+                        self.assertFalse(
+                            finished.wait(timeout=1.0),
+                            f"{scope} advisory lock did not block the request")
+                    finally:
+                        lock_conn.rollback(); lock_cur.close(); lock_conn.close()
+                    self.assertEqual(future.result(timeout=5), 400)
+                    self.assertTrue(finished.is_set())
 
     def test_concurrent_correct_claim_requests_create_only_one_pending_claim(self):
         members = [
@@ -710,7 +765,7 @@ class MemberV1DatabaseTests(unittest.TestCase):
 
         def claim(member_id):
             client = self._client(member_id)
-            barrier.wait()
+            barrier.wait(timeout=30)
             return self._claim(client, booking_ref, verification_hint="own")[0].status_code
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
@@ -723,6 +778,68 @@ class MemberV1DatabaseTests(unittest.TestCase):
                             (order_id,))
         self.assertEqual(len(claims), 1)
         self.assertIn(claims[0]["member_id"], members)
+        challenges = self._rows("""SELECT id FROM member_verification_challenges
+                                  WHERE purpose='order_claim'""")
+        self.assertEqual(len(challenges), 1, "losing claims must roll back their challenges")
+        self.assertEqual(
+            len([message for message in self.sent if message[2] == "order_claim"]), 1,
+            "only the winning claim may send a verification email")
+
+    def test_concurrent_claim_verification_credits_only_once(self):
+        owner = self._member("甲", "a@example.com", "0911111111")
+        self._order("CLAIM-CONCURRENT-VERIFY", "a@example.com", "0911111111", "completed")
+        _, payload = self._claim(self._client(owner), "CLAIM-CONCURRENT-VERIFY")
+        code = self.sent[-1][1]
+        barrier = threading.Barrier(6)
+
+        def verify(_):
+            client = self._client(owner)
+            barrier.wait(timeout=30)
+            return client.post("/api/member/orders/claim/verify", json={
+                "claim_id": payload["claim_id"], "code": code}).status_code
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+            statuses = list(executor.map(verify, range(6)))
+
+        self.assertEqual(statuses.count(200), 1, statuses)
+        self.assertEqual(statuses.count(404), 5, statuses)
+        trips = self._rows("SELECT id FROM member_trips WHERE member_id=%s", (owner,))
+        self.assertEqual(len(trips), 1)
+        self.assertEqual(self._ledger(owner)["member_points"], self.A.points_per_trip())
+
+    def test_concurrent_takeover_of_expired_pending_claim_has_one_winner(self):
+        original = self._member("原始", "original@example.com", "0911111111")
+        contenders = [
+            self._member("接手一", "takeover-one@example.com", "0922222222"),
+            self._member("接手二", "takeover-two@example.com", "0933333333"),
+        ]
+        booking_ref = "CLAIM-CONCURRENT-TAKEOVER"
+        order_id = self._order(booking_ref, "owner@example.com", "0911111111")
+        _, original_payload = self._claim(
+            self._client(original), booking_ref, verification_hint="own")
+        conn = self.A.get_db(); cur = conn.cursor()
+        cur.execute("""UPDATE member_verification_challenges
+                       SET expires_at=NOW()-INTERVAL '1 minute'
+                       WHERE id=(SELECT challenge_id FROM order_claims WHERE id=%s)""",
+                    (original_payload["claim_id"],))
+        conn.commit(); cur.close(); conn.close()
+        barrier = threading.Barrier(2)
+
+        def take_over(member_id):
+            client = self._client(member_id)
+            barrier.wait(timeout=30)
+            return self._claim(
+                client, booking_ref, verification_hint="own")[0].status_code
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            statuses = list(executor.map(take_over, contenders))
+
+        self.assertEqual(statuses.count(200), 1, statuses)
+        self.assertEqual(statuses.count(400), 1, statuses)
+        claims = self._rows("""SELECT member_id FROM order_claims
+                              WHERE order_type='preorder_order' AND order_id=%s""", (order_id,))
+        self.assertEqual(len(claims), 1)
+        self.assertIn(claims[0]["member_id"], contenders)
 
     def test_claim_hint_failure_window_expires_after_one_hour(self):
         member_id = self._member("甲", "a@example.com", "0911111111")
