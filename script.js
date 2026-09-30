@@ -313,6 +313,15 @@ function initContactForm() {
           is_waitlist:   !!result.is_waitlist,
         });
       }
+      // 試排器漏斗只在後端成功建立諮詢後完成；資料由安全預填模組產生，
+      // 僅含天數桶、完成度與範本 id，不含姓名、電話、日期、備註或完整行程。
+      if (form.dataset.plannerAnalytics && window.PhbayAnalytics?.trackPlanner) {
+        try {
+          window.PhbayAnalytics.trackPlanner('planner_quote_submitted', JSON.parse(form.dataset.plannerAnalytics));
+          delete form.dataset.plannerAnalytics;
+          sessionStorage.removeItem('phbay_itinerary_prefill_v1');
+        } catch (_) { /* 分析失敗不影響詢價成功 */ }
+      }
       if (typeof fbq === 'function') {
         fbq('track', 'Lead', {
           content_name: '諮詢表單',

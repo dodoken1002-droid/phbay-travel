@@ -63,7 +63,7 @@ app.permanent_session_lifetime = timedelta(hours=12)
 # ─── 靜態資源快取 ──────────────────────────────────────────
 # CSS/JS/圖片長快取；改動 css/js 時必須同步調整各 HTML 引用的 ?v= 版本字串，
 # 否則使用者會拿到快取的舊資源（版本字串統一用 ASSET_VERSION）。
-ASSET_VERSION = '20260918a'
+ASSET_VERSION = '20260930e'
 _LONG_CACHE_EXT = ('.css', '.js', '.png', '.jpg', '.jpeg', '.webp', '.avif',
                    '.gif', '.svg', '.ico', '.woff', '.woff2')
 
@@ -5237,7 +5237,7 @@ def _render_blog(title, desc, canonical, body, head_extra='', image=None, lang='
     return (f'<!DOCTYPE html><html lang="{BLOG_HTML_LANG.get(lang, "zh-TW")}"><head>'
         '<meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>'
         '<script async src="https://www.googletagmanager.com/gtag/js?id=G-47DV1VPF9J"></script>'
-        '<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());gtag("config","G-47DV1VPF9J");</script>'
+        '<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());gtag("config","G-47DV1VPF9J",{"debug_mode":location.hostname.endsWith(".up.railway.app")});</script>'
         '<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version="2.0";n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,"script","https://connect.facebook.net/en_US/fbevents.js");fbq("init","25643845041980148");fbq("track","PageView");</script>'
         '<noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=25643845041980148&ev=PageView&noscript=1"/></noscript>'
         f'<title>{_html.escape(title)}</title>'
@@ -5553,6 +5553,24 @@ def itinerary_recommendation_result():
     )
     body = '<div class="ir-shell" id="itinerary-result-v1" aria-live="polite"></div>'
     return _render_blog(title, desc, f'{SITE}/penghu-itinerary-recommendations/result',
+                        body, head, image=_PILLAR_OG_IMAGE['penghu-itinerary-recommendations'])
+
+
+@app.route('/penghu-itinerary-recommendations/planner')
+def itinerary_planner_page():
+    """P0-B 線上試排器；草稿只存在旅客瀏覽器，不讀寫資料庫。"""
+    title = '澎湖線上試排程｜潮旅國際旅行社'
+    desc = '用手機調整每天的澎湖景點、休息與活動，先排出想玩的樣子。'
+    head = (
+        '<meta name="robots" content="noindex,follow">'
+        f'<link rel="stylesheet" href="/itinerary-planner.css?v={ASSET_VERSION}">'
+        f'<script defer src="/itinerary-analytics.js?v={ASSET_VERSION}"></script>'
+        f'<script defer src="/itinerary-planner-data.js?v={ASSET_VERSION}"></script>'
+        f'<script defer src="/itinerary-planner.js?v={ASSET_VERSION}"></script>'
+        f'<script defer src="/itinerary-planner-page.js?v={ASSET_VERSION}"></script>'
+    )
+    body = '<div id="itinerary-planner-v1" aria-live="polite"></div>'
+    return _render_blog(title, desc, f'{SITE}/penghu-itinerary-recommendations/planner',
                         body, head, image=_PILLAR_OG_IMAGE['penghu-itinerary-recommendations'])
 
 # ── 行程獨立頁面（渲染在 tour_pages.py；資料來自後台維護的 tours 資料表）──
