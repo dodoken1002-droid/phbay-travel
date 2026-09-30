@@ -218,17 +218,30 @@ def init_member_tables(cur):
     cur.execute("""
         CREATE TABLE IF NOT EXISTS order_claims (
             id BIGSERIAL PRIMARY KEY,
-            member_id INT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+            member_id INT NOT NULL REFERENCES members(id) ON DELETE RESTRICT,
             order_type VARCHAR(30) NOT NULL CHECK (order_type IN ('neihai_order','preorder_order')),
             order_id INT NOT NULL,
             channel VARCHAR(20) NOT NULL CHECK (channel IN ('email','phone')),
             destination_normalized VARCHAR(200) NOT NULL,
-            challenge_id BIGINT NOT NULL REFERENCES member_verification_challenges(id) ON DELETE CASCADE,
+            challenge_id BIGINT NOT NULL REFERENCES member_verification_challenges(id) ON DELETE RESTRICT,
             claimed_at TIMESTAMP,
             created_at TIMESTAMP NOT NULL DEFAULT NOW(),
             UNIQUE (order_type, order_id)
         )
     """)
+    # 舊資料庫曾使用 CASCADE，會讓刪除來源會員/challenge 時連 claim audit 一起消失。
+    for column in ("member_id", "challenge_id"):
+        cur.execute("""SELECT conname FROM pg_constraint
+          WHERE conrelid='order_claims'::regclass AND contype='f' AND confdeltype='c'
+            AND conkey=ARRAY[(SELECT attnum FROM pg_attribute
+              WHERE attrelid='order_claims'::regclass AND attname=%s)]""", (column,))
+        row = cur.fetchone()
+        if row:
+            constraint = row["conname"] if not isinstance(row, tuple) else row[0]
+            parent = "members" if column == "member_id" else "member_verification_challenges"
+            cur.execute(f'ALTER TABLE order_claims DROP CONSTRAINT "{constraint}"')
+            cur.execute(f'ALTER TABLE order_claims ADD CONSTRAINT "{constraint}" '
+                        f'FOREIGN KEY ({column}) REFERENCES {parent}(id) ON DELETE RESTRICT')
     cur.execute("""
         CREATE TABLE IF NOT EXISTS member_merge_requests (
             id BIGSERIAL PRIMARY KEY,

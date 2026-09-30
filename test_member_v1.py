@@ -16,6 +16,9 @@
 """
 
 import os
+import http.client
+import concurrent.futures
+import threading
 import time
 import unittest
 import urllib.parse
@@ -111,6 +114,43 @@ class MemberV1RouteTests(unittest.TestCase):
                 self.assertNotIn("member_oauth_state", sess,
                                  "OAuth state must be single-use after a callback")
 
+    def test_oauth_callback_handles_non_ascii_state_and_provider_network_errors(self):
+        configured = {
+            "LINE_OAUTH_CLIENT_ID": "line-test-client",
+            "LINE_OAUTH_CLIENT_SECRET": "line-test-secret",
+        }
+        with mock.patch.dict(os.environ, configured, clear=False):
+            started = self.client.get("/api/member/oauth/line/start")
+            self.assertEqual(started.status_code, 302)
+            non_ascii = self.client.get(
+                "/api/member/oauth/line/callback", query_string={"state": "測試", "code": "x"})
+            self.assertEqual(non_ascii.status_code, 302)
+            self.assertIn("oauth_error=state", non_ascii.location)
+
+            for error in (ConnectionResetError(), http.client.IncompleteRead(b""), TimeoutError()):
+                with self.subTest(error=type(error).__name__):
+                    started = self.client.get("/api/member/oauth/line/start")
+                    state = urllib.parse.parse_qs(
+                        urllib.parse.urlparse(started.location).query)["state"][0]
+                    with mock.patch.object(member_v1, "_post_form", side_effect=error):
+                        failed = self.client.get(
+                            "/api/member/oauth/line/callback",
+                            query_string={"state": state, "code": "x"})
+                    self.assertEqual(failed.status_code, 302)
+                    self.assertIn("oauth_error=provider", failed.location)
+
+    def test_member_email_codes_use_the_shared_delivery_entrypoint(self):
+        delivered = []
+
+        def deliver(sender, recipient, message):
+            delivered.append((sender, recipient, message["Subject"]))
+            return True, "test"
+
+        with mock.patch.dict(os.environ, {"EMAIL_USER": "sender@example.com"}, clear=False):
+            self.assertTrue(member_v1._send_email_code(
+                "guest@example.com", "123456", "order_claim", deliver))
+        self.assertEqual(delivered[0][:2], ("sender@example.com", "guest@example.com"))
+
     def test_legacy_member_regression_routes_remain_registered(self):
         """P0 修正不可移除既有正式會員、綁定、點數、合併或認領入口。"""
         routes = {(rule.rule, tuple(sorted(rule.methods - {"HEAD", "OPTIONS"})))
@@ -195,6 +235,17 @@ class MemberV1SchemaTests(unittest.TestCase):
         self.assertIn("used_at=NOW()", body)
         self.assertIn("attempts<5", self.v1)
 
+    def test_claim_requires_contact_hint_and_preserves_audit_foreign_keys(self):
+        self.assertIn('data.get("verification_hint")', self.v1)
+        order_claims = self.program.split("CREATE TABLE IF NOT EXISTS order_claims", 1)[1].split(
+            '"""', 1)[0]
+        self.assertEqual(order_claims.count("ON DELETE RESTRICT"), 2)
+
+    def test_member_v1_email_does_not_open_its_own_smtp_connection(self):
+        self.assertNotIn("import smtplib", self.v1)
+        registration = self.app_src.split("register_member_v1(app", 1)[1]
+        self.assertIn("_deliver", registration)
+
     def test_oauth_uses_provider_subject_and_state(self):
         self.assertIn("UNIQUE (provider, provider_subject)", self.program)
         self.assertIn("hmac.compare_digest", self.v1)
@@ -203,7 +254,7 @@ class MemberV1SchemaTests(unittest.TestCase):
     def test_all_member_apis_share_one_session_validator(self):
         self.assertIn("def require_member():", self.app_src)
         self.assertIn("member = require_member()", self.app_src)
-        self.assertIn("require_member):", self.v1)
+        self.assertIn("require_member, deliver_email):", self.v1)
         current = self.v1.split("def current_member_id", 1)[1].split("def issue_challenge", 1)[0]
         self.assertIn("require_member()", current)
         self.assertNotIn("SELECT id FROM members", current)
@@ -276,12 +327,19 @@ class MemberV1DatabaseTests(unittest.TestCase):
         cls.A = app_module
         cls.V1 = member_v1
         cls.sent = []
-        member_v1._send_email_code = lambda dest, code, purpose: (
+        cls.original_send_email_code = member_v1._send_email_code
+        cls.original_send_phone_code = member_v1._send_phone_code
+        member_v1._send_email_code = lambda dest, code, purpose, deliver: (
             cls.sent.append((dest, code, purpose)), True)[1]
         member_v1._send_phone_code = lambda dest, code: (
             cls.sent.append((dest, code, "phone")), True)[1]
         cls.A.init_db()
         cls.A.app.config.update(TESTING=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.V1._send_email_code = cls.original_send_email_code
+        cls.V1._send_phone_code = cls.original_send_phone_code
 
     def setUp(self):
         self.sent.clear()
@@ -362,11 +420,24 @@ class MemberV1DatabaseTests(unittest.TestCase):
             "wallet_lifetime": int(wallet[0]["lifetime_earned"]) if wallet else None,
         }
 
-    def _claim(self, client, ref, channel="email"):
+    def _claim(self, client, ref, channel="email", verification_hint=None):
+        if verification_hint is None:
+            verification_hint = "a" if channel == "email" else "1111"
         response = client.post("/api/member/orders/claim/request",
                                json={"order_type": "preorder_order", "booking_ref": ref,
-                                     "channel": channel})
+                                     "channel": channel,
+                                     "verification_hint": verification_hint})
         return response, (response.get_json() or {})
+
+    def _claim_hint_lock_keys(self, member_id, booking_ref):
+        """Mirror the production lock-key derivation without changing production code."""
+        secret = self.A.app.secret_key
+        booking_key = self.V1._digest(secret, "order_claim_hint", booking_ref)
+        member_lock = int.from_bytes(bytes.fromhex(self.V1._digest(
+            secret, "claim_hint_member_lock", member_id))[:8], "big", signed=True)
+        booking_lock = int.from_bytes(bytes.fromhex(self.V1._digest(
+            secret, "claim_hint_booking_lock", booking_key))[:8], "big", signed=True)
+        return member_lock, booking_lock, booking_key
 
     # ── 五、訂單認領 ──
     def test_legacy_register_login_member_center_and_line_binding(self):
@@ -458,7 +529,332 @@ class MemberV1DatabaseTests(unittest.TestCase):
         second = self._member("乙", "b@example.com", "0922222222")
         self._order("CLAIM-OWNED", "a@example.com", "0911111111", "completed", member_id=first)
         response, payload = self._claim(self._client(second), "CLAIM-OWNED")
-        self.assertEqual(response.status_code, 409, payload)
+        self.assertEqual(response.status_code, 400, payload)
+
+    def test_claim_request_failures_are_uniform_and_require_contact_hint(self):
+        owner = self._member("甲", "a@example.com", "0911111111")
+        other = self._member("乙", "b@example.com", "0922222222")
+        self._order("CLAIM-SECRET", "a@example.com", "0911111111", member_id=other)
+        client = self._client(owner)
+        responses = [
+            self._claim(client, "DOES-NOT-EXIST", verification_hint="a")[0],
+            self._claim(client, "CLAIM-SECRET", verification_hint="wrong")[0],
+            self._claim(client, "CLAIM-SECRET", verification_hint="a")[0],
+        ]
+        self.assertEqual({response.status_code for response in responses}, {400})
+        self.assertEqual(len({response.get_json()["error"] for response in responses}), 1)
+        failures = self._rows("""SELECT COUNT(*) AS n FROM member_verification_challenges
+                                 WHERE member_id=%s AND purpose='order_claim_hint_failure'""",
+                              (owner,))[0]["n"]
+        self.assertEqual(failures, 3, "不存在、已認領、比對碼錯誤都必須累計")
+
+    def test_pending_claim_cannot_be_overwritten_by_another_member(self):
+        first = self._member("甲", "a@example.com", "0911111111")
+        second = self._member("乙", "b@example.com", "0922222222")
+        self._order("CLAIM-PENDING", "a@example.com", "0911111111")
+        first_response, first_payload = self._claim(self._client(first), "CLAIM-PENDING")
+        self.assertEqual(first_response.status_code, 200, first_payload)
+        second_response, _ = self._claim(self._client(second), "CLAIM-PENDING")
+        self.assertEqual(second_response.status_code, 400)
+        audit = self._rows("SELECT member_id FROM order_claims WHERE id=%s",
+                           (first_payload["claim_id"],))[0]
+        self.assertEqual(audit["member_id"], first)
+
+    def test_expired_pending_claim_can_be_taken_over_and_keeps_old_challenge(self):
+        first = self._member("甲", "a@example.com", "0911111111")
+        second = self._member("乙", "b@example.com", "0922222222")
+        self._order("CLAIM-EXPIRED-PENDING", "a@example.com", "0911111111")
+        _, first_payload = self._claim(self._client(first), "CLAIM-EXPIRED-PENDING")
+        old_challenge = self._rows("SELECT challenge_id FROM order_claims WHERE id=%s",
+                                   (first_payload["claim_id"],))[0]["challenge_id"]
+        conn = self.A.get_db(); cur = conn.cursor()
+        cur.execute("""UPDATE member_verification_challenges
+                       SET expires_at=NOW()-INTERVAL '1 minute' WHERE id=%s""",
+                    (old_challenge,))
+        conn.commit(); cur.close(); conn.close()
+
+        response, payload = self._claim(self._client(second), "CLAIM-EXPIRED-PENDING")
+        self.assertEqual(response.status_code, 200, payload)
+        audit = self._rows("SELECT member_id,claimed_at,challenge_id FROM order_claims WHERE id=%s",
+                           (first_payload["claim_id"],))[0]
+        self.assertEqual(audit["member_id"], second)
+        self.assertIsNone(audit["claimed_at"])
+        self.assertNotEqual(audit["challenge_id"], old_challenge)
+        self.assertEqual(self._rows(
+            "SELECT COUNT(*) AS n FROM member_verification_challenges WHERE id=%s",
+            (old_challenge,))[0]["n"], 1, "舊 challenge 必須保留作為稽核紀錄")
+
+    def test_used_pending_claim_can_be_taken_over(self):
+        first = self._member("甲", "a@example.com", "0911111111")
+        second = self._member("乙", "b@example.com", "0922222222")
+        self._order("CLAIM-USED-PENDING", "a@example.com", "0911111111")
+        _, first_payload = self._claim(self._client(first), "CLAIM-USED-PENDING")
+        conn = self.A.get_db(); cur = conn.cursor()
+        cur.execute("""UPDATE member_verification_challenges SET used_at=NOW()
+                       WHERE id=(SELECT challenge_id FROM order_claims WHERE id=%s)""",
+                    (first_payload["claim_id"],))
+        conn.commit(); cur.close(); conn.close()
+        response, payload = self._claim(self._client(second), "CLAIM-USED-PENDING")
+        self.assertEqual(response.status_code, 200, payload)
+        self.assertEqual(self._rows("SELECT member_id FROM order_claims WHERE id=%s",
+                                    (first_payload["claim_id"],))[0]["member_id"], second)
+
+    def test_same_member_can_refresh_a_pending_claim(self):
+        member_id = self._member("甲", "a@example.com", "0911111111")
+        self._order("CLAIM-REFRESH", "a@example.com", "0911111111")
+        client = self._client(member_id)
+        _, first_payload = self._claim(client, "CLAIM-REFRESH")
+        first_challenge = self._rows("SELECT challenge_id FROM order_claims WHERE id=%s",
+                                     (first_payload["claim_id"],))[0]["challenge_id"]
+        second_response, second_payload = self._claim(client, "CLAIM-REFRESH")
+        self.assertEqual(second_response.status_code, 200, second_payload)
+        refreshed = self._rows("SELECT id,challenge_id FROM order_claims WHERE id=%s",
+                               (first_payload["claim_id"],))[0]
+        self.assertEqual(refreshed["id"], first_payload["claim_id"])
+        self.assertNotEqual(refreshed["challenge_id"], first_challenge)
+
+    def test_completed_claim_cannot_be_overwritten(self):
+        first = self._member("甲", "a@example.com", "0911111111")
+        second = self._member("乙", "b@example.com", "0922222222")
+        self._order("CLAIM-COMPLETE", "a@example.com", "0911111111")
+        first_client = self._client(first)
+        _, payload = self._claim(first_client, "CLAIM-COMPLETE")
+        first_client.post("/api/member/orders/claim/verify", json={
+            "claim_id": payload["claim_id"], "code": self.sent[-1][1]})
+        blocked, _ = self._claim(self._client(second), "CLAIM-COMPLETE")
+        self.assertEqual(blocked.status_code, 400)
+        audit = self._rows("SELECT member_id,claimed_at FROM order_claims WHERE id=%s",
+                           (payload["claim_id"],))[0]
+        self.assertEqual(audit["member_id"], first)
+        self.assertIsNotNone(audit["claimed_at"])
+
+    def test_claim_hint_failures_rate_limit_member_before_correct_attempt(self):
+        member_id = self._member("甲", "a@example.com", "0911111111")
+        self._order("CLAIM-MEMBER-LIMIT", "a@example.com", "0911111111")
+        client = self._client(member_id)
+        for _ in range(10):
+            response, _ = self._claim(
+                client, "CLAIM-MEMBER-LIMIT", verification_hint="wrong")
+            self.assertEqual(response.status_code, 400)
+        before_rows = self._rows("SELECT COUNT(*) AS n FROM member_verification_challenges")[0]["n"]
+        before_sent = len(self.sent)
+        blocked, payload = self._claim(client, "CLAIM-MEMBER-LIMIT")
+        self.assertEqual(blocked.status_code, 429, payload)
+        self.assertEqual(payload["error"], "嘗試次數過多，請稍後再試")
+        self.assertEqual(
+            self._rows("SELECT COUNT(*) AS n FROM member_verification_challenges")[0]["n"],
+            before_rows, "被限流後不得建立 challenge")
+        self.assertEqual(len(self.sent), before_sent, "被限流後不得寄信")
+
+    def test_claim_hint_failures_rate_limit_booking_across_members(self):
+        first = self._member("甲", "a@example.com", "0911111111")
+        second = self._member("乙", "b@example.com", "0922222222")
+        third = self._member("丙", "c@example.com", "0933333333")
+        self._order("CLAIM-BOOKING-LIMIT", "a@example.com", "0911111111")
+        for client in (self._client(first), self._client(second)):
+            for _ in range(5):
+                response, _ = self._claim(
+                    client, "CLAIM-BOOKING-LIMIT", verification_hint="wrong")
+                self.assertEqual(response.status_code, 400)
+        blocked, payload = self._claim(self._client(third), "CLAIM-BOOKING-LIMIT")
+        self.assertEqual(blocked.status_code, 429, payload)
+
+    def test_concurrent_claim_hint_failures_cannot_bypass_member_limit(self):
+        for round_no in range(5):
+            member_id = self._member(
+                f"甲{round_no}", f"same-member-{round_no}@example.com", f"0911111{round_no:03d}")
+            booking_ref = f"CLAIM-CONCURRENT-MEMBER-{round_no}"
+            self._order(booking_ref, "owner@example.com", "0911111111")
+            barrier = threading.Barrier(30)
+
+            def guess_wrong(_):
+                client = self._client(member_id)
+                barrier.wait(timeout=30)
+                return self._claim(
+                    client, booking_ref, verification_hint="wrong")[0].status_code
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
+                statuses = list(executor.map(guess_wrong, range(30)))
+
+            self.assertEqual(statuses.count(400), 10, (round_no, statuses))
+            self.assertEqual(statuses.count(429), 20, (round_no, statuses))
+            failures = self._rows("""SELECT COUNT(*) AS n
+                                     FROM member_verification_challenges
+                                     WHERE member_id=%s
+                                       AND purpose='order_claim_hint_failure'""",
+                                  (member_id,))[0]["n"]
+            self.assertLessEqual(failures, 10)
+
+    def test_concurrent_claim_hint_failures_cannot_bypass_booking_limit(self):
+        for round_no in range(5):
+            members = [
+                self._member(f"會員{round_no}-{i}", f"member-{round_no}-{i}@example.com",
+                             f"09{round_no:01d}{i:07d}")
+                for i in range(30)
+            ]
+            booking_ref = f"CLAIM-CONCURRENT-BOOKING-{round_no}"
+            self._order(booking_ref, "owner@example.com", "0911111111")
+            barrier = threading.Barrier(30)
+
+            def guess_wrong(member_id):
+                client = self._client(member_id)
+                barrier.wait(timeout=30)
+                return self._claim(
+                    client, booking_ref, verification_hint="wrong")[0].status_code
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
+                statuses = list(executor.map(guess_wrong, members))
+
+            self.assertEqual(statuses.count(400), 10, (round_no, statuses))
+            self.assertEqual(statuses.count(429), 20, (round_no, statuses))
+            booking_key = self._claim_hint_lock_keys(members[0], booking_ref)[2]
+            failure_summary = self._rows("""SELECT COUNT(*) AS n,
+                                            COUNT(DISTINCT destination_normalized) AS booking_keys
+                                     FROM member_verification_challenges
+                                     WHERE purpose='order_claim_hint_failure'
+                                       AND destination_normalized=%s""", (booking_key,))[0]
+            self.assertEqual(failure_summary["booking_keys"], 1)
+            self.assertLessEqual(failure_summary["n"], 10)
+
+    def test_claim_hint_member_and_booking_advisory_locks_block_requests(self):
+        for scope in ("member", "booking"):
+            with self.subTest(scope=scope):
+                suffix = scope.upper()
+                member_id = self._member(
+                    f"鎖{scope}", f"lock-{scope}@example.com",
+                    "0977000001" if scope == "member" else "0977000002")
+                booking_ref = f"CLAIM-LOCK-{suffix}"
+                self._order(booking_ref, "owner@example.com", "0911111111")
+                member_lock, booking_lock, _ = self._claim_hint_lock_keys(
+                    member_id, booking_ref)
+                held_lock = member_lock if scope == "member" else booking_lock
+                lock_conn = self.A.get_db(); lock_cur = lock_conn.cursor()
+                lock_cur.execute("SELECT pg_advisory_xact_lock(%s)", (held_lock,))
+                started = threading.Event()
+                finished = threading.Event()
+
+                def guess_wrong():
+                    started.set()
+                    try:
+                        return self._claim(
+                            self._client(member_id), booking_ref,
+                            verification_hint="wrong")[0].status_code
+                    finally:
+                        finished.set()
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(guess_wrong)
+                    try:
+                        self.assertTrue(started.wait(timeout=5))
+                        self.assertFalse(
+                            finished.wait(timeout=1.0),
+                            f"{scope} advisory lock did not block the request")
+                    finally:
+                        lock_conn.rollback(); lock_cur.close(); lock_conn.close()
+                    self.assertEqual(future.result(timeout=5), 400)
+                    self.assertTrue(finished.is_set())
+
+    def test_concurrent_correct_claim_requests_create_only_one_pending_claim(self):
+        members = [
+            self._member(f"會員{i}", f"claimant{i}@example.com", f"08{i:08d}")
+            for i in range(3)
+        ]
+        booking_ref = "CLAIM-CONCURRENT-CORRECT"
+        order_id = self._order(booking_ref, "owner@example.com", "0911111111")
+        barrier = threading.Barrier(3)
+
+        def claim(member_id):
+            client = self._client(member_id)
+            barrier.wait(timeout=30)
+            return self._claim(client, booking_ref, verification_hint="own")[0].status_code
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            statuses = list(executor.map(claim, members))
+
+        self.assertEqual(statuses.count(200), 1, statuses)
+        self.assertEqual(statuses.count(400), 2, statuses)
+        claims = self._rows("""SELECT member_id FROM order_claims
+                              WHERE order_type='preorder_order' AND order_id=%s""",
+                            (order_id,))
+        self.assertEqual(len(claims), 1)
+        self.assertIn(claims[0]["member_id"], members)
+        challenges = self._rows("""SELECT id FROM member_verification_challenges
+                                  WHERE purpose='order_claim'""")
+        self.assertEqual(len(challenges), 1, "losing claims must roll back their challenges")
+        self.assertEqual(
+            len([message for message in self.sent if message[2] == "order_claim"]), 1,
+            "only the winning claim may send a verification email")
+
+    def test_concurrent_claim_verification_credits_only_once(self):
+        owner = self._member("甲", "a@example.com", "0911111111")
+        self._order("CLAIM-CONCURRENT-VERIFY", "a@example.com", "0911111111", "completed")
+        _, payload = self._claim(self._client(owner), "CLAIM-CONCURRENT-VERIFY")
+        code = self.sent[-1][1]
+        barrier = threading.Barrier(6)
+
+        def verify(_):
+            client = self._client(owner)
+            barrier.wait(timeout=30)
+            return client.post("/api/member/orders/claim/verify", json={
+                "claim_id": payload["claim_id"], "code": code}).status_code
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+            statuses = list(executor.map(verify, range(6)))
+
+        self.assertEqual(statuses.count(200), 1, statuses)
+        self.assertEqual(statuses.count(404), 5, statuses)
+        trips = self._rows("SELECT id FROM member_trips WHERE member_id=%s", (owner,))
+        self.assertEqual(len(trips), 1)
+        self.assertEqual(self._ledger(owner)["member_points"], self.A.points_per_trip())
+
+    def test_concurrent_takeover_of_expired_pending_claim_has_one_winner(self):
+        original = self._member("原始", "original@example.com", "0911111111")
+        contenders = [
+            self._member("接手一", "takeover-one@example.com", "0922222222"),
+            self._member("接手二", "takeover-two@example.com", "0933333333"),
+        ]
+        booking_ref = "CLAIM-CONCURRENT-TAKEOVER"
+        order_id = self._order(booking_ref, "owner@example.com", "0911111111")
+        _, original_payload = self._claim(
+            self._client(original), booking_ref, verification_hint="own")
+        conn = self.A.get_db(); cur = conn.cursor()
+        cur.execute("""UPDATE member_verification_challenges
+                       SET expires_at=NOW()-INTERVAL '1 minute'
+                       WHERE id=(SELECT challenge_id FROM order_claims WHERE id=%s)""",
+                    (original_payload["claim_id"],))
+        conn.commit(); cur.close(); conn.close()
+        barrier = threading.Barrier(2)
+
+        def take_over(member_id):
+            client = self._client(member_id)
+            barrier.wait(timeout=30)
+            return self._claim(
+                client, booking_ref, verification_hint="own")[0].status_code
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            statuses = list(executor.map(take_over, contenders))
+
+        self.assertEqual(statuses.count(200), 1, statuses)
+        self.assertEqual(statuses.count(400), 1, statuses)
+        claims = self._rows("""SELECT member_id FROM order_claims
+                              WHERE order_type='preorder_order' AND order_id=%s""", (order_id,))
+        self.assertEqual(len(claims), 1)
+        self.assertIn(claims[0]["member_id"], contenders)
+
+    def test_claim_hint_failure_window_expires_after_one_hour(self):
+        member_id = self._member("甲", "a@example.com", "0911111111")
+        self._order("CLAIM-WINDOW", "a@example.com", "0911111111")
+        client = self._client(member_id)
+        for _ in range(10):
+            self._claim(client, "CLAIM-WINDOW", verification_hint="wrong")
+        conn = self.A.get_db(); cur = conn.cursor()
+        cur.execute("""UPDATE member_verification_challenges
+                       SET created_at=NOW()-INTERVAL '61 minutes'
+                       WHERE purpose='order_claim_hint_failure' AND member_id=%s""",
+                    (member_id,))
+        conn.commit(); cur.close(); conn.close()
+        response, payload = self._claim(client, "CLAIM-WINDOW")
+        self.assertEqual(response.status_code, 200, payload)
 
     def test_repeated_claim_does_not_double_credit(self):
         owner = self._member("甲", "a@example.com", "0911111111")
@@ -562,12 +958,11 @@ class MemberV1DatabaseTests(unittest.TestCase):
         client = self._client(target)
         response = client.post("/api/member/merge/request", json={"source_email": "b@example.com"})
         payload = response.get_json()
+        self.assertNotIn("request_id", payload, "回應不可洩漏是否真的建立了合併要求")
         self.assertEqual(self.sent[-1][0], "b@example.com", "驗證碼必須寄到來源帳號的已驗證 Email")
-        wrong = client.post("/api/member/merge/confirm",
-                            json={"request_id": payload["request_id"], "code": "000000"})
+        wrong = client.post("/api/member/merge/confirm", json={"code": "000000"})
         self.assertEqual(wrong.status_code, 401)
-        ok = client.post("/api/member/merge/confirm",
-                         json={"request_id": payload["request_id"], "code": self.sent[-1][1]})
+        ok = client.post("/api/member/merge/confirm", json={"code": self.sent[-1][1]})
         self.assertEqual(ok.status_code, 200, ok.get_json())
         row = self._rows("SELECT is_active,merged_into_member_id FROM members WHERE id=%s", (source,))[0]
         self.assertFalse(row["is_active"])
@@ -581,8 +976,7 @@ class MemberV1DatabaseTests(unittest.TestCase):
         client = self._client(target)
         payload = client.post("/api/member/merge/request",
                               json={"source_email": "b@example.com"}).get_json()
-        client.post("/api/member/merge/confirm",
-                    json={"request_id": payload["request_id"], "code": self.sent[-1][1]})
+        client.post("/api/member/merge/confirm", json={"code": self.sent[-1][1]})
 
         for method, path, body in (("get", "/api/member/me", None),
                                    ("get", "/api/member/identities", None),
@@ -594,6 +988,48 @@ class MemberV1DatabaseTests(unittest.TestCase):
         self.assertEqual(
             self._rows("SELECT COUNT(*) n FROM member_consents WHERE member_id=%s", (source,))[0]["n"],
             0, "合併後的來源帳號不可再被寫入資料")
+
+    def test_merge_request_response_does_not_reveal_account_existence(self):
+        target = self._member("甲", "a@example.com", "0911111111")
+        self._member("乙", "b@example.com", "0922222222")
+        client = self._client(target)
+        missing = client.post("/api/member/merge/request",
+                              json={"source_email": "missing@example.com"})
+        existing = client.post("/api/member/merge/request",
+                               json={"source_email": "b@example.com"})
+        self.assertEqual(missing.status_code, existing.status_code)
+        self.assertEqual(missing.get_json(), existing.get_json())
+
+    def test_merge_preserves_pending_claim_audit_and_fk_chain(self):
+        target = self._member("目標", "target@example.com", "0911111111")
+        source = self._member("來源", "source@example.com", "0922222222")
+        self._order("CLAIM-AUDIT", "source@example.com", "0922222222")
+        claim_response, claim_payload = self._claim(
+            self._client(source), "CLAIM-AUDIT", verification_hint="sou")
+        self.assertEqual(claim_response.status_code, 200, claim_payload)
+
+        client = self._client(target)
+        client.post("/api/member/merge/request", json={"source_email": "source@example.com"})
+        merged = client.post("/api/member/merge/confirm", json={"code": self.sent[-1][1]})
+        self.assertEqual(merged.status_code, 200, merged.get_json())
+        audit = self._rows("""SELECT c.member_id,v.member_id AS challenge_member_id
+                              FROM order_claims c JOIN member_verification_challenges v
+                                ON v.id=c.challenge_id WHERE c.id=%s""",
+                           (claim_payload["claim_id"],))[0]
+        self.assertEqual(audit, {"member_id": target, "challenge_member_id": target})
+
+    def test_consent_granted_requires_a_real_json_boolean(self):
+        member_id = self._member("甲", "a@example.com", "0911111111")
+        client = self._client(member_id)
+        malformed = client.post("/api/member/consents", json={
+            "consent_type": "marketing", "granted": "false"})
+        self.assertEqual(malformed.status_code, 400)
+        accepted = client.post("/api/member/consents", json={
+            "consent_type": "marketing", "granted": False})
+        self.assertEqual(accepted.status_code, 200, accepted.get_json())
+        row = self._rows("""SELECT granted FROM member_consents
+                            WHERE member_id=%s ORDER BY id DESC LIMIT 1""", (member_id,))[0]
+        self.assertFalse(row["granted"])
 
     # ── 二、社群註冊 ──
     def test_oauth_signup_requires_a_verified_email(self):
@@ -710,7 +1146,8 @@ class MemberV1DatabaseTests(unittest.TestCase):
                                  WHERE provider='line' AND provider_subject=%s""",
                               ("Uverified-immutable",))[0]
         self.assertEqual(identity["member_id"], member_id)
-        self.assertEqual(identity["email_normalized"], "provider@example.com")
+        self.assertIsNone(identity["email_normalized"],
+                          "LINE email claim 預設不得視為本站已驗證 Email")
 
     # ── 四、OTP 上限 ──
     def test_challenge_has_attempt_and_request_limits(self):
@@ -728,6 +1165,17 @@ class MemberV1DatabaseTests(unittest.TestCase):
 
         statuses = [self._claim(client, "LIMIT-1")[0].status_code for _ in range(6)]
         self.assertIn(429, statuses, "驗證碼要求必須有頻率上限")
+
+    def test_phone_otp_rate_limit_is_bound_to_destination_across_members(self):
+        statuses = []
+        for index in range(6):
+            member_id = self._member(
+                f"會員{index}", f"phone-limit-{index}@example.com", f"09880000{index:02d}")
+            response = self._client(member_id).post(
+                "/api/member/phone/request", json={"phone": "0977555666"})
+            statuses.append(response.status_code)
+        self.assertEqual(statuses[:5], [200] * 5)
+        self.assertEqual(statuses[5], 429)
 
 
 if __name__ == "__main__":

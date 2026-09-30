@@ -8,14 +8,13 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import http.client
 import json
 import os
 import random
 import base64
 import secrets
-import smtplib
 import time
-import urllib.error
 import urllib.parse
 import urllib.request
 from email.mime.text import MIMEText
@@ -122,20 +121,18 @@ def _verify_line_id_token(config, id_token, nonce, now=None):
     return claims
 
 
-def _send_email_code(destination, code, purpose):
+def _send_email_code(destination, code, purpose, deliver_email):
+    """用 app.py 的共用寄信入口寄送 OTP，不另開一套 SMTP 設定。"""
     sender = os.environ.get("EMAIL_USER", "").strip()
-    password = os.environ.get("EMAIL_PASS", "").strip()
-    if not sender or not password:
+    if not sender:
         return False
     label = "訂單認領" if purpose == "order_claim" else "會員驗證"
     msg = MIMEText(f"您的潮旅{label}驗證碼是：{code}\n驗證碼 10 分鐘內有效。", "plain", "utf-8")
     msg["Subject"] = f"潮旅{label}驗證碼"
     msg["From"] = sender
     msg["To"] = destination
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=12) as smtp:
-        smtp.login(sender, password)
-        smtp.sendmail(sender, [destination], msg.as_string())
-    return True
+    ok, _detail = deliver_email(sender, destination, msg)
+    return bool(ok)
 
 
 def _send_phone_code(destination, code):
@@ -155,7 +152,7 @@ def _send_phone_code(destination, code):
 
 def register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email,
                        public_member, sync_completed_order_trip, recalculate_member,
-                       require_member):
+                       require_member, deliver_email):
     """把 V1 API 掛到現有 app；參數注入避免循環 import。"""
 
     def current_member_id():
@@ -174,10 +171,20 @@ def register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email
         return (proof_member_id == member_id
                 and 0 <= int(time.time()) - verified_at <= 600)
 
+    def send_email_code(destination, code, purpose):
+        return _send_email_code(destination, code, purpose, deliver_email)
+
     def issue_challenge(cur, member_id, purpose, channel, destination):
         cur.execute("""SELECT COUNT(*) AS n FROM member_verification_challenges
           WHERE member_id=%s AND purpose=%s AND created_at>NOW()-INTERVAL '1 hour'""",
                     (member_id, purpose))
+        if int(cur.fetchone()["n"] or 0) >= 5:
+            raise ChallengeRateLimit
+        # 同時綁定收件目的地，避免換會員/session 後持續轟炸同一信箱或手機。
+        cur.execute("""SELECT COUNT(*) AS n FROM member_verification_challenges
+          WHERE purpose=%s AND channel=%s AND destination_normalized=%s
+            AND created_at>NOW()-INTERVAL '1 hour'""",
+                    (purpose, channel, destination))
         if int(cur.fetchone()["n"] or 0) >= 5:
             raise ChallengeRateLimit
         code = f"{random.SystemRandom().randrange(100000, 1000000)}"
@@ -206,6 +213,39 @@ def register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email
           VALUES (NULL,%s,%s,%s,%s,NOW()+INTERVAL '10 minutes') RETURNING id""",
                     (purpose, channel, destination, digest))
         return cur.fetchone()["id"], code
+
+    def claim_hint_failure_key(booking_ref):
+        """訂單編號只用 HMAC 後的穩定鍵計次，不把原值存進 challenge destination。"""
+        return _digest(app.secret_key, "order_claim_hint", booking_ref)
+
+    def claim_hint_rate_limited(cur, member_id, booking_key):
+        # 同時到達的請求也必須共用同一上限；固定排序避免兩個 scope 反向取鎖造成 deadlock。
+        lock_keys = sorted({
+            int.from_bytes(bytes.fromhex(_digest(
+                app.secret_key, "claim_hint_member_lock", member_id))[:8], "big", signed=True),
+            int.from_bytes(bytes.fromhex(_digest(
+                app.secret_key, "claim_hint_booking_lock", booking_key))[:8], "big", signed=True),
+        })
+        for lock_key in lock_keys:
+            cur.execute("SELECT pg_advisory_xact_lock(%s)", (lock_key,))
+        cur.execute("""SELECT
+            COUNT(*) FILTER (WHERE member_id=%s) AS member_failures,
+            COUNT(*) FILTER (WHERE destination_normalized=%s) AS booking_failures
+          FROM member_verification_challenges
+          WHERE purpose='order_claim_hint_failure'
+            AND created_at>NOW()-INTERVAL '1 hour'""", (member_id, booking_key))
+        counts = cur.fetchone()
+        return (int(counts["member_failures"] or 0) >= 10
+                or int(counts["booking_failures"] or 0) >= 10)
+
+    def record_claim_hint_failure(cur, member_id, channel, booking_key, verification_hint):
+        digest = _digest(app.secret_key, member_id, "order_claim_hint_failure",
+                         channel, booking_key, verification_hint)
+        cur.execute("""INSERT INTO member_verification_challenges
+          (member_id,purpose,channel,destination_normalized,code_hash,expires_at,used_at)
+          VALUES (%s,'order_claim_hint_failure',%s,%s,%s,
+                  NOW()+INTERVAL '1 hour',NOW())""",
+                    (member_id, channel, booking_key, digest))
 
     def verify_anonymous_challenge(cur, challenge_id, purpose, destination, code):
         cur.execute("""SELECT * FROM member_verification_challenges
@@ -291,9 +331,15 @@ def register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email
     def member_oauth_callback(provider):
         saved = session.pop("member_oauth_state", None) or {}
         state = request.args.get("state", "")
+        saved_state = str(saved.get("state") or "").encode("utf-8")
+        supplied_state = str(state).encode("utf-8")
+        try:
+            state_age = int(time.time()) - int(saved.get("at", 0))
+        except (TypeError, ValueError):
+            state_age = 601
         if (saved.get("provider") != provider or not state
-                or not hmac.compare_digest(saved.get("state", ""), state)
-                or int(time.time()) - int(saved.get("at", 0)) > 600):
+                or not hmac.compare_digest(saved_state, supplied_state)
+                or state_age > 600):
             return redirect("/member/dashboard?oauth_error=state")
         if request.args.get("error") or not request.args.get("code"):
             return redirect("/member/dashboard?oauth_error=denied")
@@ -309,11 +355,12 @@ def register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email
             if provider == "line":
                 profile = _verify_line_id_token(
                     config, token["id_token"], saved.get("nonce"))
-                email_verified = bool(profile.get("email"))
+                # LINE 的 email claim 預設不視為已驗證；本站 Email OTP 才能建立 Email identity。
+                email_verified = False
             else:
                 profile = _get_json(config["userinfo"], token["access_token"])
                 email_verified = bool(profile.get(config["email_verified"]))
-        except (KeyError, ValueError, urllib.error.URLError) as exc:
+        except (KeyError, ValueError, OSError, http.client.HTTPException) as exc:
             app.logger.warning("OAuth callback failed for %s: %s", provider, type(exc).__name__)
             return redirect("/member/dashboard?oauth_error=provider")
         subject = str(profile.get(config["subject"]) or "")[:255]
@@ -389,7 +436,7 @@ def register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email
                     return jsonify(ok=False, error="驗證碼要求過於頻繁，請稍後再試"), 429
                 conn.commit(); cur.close(); conn.close()
                 try:
-                    delivered = _send_email_code(email, otp, "oauth_signup")
+                    delivered = send_email_code(email, otp, "oauth_signup")
                 except Exception:
                     delivered = False
                 if not delivered:
@@ -510,24 +557,36 @@ def register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email
         order_type = (data.get("order_type") or "").strip()
         booking_ref = (data.get("booking_ref") or "").strip()[:40]
         channel = (data.get("channel") or "").strip()
+        verification_hint = (data.get("verification_hint") or "").strip().lower()
         tables = {"neihai_order": "neihai_preorders", "preorder_order": "preorder_orders"}
-        if order_type not in tables or channel not in {"email", "phone"} or not booking_ref:
-            return jsonify(ok=False, error="訂單或驗證方式不正確"), 400
+        claim_error = "無法驗證訂單資料，請確認輸入後再試或聯絡客服"
+        if (order_type not in tables or channel not in {"email", "phone"}
+                or not booking_ref or not verification_hint):
+            return jsonify(ok=False, error=claim_error), 400
         conn = get_db(); cur = conn.cursor()
+        booking_key = claim_hint_failure_key(booking_ref)
+        if claim_hint_rate_limited(cur, member_id, booking_key):
+            cur.close(); conn.close()
+            return jsonify(ok=False, error="嘗試次數過多，請稍後再試"), 429
+
+        def claim_failure_response():
+            record_claim_hint_failure(
+                cur, member_id, channel, booking_key, verification_hint)
+            conn.commit(); cur.close(); conn.close()
+            return jsonify(ok=False, error=claim_error), 400
+
         cur.execute(f"SELECT id,member_id,contact_email,contact_phone FROM {tables[order_type]} WHERE booking_ref=%s FOR UPDATE",
                     (booking_ref,))
         order = cur.fetchone()
-        if not order:
-            cur.close(); conn.close()
-            return jsonify(ok=False, error="找不到可認領訂單"), 404
-        if order.get("member_id") not in (None, member_id):
-            cur.close(); conn.close()
-            return jsonify(ok=False, error="此訂單已由其他會員認領"), 409
+        if not order or order.get("member_id") is not None:
+            return claim_failure_response()
         destination = ((order.get("contact_email") or "").strip().lower() if channel == "email"
                        else normalize_phone(order.get("contact_phone")))
-        if not destination:
-            cur.close(); conn.close()
-            return jsonify(ok=False, error="訂單沒有可驗證的聯絡資料，請聯絡客服"), 400
+        expected_hint = ((destination.split("@", 1)[0][:3].lower()) if channel == "email"
+                         else destination[-4:])
+        if not destination or not expected_hint or not hmac.compare_digest(
+                expected_hint.encode("utf-8"), verification_hint.encode("utf-8")):
+            return claim_failure_response()
         try:
             challenge_id, code = issue_challenge(cur, member_id, "order_claim", channel, destination)
         except ChallengeRateLimit:
@@ -539,11 +598,20 @@ def register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email
           ON CONFLICT (order_type,order_id) DO UPDATE SET member_id=EXCLUDED.member_id,
             channel=EXCLUDED.channel,destination_normalized=EXCLUDED.destination_normalized,
             challenge_id=EXCLUDED.challenge_id,claimed_at=NULL,created_at=NOW()
+          WHERE order_claims.claimed_at IS NULL AND
+            (order_claims.member_id=EXCLUDED.member_id OR EXISTS (
+              SELECT 1 FROM member_verification_challenges old_challenge
+              WHERE old_challenge.id=order_claims.challenge_id AND
+                (old_challenge.expires_at<=NOW() OR old_challenge.used_at IS NOT NULL)))
           RETURNING id""", (member_id, order_type, order["id"], channel, destination, challenge_id))
-        claim_id = cur.fetchone()["id"]
+        claim = cur.fetchone()
+        if not claim:
+            conn.rollback(); cur.close(); conn.close()
+            return jsonify(ok=False, error=claim_error), 400
+        claim_id = claim["id"]
         conn.commit(); cur.close(); conn.close()
         try:
-            delivered = (_send_email_code(destination, code, "order_claim") if channel == "email"
+            delivered = (send_email_code(destination, code, "order_claim") if channel == "email"
                          else _send_phone_code(destination, code))
         except Exception:
             delivered = False
@@ -630,6 +698,7 @@ def register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email
         if not valid_email(source_email):
             return jsonify(ok=False, error="Email 格式不正確"), 400
         conn = get_db(); cur = conn.cursor()
+        session.pop("pending_member_merge_request_id", None)
         cur.execute("""SELECT i.id,i.member_id FROM member_identities i
           JOIN members m ON m.id=i.member_id
           WHERE i.provider='email' AND i.email_normalized=%s AND i.verified_at IS NOT NULL
@@ -638,25 +707,26 @@ def register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email
         if not proof:
             cur.close(); conn.close()
             # 不透露指定 Email 是否為會員或是否已驗證。
-            return jsonify(ok=True, message="若資料符合，我們已寄出合併驗證碼")
+            return jsonify(ok=True, expires_minutes=10,
+                           message="若資料符合，我們已寄出合併驗證碼")
         try:
             challenge_id, code = issue_challenge(cur, target_id, "account_merge", "email", source_email)
         except ChallengeRateLimit:
             cur.close(); conn.close()
-            return jsonify(ok=False, error="驗證碼要求過於頻繁，請稍後再試"), 429
+            return jsonify(ok=True, expires_minutes=10,
+                           message="若資料符合，我們已寄出合併驗證碼")
         cur.execute("""INSERT INTO member_merge_requests
           (source_member_id,target_member_id,proof_identity_id,challenge_id)
           VALUES (%s,%s,%s,%s) RETURNING id""",
                     (proof["member_id"], target_id, proof["id"], challenge_id))
         request_id = cur.fetchone()["id"]
         conn.commit(); cur.close(); conn.close()
+        session["pending_member_merge_request_id"] = request_id
         try:
-            delivered = _send_email_code(source_email, code, "account_merge")
+            send_email_code(source_email, code, "account_merge")
         except Exception:
-            delivered = False
-        if not delivered:
-            return jsonify(ok=False, error="驗證訊息暫時無法寄送"), 503
-        return jsonify(ok=True, request_id=request_id, expires_minutes=10,
+            pass
+        return jsonify(ok=True, expires_minutes=10,
                        message="若資料符合，我們已寄出合併驗證碼")
 
     @app.post("/api/member/merge/confirm")
@@ -666,9 +736,10 @@ def register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email
             return jsonify(ok=False, error="尚未登入"), 401
         code = "".join(ch for ch in str(data.get("code") or "") if ch.isdigit())[:6]
         conn = get_db(); cur = conn.cursor()
+        request_id = session.get("pending_member_merge_request_id")
         cur.execute("""SELECT * FROM member_merge_requests
           WHERE id=%s AND target_member_id=%s AND status='pending' FOR UPDATE""",
-                    (data.get("request_id"), target_id))
+                    (request_id, target_id))
         merge = cur.fetchone()
         if not merge:
             cur.close(); conn.close()
@@ -694,8 +765,10 @@ def register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email
                 cur.execute(f"UPDATE {table} SET member_id=%s WHERE member_id=%s",
                             (target_id, source_id))
             cur.execute("DELETE FROM member_auth_codes WHERE member_id=%s", (source_id,))
-            cur.execute("DELETE FROM member_verification_challenges WHERE member_id=%s AND id<>%s",
-                        (source_id, challenge["id"]))
+            # challenge 是 claim audit 的 FK 一部分；搬移並封存，不可刪除造成稽核紀錄連帶消失。
+            cur.execute("""UPDATE member_verification_challenges
+                           SET member_id=%s,used_at=COALESCE(used_at,NOW())
+                           WHERE member_id=%s""", (target_id, source_id))
             cur.execute("DELETE FROM point_wallet WHERE member_id=%s", (source_id,))
             cur.execute("""UPDATE members SET is_active=FALSE,merged_into_member_id=%s,
               phone='',phone_normalized=%s,email=%s,line_user_id=NULL,
@@ -708,6 +781,7 @@ def register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email
               WHERE id=%s""", (merge["id"],))
             recalculate_member(cur, target_id)
             conn.commit(); cur.close(); conn.close()
+            session.pop("pending_member_merge_request_id", None)
             return jsonify(ok=True, member_id=target_id)
         except Exception as exc:
             conn.rollback(); cur.close(); conn.close()
@@ -723,12 +797,15 @@ def register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email
         if consent_type not in {"privacy", "marketing", "line_notification"}:
             return jsonify(ok=False, error="同意項目不正確"), 400
         version = (data.get("policy_version") or os.environ.get("MEMBER_PRIVACY_POLICY_VERSION", "v1"))[:40]
+        granted = data.get("granted")
+        if type(granted) is not bool:
+            return jsonify(ok=False, error="同意狀態必須是布林值"), 400
         ip_hash = _digest(app.secret_key, request.remote_addr or "")
         ua_hash = _digest(app.secret_key, request.headers.get("User-Agent", ""))
         conn = get_db(); cur = conn.cursor()
         cur.execute("""INSERT INTO member_consents
           (member_id,consent_type,policy_version,granted,source,ip_hash,user_agent_hash)
           VALUES (%s,%s,%s,%s,'member_center',%s,%s)""",
-                    (member_id, consent_type, version, bool(data.get("granted")), ip_hash, ua_hash))
+                    (member_id, consent_type, version, granted, ip_hash, ua_hash))
         conn.commit(); cur.close(); conn.close()
         return jsonify(ok=True)

@@ -2221,6 +2221,10 @@ def admin_member_merge():
         cur.execute("UPDATE member_identities SET member_id=%s WHERE member_id=%s", (target_id, source_id))
         cur.execute("UPDATE member_consents SET member_id=%s WHERE member_id=%s", (target_id, source_id))
         cur.execute("UPDATE order_claims SET member_id=%s WHERE member_id=%s", (target_id, source_id))
+        # challenge 由 order_claims 參照，是認領稽核鏈的一部分；先搬移再刪來源會員。
+        cur.execute("""UPDATE member_verification_challenges
+                       SET member_id=%s,used_at=COALESCE(used_at,NOW())
+                       WHERE member_id=%s""", (target_id, source_id))
         cur.execute("UPDATE neihai_preorders SET member_id=%s WHERE member_id=%s", (target_id, source_id))
         cur.execute("UPDATE preorder_orders SET member_id=%s WHERE member_id=%s", (target_id, source_id))
         cur.execute("DELETE FROM point_wallet WHERE member_id=%s", (source_id,))
@@ -5982,7 +5986,7 @@ except ModuleNotFoundError:
 else:
     register_member_v1(app, get_db, next_member_no, normalize_phone, valid_email,
                        public_member, _sync_completed_order_trip, recalculate_member,
-                       require_member)
+                       require_member, _deliver)
 
 
 if __name__ == '__main__':
