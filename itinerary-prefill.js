@@ -23,12 +23,20 @@
   function transportValue(method){return String(method||'').startsWith('flight')?'飛機':String(method||'').startsWith('ferry')?'搭船':'';}
   function budgetValue(v){return ({under_5k:'under5000','5k_8k':'5000-8000','8k_12k':'8000-12000',quality_first:'12000-18000'})[v]||'';}
   function summary(payload){
+    if(payload.planner&&payload.planner.summary)return String(payload.planner.summary).trim().slice(0,4000);
     const a=payload.answers||{},r=payload.result||{},p=payload.product||{},styles=list(a.travel_style).map(x=>LABELS.style[x]||x),avoid=list(a.avoid_preference).map(x=>LABELS.avoid[x]||x);
     return `【30 秒行程診斷】${r.type||'行程推薦'}｜${LABELS.days[a.travel_days]||a.travel_days||'天數未定'}｜${LABELS.party[a.party_type]||a.party_type||'同行類型未定'}｜成人 ${Number(a.adults||0)}、兒童 ${Number(a.children||0)}｜偏好：${styles.join('、')||'未選'}｜避開：${avoid.join('、')||'未選'}｜推薦：${p.name||'待確認'}`;
   }
+  function summaryMarker(payload){return payload&&payload.planner?'【潮旅澎湖線上試排程】':'【30 秒行程診斷】';}
+  function plannerAnalytics(payload){
+    const s=payload&&payload.planner&&payload.planner.structure;if(!s)return null;
+    const days=Array.isArray(s.days)?s.days:[],count=days.reduce((n,d)=>n+(Array.isArray(d.items)?d.items.length:0),0),complete=days.length>0&&days.every(d=>Array.isArray(d.items)&&d.items.length>0);
+    return {day_bucket:days.length>=5?'5d_plus':`${Math.max(2,days.length)}d`,completion_bucket:count===0?'started':complete?'complete':'partial',template_id:String(s.template_id||'custom').replace(/[^a-z0-9_-]/gi,'').slice(0,64)||'custom'};
+  }
   function formValues(payload){
     const a=payload.answers||{};
-    return {travel_date:a.travel_date==='undecided'?'':(a.travel_date||''),travel_date_end:a.travel_date==='undecided'?'':endDate(a.travel_date,a.travel_days),people:peopleRange(a.adults,a.children),transport:transportValue(a.arrival_method),budget:budgetValue(a.budget_range),tour_id:String((payload.product||{}).tour_id||''),notes:summary(payload)};
+    const hasParty=a.adults!=null||a.children!=null;
+    return {travel_date:a.travel_date==='undecided'?'':(a.travel_date||''),travel_date_end:a.travel_date==='undecided'?'':endDate(a.travel_date,a.travel_days),people:hasParty?peopleRange(a.adults,a.children):'',transport:transportValue(a.arrival_method),budget:budgetValue(a.budget_range),tour_id:String((payload.product||{}).tour_id||''),notes:summary(payload)};
   }
   function loadPayload(){
     try{const value=JSON.parse(root.sessionStorage.getItem(KEY)||'null');if(!value||value.version!==1)return null;if(!value.created_at||Date.now()-value.created_at>MAX_AGE_MS){root.sessionStorage.removeItem(KEY);return null;}return value;}catch(_){return null;}
@@ -41,11 +49,12 @@
     if(v.transport&&!doc.querySelector('input[name="transport"]:checked')){const radio=doc.querySelector(`input[name="transport"][value="${v.transport}"]`);if(radio){radio.checked=true;radio.dispatchEvent(new Event('change',{bubbles:true}));}}
     const select=doc.getElementById('tour-interest'),option=select&&v.tour_id?select.querySelector(`option[data-tour-id="${v.tour_id}"]`):null;
     if(option&&select.value!==option.value){select.value=option.value;select.dispatchEvent(new Event('change',{bubbles:true}));}
-    const notes=doc.getElementById('notes');if(notes&&!notes.value.includes('【30 秒行程診斷】'))notes.value=notes.value?`${notes.value}\n${v.notes}`:v.notes;
+    const notes=doc.getElementById('notes'),marker=summaryMarker(payload);if(notes&&!notes.value.includes(marker))notes.value=notes.value?`${notes.value}\n${v.notes}`:v.notes;
+    const form=doc.getElementById('contact-form'),plannerMeta=plannerAnalytics(payload);if(form&&plannerMeta){form.dataset=form.dataset||{};form.dataset.plannerAnalytics=JSON.stringify(plannerMeta);}
     const details=doc.querySelector('.form-more');if(details)details.open=true;
     return {applied:true,tourApplied:!!option,values:v};
   }
   function applyStored(){return apply(loadPayload(),root.document);}
   if(root.document){root.document.addEventListener('DOMContentLoaded',applyStored);root.addEventListener('phbay:tours-ready',applyStored);}
-  return {KEY,MAX_AGE_MS,dayCount,endDate,peopleRange,transportValue,budgetValue,summary,formValues,loadPayload,apply,applyStored};
+  return {KEY,MAX_AGE_MS,dayCount,endDate,peopleRange,transportValue,budgetValue,summary,summaryMarker,plannerAnalytics,formValues,loadPayload,apply,applyStored};
 });

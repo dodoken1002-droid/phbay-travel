@@ -63,7 +63,7 @@ app.permanent_session_lifetime = timedelta(hours=12)
 # ─── 靜態資源快取 ──────────────────────────────────────────
 # CSS/JS/圖片長快取；改動 css/js 時必須同步調整各 HTML 引用的 ?v= 版本字串，
 # 否則使用者會拿到快取的舊資源（版本字串統一用 ASSET_VERSION）。
-ASSET_VERSION = '20260918a'
+ASSET_VERSION = '20260930d'
 _LONG_CACHE_EXT = ('.css', '.js', '.png', '.jpg', '.jpeg', '.webp', '.avif',
                    '.gif', '.svg', '.ico', '.woff', '.woff2')
 
@@ -5553,6 +5553,24 @@ def itinerary_recommendation_result():
     )
     body = '<div class="ir-shell" id="itinerary-result-v1" aria-live="polite"></div>'
     return _render_blog(title, desc, f'{SITE}/penghu-itinerary-recommendations/result',
+                        body, head, image=_PILLAR_OG_IMAGE['penghu-itinerary-recommendations'])
+
+
+@app.route('/penghu-itinerary-recommendations/planner')
+def itinerary_planner_page():
+    """P0-B 線上試排器；草稿只存在旅客瀏覽器，不讀寫資料庫。"""
+    title = '澎湖線上試排程｜潮旅國際旅行社'
+    desc = '用手機調整每天的澎湖景點、休息與活動，先排出想玩的樣子。'
+    head = (
+        '<meta name="robots" content="noindex,follow">'
+        f'<link rel="stylesheet" href="/itinerary-planner.css?v={ASSET_VERSION}">'
+        f'<script defer src="/itinerary-analytics.js?v={ASSET_VERSION}"></script>'
+        f'<script defer src="/itinerary-planner-data.js?v={ASSET_VERSION}"></script>'
+        f'<script defer src="/itinerary-planner.js?v={ASSET_VERSION}"></script>'
+        f'<script defer src="/itinerary-planner-page.js?v={ASSET_VERSION}"></script>'
+    )
+    body = '<div id="itinerary-planner-v1" aria-live="polite"></div>'
+    return _render_blog(title, desc, f'{SITE}/penghu-itinerary-recommendations/planner',
                         body, head, image=_PILLAR_OG_IMAGE['penghu-itinerary-recommendations'])
 
 # ── 行程獨立頁面（渲染在 tour_pages.py；資料來自後台維護的 tours 資料表）──

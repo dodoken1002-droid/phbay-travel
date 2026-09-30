@@ -36,6 +36,22 @@ class ItineraryP0RouteTests(unittest.TestCase):
         self.assertIn('id="itinerary-result-v1"', body)
         self.assertIn('/itinerary-analytics.js?v=', body)
 
+    def test_planner_page_is_noindex_and_loads_local_rule_engine(self):
+        response = self.client.get('/penghu-itinerary-recommendations/planner')
+        body = response.get_data(as_text=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('name="robots" content="noindex,follow"', body)
+        self.assertIn('id="itinerary-planner-v1"', body)
+        self.assertIn('/itinerary-planner-data.js?v=', body)
+        self.assertIn('/itinerary-planner.js?v=', body)
+        self.assertIn('/itinerary-planner-page.js?v=', body)
+        self.assertNotIn('/api/contact', body)
+
+    def test_result_page_links_to_planner(self):
+        text = src('itinerary-quiz.js')
+        self.assertIn('/penghu-itinerary-recommendations/planner', text)
+        self.assertIn('開始試排行程', text)
+
     def test_existing_legal_member_and_order_routes_remain_registered(self):
         rules = {rule.rule for rule in app.url_map.iter_rules()}
         for route in ('/privacy', '/terms', '/member/dashboard',
