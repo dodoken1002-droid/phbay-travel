@@ -45,6 +45,7 @@ class ItineraryP0RouteTests(unittest.TestCase):
         self.assertIn('/itinerary-planner-data.js?v=', body)
         self.assertIn('/itinerary-planner.js?v=', body)
         self.assertIn('/itinerary-planner-page.js?v=', body)
+        self.assertIn('"debug_mode":location.hostname.endsWith(".up.railway.app")', body)
         self.assertNotIn('/api/contact', body)
 
     def test_result_page_links_to_planner(self):
