@@ -50,7 +50,7 @@
     const select=doc.getElementById('tour-interest'),option=select&&v.tour_id?select.querySelector(`option[data-tour-id="${v.tour_id}"]`):null;
     if(option&&select.value!==option.value){select.value=option.value;select.dispatchEvent(new Event('change',{bubbles:true}));}
     const notes=doc.getElementById('notes'),marker=summaryMarker(payload);if(notes&&!notes.value.includes(marker))notes.value=notes.value?`${notes.value}\n${v.notes}`:v.notes;
-    const form=doc.getElementById('contact-form'),plannerMeta=plannerAnalytics(payload);if(form&&plannerMeta){form.dataset=form.dataset||{};form.dataset.plannerAnalytics=JSON.stringify(plannerMeta);}
+    const form=doc.getElementById('contact-form'),plannerMeta=plannerAnalytics(payload);if(form&&form.dataset&&plannerMeta)form.dataset.plannerAnalytics=JSON.stringify(plannerMeta);
     const details=doc.querySelector('.form-more');if(details)details.open=true;
     return {applied:true,tourApplied:!!option,values:v};
   }

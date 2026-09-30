@@ -90,10 +90,16 @@ assert.strictEqual(formValues.people, '', '沒有精確人數時不可猜成 1�
 assert.strictEqual(formValues.tour_id, '');
 assert(formValues.notes.includes('Day 1'));
 assert.strictEqual(prefill.summaryMarker(plannerPayload), '【潮旅澎湖線上試排程】');
-const fakeElements = { 'contact-form': {}, notes: { value: '' } };
+// 瀏覽器的 HTMLElement.dataset 只有 getter；strict mode 下重新指定會拋 TypeError，
+// 假元素必須照這個行為模擬，否則測試會放過 `form.dataset = ...` 這種寫法。
+const contactForm = {};
+const contactFormDataset = {};
+Object.defineProperty(contactForm, 'dataset', { get() { return contactFormDataset; }, enumerable: true });
+const formMore = { open: false };
+const fakeElements = { 'contact-form': contactForm, notes: { value: '' } };
 const fakeDocument = {
   getElementById(id) { return fakeElements[id] || null; },
-  querySelector() { return null; }
+  querySelector(selector) { return selector === '.form-more' ? formMore : null; }
 };
 prefill.apply(plannerPayload, fakeDocument);
 const notesOnce = fakeElements.notes.value;
@@ -102,6 +108,7 @@ assert.strictEqual(fakeElements.notes.value, notesOnce, '重複觸發預填時�
 assert.deepStrictEqual(JSON.parse(fakeElements['contact-form'].dataset.plannerAnalytics), {
   day_bucket: '4d', completion_bucket: 'complete', template_id: state.plan.template_id
 });
+assert.strictEqual(formMore.open, true, '帶入試排摘要後要展開備註區，旅客才看得到內容');
 
 let copied = '';
 page.copyText('LINE 摘要', { clipboard: { writeText(value) { copied = value; return Promise.resolve(); } } }, null);
