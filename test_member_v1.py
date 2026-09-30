@@ -17,6 +17,8 @@
 
 import os
 import http.client
+import concurrent.futures
+import threading
 import time
 import unittest
 import urllib.parse
@@ -646,6 +648,81 @@ class MemberV1DatabaseTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 400)
         blocked, payload = self._claim(self._client(third), "CLAIM-BOOKING-LIMIT")
         self.assertEqual(blocked.status_code, 429, payload)
+
+    def test_concurrent_claim_hint_failures_cannot_bypass_member_limit(self):
+        member_id = self._member("甲", "a@example.com", "0911111111")
+        self._order("CLAIM-CONCURRENT-MEMBER", "a@example.com", "0911111111")
+        barrier = threading.Barrier(30)
+
+        def guess_wrong(_):
+            client = self._client(member_id)
+            barrier.wait()
+            return self._claim(
+                client, "CLAIM-CONCURRENT-MEMBER", verification_hint="wrong")[0].status_code
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
+            statuses = list(executor.map(guess_wrong, range(30)))
+
+        self.assertEqual(statuses.count(400), 10, statuses)
+        self.assertEqual(statuses.count(429), 20, statuses)
+        failures = self._rows("""SELECT COUNT(*) AS n
+                                 FROM member_verification_challenges
+                                 WHERE member_id=%s
+                                   AND purpose='order_claim_hint_failure'""",
+                              (member_id,))[0]["n"]
+        self.assertLessEqual(failures, 10)
+
+    def test_concurrent_claim_hint_failures_cannot_bypass_booking_limit(self):
+        members = [
+            self._member(f"會員{i}", f"member{i}@example.com", f"09{i:08d}")
+            for i in range(30)
+        ]
+        booking_ref = "CLAIM-CONCURRENT-BOOKING"
+        self._order(booking_ref, "owner@example.com", "0911111111")
+        barrier = threading.Barrier(30)
+
+        def guess_wrong(member_id):
+            client = self._client(member_id)
+            barrier.wait()
+            return self._claim(
+                client, booking_ref, verification_hint="wrong")[0].status_code
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
+            statuses = list(executor.map(guess_wrong, members))
+
+        self.assertEqual(statuses.count(400), 10, statuses)
+        self.assertEqual(statuses.count(429), 20, statuses)
+        failure_summary = self._rows("""SELECT COUNT(*) AS n,
+                                        COUNT(DISTINCT destination_normalized) AS booking_keys
+                                 FROM member_verification_challenges
+                                 WHERE purpose='order_claim_hint_failure'""")[0]
+        self.assertEqual(failure_summary["booking_keys"], 1)
+        self.assertLessEqual(failure_summary["n"], 10)
+
+    def test_concurrent_correct_claim_requests_create_only_one_pending_claim(self):
+        members = [
+            self._member(f"會員{i}", f"claimant{i}@example.com", f"08{i:08d}")
+            for i in range(3)
+        ]
+        booking_ref = "CLAIM-CONCURRENT-CORRECT"
+        order_id = self._order(booking_ref, "owner@example.com", "0911111111")
+        barrier = threading.Barrier(3)
+
+        def claim(member_id):
+            client = self._client(member_id)
+            barrier.wait()
+            return self._claim(client, booking_ref, verification_hint="own")[0].status_code
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            statuses = list(executor.map(claim, members))
+
+        self.assertEqual(statuses.count(200), 1, statuses)
+        self.assertEqual(statuses.count(400), 2, statuses)
+        claims = self._rows("""SELECT member_id FROM order_claims
+                              WHERE order_type='preorder_order' AND order_id=%s""",
+                            (order_id,))
+        self.assertEqual(len(claims), 1)
+        self.assertIn(claims[0]["member_id"], members)
 
     def test_claim_hint_failure_window_expires_after_one_hour(self):
         member_id = self._member("甲", "a@example.com", "0911111111")
