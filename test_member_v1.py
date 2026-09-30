@@ -111,6 +111,39 @@ class MemberV1RouteTests(unittest.TestCase):
                 self.assertNotIn("member_oauth_state", sess,
                                  "OAuth state must be single-use after a callback")
 
+    def test_oauth_callback_handles_non_ascii_state_and_provider_timeout(self):
+        configured = {
+            "LINE_OAUTH_CLIENT_ID": "line-test-client",
+            "LINE_OAUTH_CLIENT_SECRET": "line-test-secret",
+        }
+        with mock.patch.dict(os.environ, configured, clear=False):
+            started = self.client.get("/api/member/oauth/line/start")
+            self.assertEqual(started.status_code, 302)
+            non_ascii = self.client.get(
+                "/api/member/oauth/line/callback", query_string={"state": "測試", "code": "x"})
+            self.assertEqual(non_ascii.status_code, 302)
+            self.assertIn("oauth_error=state", non_ascii.location)
+
+            started = self.client.get("/api/member/oauth/line/start")
+            state = urllib.parse.parse_qs(urllib.parse.urlparse(started.location).query)["state"][0]
+            with mock.patch.object(member_v1, "_post_form", side_effect=TimeoutError):
+                timed_out = self.client.get(
+                    "/api/member/oauth/line/callback", query_string={"state": state, "code": "x"})
+            self.assertEqual(timed_out.status_code, 302)
+            self.assertIn("oauth_error=provider", timed_out.location)
+
+    def test_member_email_codes_use_the_shared_delivery_entrypoint(self):
+        delivered = []
+
+        def deliver(sender, recipient, message):
+            delivered.append((sender, recipient, message["Subject"]))
+            return True, "test"
+
+        with mock.patch.dict(os.environ, {"EMAIL_USER": "sender@example.com"}, clear=False):
+            self.assertTrue(member_v1._send_email_code(
+                "guest@example.com", "123456", "order_claim", deliver))
+        self.assertEqual(delivered[0][:2], ("sender@example.com", "guest@example.com"))
+
     def test_legacy_member_regression_routes_remain_registered(self):
         """P0 修正不可移除既有正式會員、綁定、點數、合併或認領入口。"""
         routes = {(rule.rule, tuple(sorted(rule.methods - {"HEAD", "OPTIONS"})))
@@ -195,6 +228,17 @@ class MemberV1SchemaTests(unittest.TestCase):
         self.assertIn("used_at=NOW()", body)
         self.assertIn("attempts<5", self.v1)
 
+    def test_claim_requires_contact_hint_and_preserves_audit_foreign_keys(self):
+        self.assertIn('data.get("verification_hint")', self.v1)
+        order_claims = self.program.split("CREATE TABLE IF NOT EXISTS order_claims", 1)[1].split(
+            '"""', 1)[0]
+        self.assertEqual(order_claims.count("ON DELETE RESTRICT"), 2)
+
+    def test_member_v1_email_does_not_open_its_own_smtp_connection(self):
+        self.assertNotIn("import smtplib", self.v1)
+        registration = self.app_src.split("register_member_v1(app", 1)[1]
+        self.assertIn("_deliver", registration)
+
     def test_oauth_uses_provider_subject_and_state(self):
         self.assertIn("UNIQUE (provider, provider_subject)", self.program)
         self.assertIn("hmac.compare_digest", self.v1)
@@ -203,7 +247,7 @@ class MemberV1SchemaTests(unittest.TestCase):
     def test_all_member_apis_share_one_session_validator(self):
         self.assertIn("def require_member():", self.app_src)
         self.assertIn("member = require_member()", self.app_src)
-        self.assertIn("require_member):", self.v1)
+        self.assertIn("require_member, deliver_email):", self.v1)
         current = self.v1.split("def current_member_id", 1)[1].split("def issue_challenge", 1)[0]
         self.assertIn("require_member()", current)
         self.assertNotIn("SELECT id FROM members", current)
@@ -276,12 +320,19 @@ class MemberV1DatabaseTests(unittest.TestCase):
         cls.A = app_module
         cls.V1 = member_v1
         cls.sent = []
-        member_v1._send_email_code = lambda dest, code, purpose: (
+        cls.original_send_email_code = member_v1._send_email_code
+        cls.original_send_phone_code = member_v1._send_phone_code
+        member_v1._send_email_code = lambda dest, code, purpose, deliver: (
             cls.sent.append((dest, code, purpose)), True)[1]
         member_v1._send_phone_code = lambda dest, code: (
             cls.sent.append((dest, code, "phone")), True)[1]
         cls.A.init_db()
         cls.A.app.config.update(TESTING=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.V1._send_email_code = cls.original_send_email_code
+        cls.V1._send_phone_code = cls.original_send_phone_code
 
     def setUp(self):
         self.sent.clear()
@@ -362,10 +413,13 @@ class MemberV1DatabaseTests(unittest.TestCase):
             "wallet_lifetime": int(wallet[0]["lifetime_earned"]) if wallet else None,
         }
 
-    def _claim(self, client, ref, channel="email"):
+    def _claim(self, client, ref, channel="email", verification_hint=None):
+        if verification_hint is None:
+            verification_hint = "a" if channel == "email" else "1111"
         response = client.post("/api/member/orders/claim/request",
                                json={"order_type": "preorder_order", "booking_ref": ref,
-                                     "channel": channel})
+                                     "channel": channel,
+                                     "verification_hint": verification_hint})
         return response, (response.get_json() or {})
 
     # ── 五、訂單認領 ──
@@ -458,7 +512,32 @@ class MemberV1DatabaseTests(unittest.TestCase):
         second = self._member("乙", "b@example.com", "0922222222")
         self._order("CLAIM-OWNED", "a@example.com", "0911111111", "completed", member_id=first)
         response, payload = self._claim(self._client(second), "CLAIM-OWNED")
-        self.assertEqual(response.status_code, 409, payload)
+        self.assertEqual(response.status_code, 400, payload)
+
+    def test_claim_request_failures_are_uniform_and_require_contact_hint(self):
+        owner = self._member("甲", "a@example.com", "0911111111")
+        other = self._member("乙", "b@example.com", "0922222222")
+        self._order("CLAIM-SECRET", "a@example.com", "0911111111", member_id=other)
+        client = self._client(owner)
+        responses = [
+            self._claim(client, "DOES-NOT-EXIST", verification_hint="a")[0],
+            self._claim(client, "CLAIM-SECRET", verification_hint="wrong")[0],
+            self._claim(client, "CLAIM-SECRET", verification_hint="a")[0],
+        ]
+        self.assertEqual({response.status_code for response in responses}, {400})
+        self.assertEqual(len({response.get_json()["error"] for response in responses}), 1)
+
+    def test_pending_claim_cannot_be_overwritten_by_another_member(self):
+        first = self._member("甲", "a@example.com", "0911111111")
+        second = self._member("乙", "b@example.com", "0922222222")
+        self._order("CLAIM-PENDING", "a@example.com", "0911111111")
+        first_response, first_payload = self._claim(self._client(first), "CLAIM-PENDING")
+        self.assertEqual(first_response.status_code, 200, first_payload)
+        second_response, _ = self._claim(self._client(second), "CLAIM-PENDING")
+        self.assertEqual(second_response.status_code, 400)
+        audit = self._rows("SELECT member_id FROM order_claims WHERE id=%s",
+                           (first_payload["claim_id"],))[0]
+        self.assertEqual(audit["member_id"], first)
 
     def test_repeated_claim_does_not_double_credit(self):
         owner = self._member("甲", "a@example.com", "0911111111")
@@ -562,12 +641,11 @@ class MemberV1DatabaseTests(unittest.TestCase):
         client = self._client(target)
         response = client.post("/api/member/merge/request", json={"source_email": "b@example.com"})
         payload = response.get_json()
+        self.assertNotIn("request_id", payload, "回應不可洩漏是否真的建立了合併要求")
         self.assertEqual(self.sent[-1][0], "b@example.com", "驗證碼必須寄到來源帳號的已驗證 Email")
-        wrong = client.post("/api/member/merge/confirm",
-                            json={"request_id": payload["request_id"], "code": "000000"})
+        wrong = client.post("/api/member/merge/confirm", json={"code": "000000"})
         self.assertEqual(wrong.status_code, 401)
-        ok = client.post("/api/member/merge/confirm",
-                         json={"request_id": payload["request_id"], "code": self.sent[-1][1]})
+        ok = client.post("/api/member/merge/confirm", json={"code": self.sent[-1][1]})
         self.assertEqual(ok.status_code, 200, ok.get_json())
         row = self._rows("SELECT is_active,merged_into_member_id FROM members WHERE id=%s", (source,))[0]
         self.assertFalse(row["is_active"])
@@ -581,8 +659,7 @@ class MemberV1DatabaseTests(unittest.TestCase):
         client = self._client(target)
         payload = client.post("/api/member/merge/request",
                               json={"source_email": "b@example.com"}).get_json()
-        client.post("/api/member/merge/confirm",
-                    json={"request_id": payload["request_id"], "code": self.sent[-1][1]})
+        client.post("/api/member/merge/confirm", json={"code": self.sent[-1][1]})
 
         for method, path, body in (("get", "/api/member/me", None),
                                    ("get", "/api/member/identities", None),
@@ -594,6 +671,48 @@ class MemberV1DatabaseTests(unittest.TestCase):
         self.assertEqual(
             self._rows("SELECT COUNT(*) n FROM member_consents WHERE member_id=%s", (source,))[0]["n"],
             0, "合併後的來源帳號不可再被寫入資料")
+
+    def test_merge_request_response_does_not_reveal_account_existence(self):
+        target = self._member("甲", "a@example.com", "0911111111")
+        self._member("乙", "b@example.com", "0922222222")
+        client = self._client(target)
+        missing = client.post("/api/member/merge/request",
+                              json={"source_email": "missing@example.com"})
+        existing = client.post("/api/member/merge/request",
+                               json={"source_email": "b@example.com"})
+        self.assertEqual(missing.status_code, existing.status_code)
+        self.assertEqual(missing.get_json(), existing.get_json())
+
+    def test_merge_preserves_pending_claim_audit_and_fk_chain(self):
+        target = self._member("目標", "target@example.com", "0911111111")
+        source = self._member("來源", "source@example.com", "0922222222")
+        self._order("CLAIM-AUDIT", "source@example.com", "0922222222")
+        claim_response, claim_payload = self._claim(
+            self._client(source), "CLAIM-AUDIT", verification_hint="sou")
+        self.assertEqual(claim_response.status_code, 200, claim_payload)
+
+        client = self._client(target)
+        client.post("/api/member/merge/request", json={"source_email": "source@example.com"})
+        merged = client.post("/api/member/merge/confirm", json={"code": self.sent[-1][1]})
+        self.assertEqual(merged.status_code, 200, merged.get_json())
+        audit = self._rows("""SELECT c.member_id,v.member_id AS challenge_member_id
+                              FROM order_claims c JOIN member_verification_challenges v
+                                ON v.id=c.challenge_id WHERE c.id=%s""",
+                           (claim_payload["claim_id"],))[0]
+        self.assertEqual(audit, {"member_id": target, "challenge_member_id": target})
+
+    def test_consent_granted_requires_a_real_json_boolean(self):
+        member_id = self._member("甲", "a@example.com", "0911111111")
+        client = self._client(member_id)
+        malformed = client.post("/api/member/consents", json={
+            "consent_type": "marketing", "granted": "false"})
+        self.assertEqual(malformed.status_code, 400)
+        accepted = client.post("/api/member/consents", json={
+            "consent_type": "marketing", "granted": False})
+        self.assertEqual(accepted.status_code, 200, accepted.get_json())
+        row = self._rows("""SELECT granted FROM member_consents
+                            WHERE member_id=%s ORDER BY id DESC LIMIT 1""", (member_id,))[0]
+        self.assertFalse(row["granted"])
 
     # ── 二、社群註冊 ──
     def test_oauth_signup_requires_a_verified_email(self):
@@ -710,7 +829,8 @@ class MemberV1DatabaseTests(unittest.TestCase):
                                  WHERE provider='line' AND provider_subject=%s""",
                               ("Uverified-immutable",))[0]
         self.assertEqual(identity["member_id"], member_id)
-        self.assertEqual(identity["email_normalized"], "provider@example.com")
+        self.assertIsNone(identity["email_normalized"],
+                          "LINE email claim 預設不得視為本站已驗證 Email")
 
     # ── 四、OTP 上限 ──
     def test_challenge_has_attempt_and_request_limits(self):
@@ -728,6 +848,17 @@ class MemberV1DatabaseTests(unittest.TestCase):
 
         statuses = [self._claim(client, "LIMIT-1")[0].status_code for _ in range(6)]
         self.assertIn(429, statuses, "驗證碼要求必須有頻率上限")
+
+    def test_phone_otp_rate_limit_is_bound_to_destination_across_members(self):
+        statuses = []
+        for index in range(6):
+            member_id = self._member(
+                f"會員{index}", f"phone-limit-{index}@example.com", f"09880000{index:02d}")
+            response = self._client(member_id).post(
+                "/api/member/phone/request", json={"phone": "0977555666"})
+            statuses.append(response.status_code)
+        self.assertEqual(statuses[:5], [200] * 5)
+        self.assertEqual(statuses[5], 429)
 
 
 if __name__ == "__main__":
