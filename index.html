@@ -51,7 +51,7 @@
   <!-- 預載首屏輪播 LCP 圖（WebP），加速最大內容繪製 -->
   <link rel="preload" as="image" href="/images/summer-festival-hero-2026.webp" type="image/webp" fetchpriority="high" />
 
-  <link rel="stylesheet" href="style.css?v=20260917" />
+  <link rel="stylesheet" href="style.css?v=20261001b" />
   <!-- Font Awesome：非阻塞載入（先以 print 媒體載入，完成後切回 all），避免拖慢首屏渲染 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" media="print" onload="this.media='all'" />
   <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" /></noscript>
@@ -260,6 +260,7 @@
           <a href="/blog" data-i18n="nav.travel">旅遊大小事 <i class="fas fa-chevron-down nav-caret"></i></a>
           <ul class="nav-submenu">
             <li><a href="/tides" data-i18n="nav.tides">潮汐查詢系統</a></li>
+            <li><a href="/penghu-itinerary-recommendations/planner?src=nav" data-i18n="nav.planner">自己排行程</a></li>
             <li><a href="/blog" data-i18n="nav.articles">旅遊文章分享</a></li>
             <li><a href="/faq.html" data-i18n="nav.faq">常見問題</a></li>
           </ul>
@@ -457,6 +458,10 @@
       <div class="quiz-wrap" id="quiz-wrap">
         <!-- 由 script.js initQuiz() 動態產生 -->
       </div>
+      <aside class="planner-entry-block">
+        <div><h3 data-i18n="planner.entry.title">想自己排？</h3><p data-i18n="planner.entry.desc">用手機把想去的景點排進每一天，排好再請潮旅幫你確認船班、潮汐與報價。</p></div>
+        <a class="btn btn-outline" href="/penghu-itinerary-recommendations/planner?src=home_block" data-i18n="planner.entry.cta"><i class="fas fa-route"></i> 開始試排行程</a>
+      </aside>
     </div>
   </section>
 
@@ -1025,10 +1030,10 @@
     <i class="fas fa-chevron-up"></i>
   </button>
 
-  <script src="i18n.js?v=20260930e"></script>
-  <script src="itinerary-analytics.js?v=20260930e"></script>
-  <script src="itinerary-prefill.js?v=20260930e"></script>
-  <script src="script.js?v=20260930e"></script>
+  <script src="i18n.js?v=20261001b"></script>
+  <script src="itinerary-analytics.js?v=20261001b"></script>
+  <script src="itinerary-prefill.js?v=20261001b"></script>
+  <script src="script.js?v=20261001b"></script>
   <a href="https://wa.me/886912151788" class="wa-float" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp 諮詢" title="WhatsApp 諮詢"><i class="fab fa-whatsapp"></i></a>
 </body>
 </html>

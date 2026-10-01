@@ -23,6 +23,7 @@ import zlib
 import urllib.request
 import urllib.error
 import urllib.parse
+from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 import smtplib
 from email.mime.text import MIMEText
@@ -63,9 +64,33 @@ app.permanent_session_lifetime = timedelta(hours=12)
 # ─── 靜態資源快取 ──────────────────────────────────────────
 # CSS/JS/圖片長快取；改動 css/js 時必須同步調整各 HTML 引用的 ?v= 版本字串，
 # 否則使用者會拿到快取的舊資源（版本字串統一用 ASSET_VERSION）。
-ASSET_VERSION = '20260930e'
+ASSET_VERSION = '20261001b'
 _LONG_CACHE_EXT = ('.css', '.js', '.png', '.jpg', '.jpeg', '.webp', '.avif',
                    '.gif', '.svg', '.ico', '.woff', '.woff2')
+
+PLANNER_ITEM_CATEGORIES = {
+    'magong_old_town_walk': 'culture', 'guanyinting_sunset': 'attraction',
+    'magong_food_break': 'food', 'hotel_rest_buffer': 'rest',
+    'north_loop_highlights': 'attraction', 'tongliang_banyan': 'attraction',
+    'erkan_settlement': 'culture', 'lintou_park': 'attraction',
+    'kuibishan_tidal_walk': 'attraction', 'suogang_stone_pagodas': 'culture',
+    'shanshui_beach': 'water', 'qimei_wangan_day_trip': 'island',
+    'inner_sea_cruise': 'island', 'souvenir_buffer': 'shopping',
+    'departure_transfer_buffer': 'transport',
+}
+PLANNER_TEMPLATES = {'custom', 'classic', 'island', 'family_slow', 'classic_first',
+                     'island_adventure', 'romantic_photo', 'culture_slow'}
+PLANNER_SLOTS = {'morning', 'noon', 'afternoon', 'evening'}
+PLANNER_TRAVEL_DAYS = {'2d1n', '3d2n', '4d3n', '5dplus'}
+PLANNER_PARTIES = {'couple', 'friends', 'family', 'three_generation', 'company', 'solo'}
+PLANNER_STYLES = {'water', 'island', 'photo', 'food', 'culture', 'relax'}
+PLANNER_AVOID = {'sun', 'long_boat', 'rushed', 'water', 'walking', 'seasick'}
+PLANNER_WARNING_TYPES = {'arrival_buffer', 'avoid_water_conflict', 'cross_area',
+                         'departure_buffer', 'fixed_schedule_overlap', 'full_day_overlap',
+                         'long_boat_conflict', 'mobility_load', 'noon_sun', 'overpacked',
+                         'schedule_confirmation', 'tide_confirmation', 'unknown_item',
+                         'walking_conflict'}
+_PLANNER_GA4_CACHE = {}
 
 # 目前站上實際會用到的外部來源。CSP 先以 Report-Only 上線：
 # 瀏覽器只回報不攔截，確認一週沒有誤擋之後，把環境變數 CSP_ENFORCE 設為 1
@@ -228,6 +253,7 @@ def init_db():
             slot_id         INT,
             is_waitlist     BOOLEAN DEFAULT FALSE,
             notes           TEXT,
+            planner_structure JSONB,
             created_at      TIMESTAMP DEFAULT NOW()
         )
     """)
@@ -253,6 +279,7 @@ def init_db():
         ('converted_at',     'TIMESTAMP'),
         ('conversion_value', 'NUMERIC(12,2)'),
         ('utm',              "JSONB DEFAULT '{}'"),
+        ('planner_structure', 'JSONB'),
     ]:
         try:
             cur.execute(f"ALTER TABLE contacts ADD COLUMN IF NOT EXISTS {col} {defn}")
@@ -5199,7 +5226,7 @@ def _blog_hreflang(path_no_lang, avail):
 def _render_blog(title, desc, canonical, body, head_extra='', image=None, lang='zh-tw', alt_links=''):
     img = image or f'{SITE}/images/festival-poster.jpg'
     nav = '''<div class="top-banner"><div class="banner-static"><span>潮旅國際旅行社</span><span class="banner-sep">｜</span><span>2026 澎湖追風音樂燈光節 官方合作旅行社</span><span class="banner-sep">｜</span><span>電話：06-9271288</span></div></div>
-<nav class="navbar" id="navbar"><div class="nav-container"><a href="/" class="nav-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a><button class="nav-toggle" id="nav-toggle" aria-label="選單"><span></span><span></span><span></span></button><ul class="nav-links" id="nav-links"><li><a href="/">首頁</a></li><li><a href="/tours">行程介紹</a></li><li class="nav-item has-submenu"><a href="/neihai-preorder.html">預購行程 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/neihai-preorder.html">小城故事內海巡禮</a></li><li><a href="/preorder/festival">追風音樂節</a></li></ul></li><li class="nav-item has-submenu"><a href="/blog">旅遊大小事 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/tides">潮汐查詢系統</a></li><li><a href="/blog">旅遊文章分享</a></li><li><a href="/faq.html">常見問題</a></li><li><a href="/reviews">旅客評價</a></li></ul></li><li class="nav-item has-submenu"><a href="/#about">關於我們 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/#contact">聯絡資訊</a></li></ul></li></ul></div></nav>'''
+<nav class="navbar" id="navbar"><div class="nav-container"><a href="/" class="nav-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a><button class="nav-toggle" id="nav-toggle" aria-label="選單"><span></span><span></span><span></span></button><ul class="nav-links" id="nav-links"><li><a href="/">首頁</a></li><li><a href="/tours">行程介紹</a></li><li class="nav-item has-submenu"><a href="/neihai-preorder.html">預購行程 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/neihai-preorder.html">小城故事內海巡禮</a></li><li><a href="/preorder/festival">追風音樂節</a></li></ul></li><li class="nav-item has-submenu"><a href="/blog">旅遊大小事 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/tides">潮汐查詢系統</a></li><li><a href="/penghu-itinerary-recommendations/planner?src=nav">自己排行程</a></li><li><a href="/blog">旅遊文章分享</a></li><li><a href="/faq.html">常見問題</a></li><li><a href="/reviews">旅客評價</a></li></ul></li><li class="nav-item has-submenu"><a href="/#about">關於我們 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/#contact">聯絡資訊</a></li></ul></li></ul></div></nav>'''
     footer = '''<footer class="footer"><div class="container"><div class="footer-bottom"><p>© 2026 潮旅國際旅行社 All Rights Reserved.｜<a href="/" style="color:inherit">官網</a>｜<a href="/blog" style="color:inherit">部落格</a>｜<a href="/reviews" style="color:inherit">旅客評價</a>｜<a href="/privacy" style="color:inherit">隱私權政策</a>｜<a href="/terms" style="color:inherit">使用條款</a></p></div></div></footer>
 <script>(function(){var t=document.getElementById('nav-toggle'),l=document.getElementById('nav-links');if(t)t.addEventListener('click',function(){l.classList.toggle('open')});var lb=document.getElementById('lang-btn'),lm=document.getElementById('lang-menu');if(lb)lb.addEventListener('click',function(e){e.stopPropagation();lm.classList.toggle('open')});document.addEventListener('click',function(){if(lm)lm.classList.remove('open')});})();</script>'''
     # 還沒有真實評價時不放「旅客評價」入口：一個點進去只寫「整理中」的頁面比沒有更扣信任感。
@@ -5569,7 +5596,7 @@ def itinerary_planner_page():
         f'<script defer src="/itinerary-planner.js?v={ASSET_VERSION}"></script>'
         f'<script defer src="/itinerary-planner-page.js?v={ASSET_VERSION}"></script>'
     )
-    body = '<div id="itinerary-planner-v1" aria-live="polite"></div>'
+    body = '<div id="itinerary-planner-v1"></div>'
     return _render_blog(title, desc, f'{SITE}/penghu-itinerary-recommendations/planner',
                         body, head, image=_PILLAR_OG_IMAGE['penghu-itinerary-recommendations'])
 
@@ -5780,6 +5807,54 @@ def dynamic_sitemap():
     return app.response_class(xml, mimetype='application/xml')
 
 
+# ─── 試排器結構白名單 ──────────────────────────────────────
+def sanitize_planner_structure(value):
+    """只保留試排器已知列舉與 id；任何錯誤都降級為不儲存。"""
+    if not isinstance(value, dict):
+        return None
+    try:
+        if len(json.dumps(value, ensure_ascii=False, separators=(',', ':')).encode('utf-8')) > 8192:
+            return None
+    except (TypeError, ValueError):
+        return None
+    if value.get('version') != 1 or value.get('template_id') not in PLANNER_TEMPLATES:
+        return None
+    clean = {'version': 1, 'template_id': value['template_id']}
+    for key, allowed in [('travel_days', PLANNER_TRAVEL_DAYS),
+                         ('party_type', PLANNER_PARTIES)]:
+        if value.get(key) in allowed:
+            clean[key] = value[key]
+    for key, allowed in [('travel_style', PLANNER_STYLES),
+                         ('avoid_preference', PLANNER_AVOID)]:
+        values = value.get(key)
+        if isinstance(values, list):
+            clean[key] = list(dict.fromkeys(v for v in values if v in allowed))
+    warnings = value.get('warning_types')
+    clean['warning_types'] = (list(dict.fromkeys(v for v in warnings
+                                                 if v in PLANNER_WARNING_TYPES))[:10]
+                              if isinstance(warnings, list) else [])
+    clean_days = []
+    for raw_day in (value.get('days') if isinstance(value.get('days'), list) else [])[:7]:
+        if not isinstance(raw_day, dict):
+            continue
+        day_index = raw_day.get('day_index')
+        if not isinstance(day_index, int) or isinstance(day_index, bool) or not 1 <= day_index <= 7:
+            continue
+        items = []
+        for raw_item in (raw_day.get('items') if isinstance(raw_day.get('items'), list) else [])[:12]:
+            if not isinstance(raw_item, dict):
+                continue
+            item_id = raw_item.get('item_id')
+            category = raw_item.get('category')
+            slot = raw_item.get('slot')
+            if (item_id in PLANNER_ITEM_CATEGORIES and
+                    category == PLANNER_ITEM_CATEGORIES[item_id] and slot in PLANNER_SLOTS):
+                items.append({'item_id': item_id, 'category': category, 'slot': slot})
+        clean_days.append({'day_index': day_index, 'items': items})
+    clean['days'] = clean_days
+    return clean
+
+
 # ─── 諮詢表單 ──────────────────────────────────────────────
 @app.route('/api/contact', methods=['POST'])
 def submit_contact():
@@ -5790,6 +5865,7 @@ def submit_contact():
         return jsonify(ok=False, error=f'缺少必填欄位：{", ".join(missing)}'), 400
 
     slot_id    = data.get('slot_id')
+    planner_structure = sanitize_planner_structure(data.get('planner_structure'))
     is_waitlist = False
     slot_label  = ''
 
@@ -5828,8 +5904,8 @@ def submit_contact():
             INSERT INTO contacts
               (name,phone,travel_date,travel_date_end,people,budget,transport,
                departure_city,tour_interest,slot_id,is_waitlist,notes,
-               visit_count,member_status,member_no,utm)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id, created_at
+               visit_count,member_status,member_no,utm,planner_structure)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id, created_at
         """, (data['name'], data['phone'], data['travel_date'], data['travel_date_end'],
               data['people'], data.get('budget',''), data['transport'],
               data.get('departure_city',''), data.get('tour_interest',''),
@@ -5838,8 +5914,9 @@ def submit_contact():
               (data.get('member_status') or '')[:30],
               (data.get('member_no') or '')[:40],
               Json({k: str(v)[:200] for k, v in (data.get('utm') or {}).items()
-                    if k in ('utm_source', 'utm_medium', 'utm_campaign', 'utm_content',
-                             'utm_term', 'landing_page', 'referrer')})))
+                     if k in ('utm_source', 'utm_medium', 'utm_campaign', 'utm_content',
+                              'utm_term', 'landing_page', 'referrer')}),
+              Json(planner_structure) if planner_structure else None))
         row = cur.fetchone()
         conn.commit(); cur.close(); conn.close()
 
@@ -5908,6 +5985,8 @@ def list_contacts():
         result = []
         for r in rows:
             r = dict(r)
+            # 試排行程和聯絡人同列儲存，但單筆名單 API 不回傳；統計只走彙總端點。
+            r.pop('planner_structure', None)
             if r.get('travel_date'):     r['travel_date']     = str(r['travel_date'])
             if r.get('travel_date_end'): r['travel_date_end'] = str(r['travel_date_end'])
             if r.get('created_at'): r['created_at'] = str(r['created_at'])
@@ -5993,6 +6072,154 @@ def conversion_summary():
     except Exception as exc:
         print(f'[CONVERSION SUMMARY] {exc}')
         return jsonify(ok=False, error='讀取轉換摘要失敗'), 500
+
+
+def _planner_ga4_credentials():
+    raw = (os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON') or '').strip()
+    if not raw:
+        raise RuntimeError('GOOGLE_SERVICE_ACCOUNT_JSON 未設定')
+    from google.oauth2 import service_account
+    return service_account.Credentials.from_service_account_info(
+        json.loads(raw), scopes=['https://www.googleapis.com/auth/analytics.readonly'])
+
+
+def _planner_ga4_report(service, property_id, start_date, dimensions, event_names):
+    body = {
+        'dateRanges': [{'startDate': start_date, 'endDate': 'today'}],
+        'dimensions': [{'name': name} for name in dimensions],
+        'metrics': [{'name': 'eventCount'}],
+        'dimensionFilter': {'filter': {'fieldName': 'eventName', 'inListFilter': {
+            'values': event_names,
+        }}},
+        'orderBys': [{'metric': {'metricName': 'eventCount'}, 'desc': True}],
+        'limit': 100,
+    }
+    response = service.properties().runReport(
+        property=f'properties/{property_id}', body=body).execute()
+    rows = []
+    for row in response.get('rows', []):
+        values = [v.get('value') or '(not set)' for v in row.get('dimensionValues', [])]
+        item = dict(zip(dimensions, values))
+        item['count'] = int(row.get('metricValues', [{}])[0].get('value') or 0)
+        rows.append(item)
+    return rows
+
+
+def _fetch_planner_ga4(days, today=None):
+    property_id = (os.environ.get('GA4_PROPERTY_ID') or '').strip()
+    if not property_id:
+        raise RuntimeError('GA4_PROPERTY_ID 未設定')
+    from googleapiclient.discovery import build
+    today = today or date.today()
+    data_since = max(today - timedelta(days=days), date(2026, 9, 30)).isoformat()
+    service = build('analyticsdata', 'v1beta', credentials=_planner_ga4_credentials(),
+                    cache_discovery=False)
+    template_rows = _planner_ga4_report(
+        service, property_id, data_since, ['customEvent:template_id'],
+        ['planner_template_generated'])
+    item_rows = _planner_ga4_report(
+        service, property_id, data_since,
+        ['customEvent:item_id', 'customEvent:category', 'customEvent:area'],
+        ['planner_item_add'])
+    funnel_rows = _planner_ga4_report(
+        service, property_id, data_since, ['eventName'],
+        ['planner_start', 'planner_complete', 'planner_quote_click',
+         'planner_quote_submitted'])
+    return {
+        'data_since': data_since,
+        'templates': [{'template_id': r.get('customEvent:template_id'), 'count': r['count']}
+                      for r in template_rows],
+        'items': [{'item_id': r.get('customEvent:item_id'),
+                   'category': r.get('customEvent:category'),
+                   'area': r.get('customEvent:area'), 'count': r['count']}
+                  for r in item_rows],
+        'funnel': {r.get('eventName'): r['count'] for r in funnel_rows},
+    }
+
+
+def _cached_planner_ga4(days):
+    cached = _PLANNER_GA4_CACHE.get(days)
+    if cached and time.time() - cached['at'] < 600:
+        return cached['value']
+    value = _fetch_planner_ga4(days)
+    _PLANNER_GA4_CACHE[days] = {'at': time.time(), 'value': value}
+    return value
+
+
+def _planner_database_insights(days):
+    conn = get_db(); cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT COUNT(*) AS total, COUNT(planner_structure) AS planned
+            FROM contacts WHERE created_at >= NOW() - (%s * INTERVAL '1 day')
+        """, (days,))
+        totals = cur.fetchone() or {'total': 0, 'planned': 0}
+        cur.execute("""
+            SELECT planner_structure FROM contacts
+            WHERE created_at >= NOW() - (%s * INTERVAL '1 day')
+              AND planner_structure IS NOT NULL
+        """, (days,))
+        templates, items = Counter(), Counter()
+        for row in cur.fetchall():
+            structure = row['planner_structure'] if isinstance(row, dict) else row[0]
+            if isinstance(structure, str):
+                try: structure = json.loads(structure)
+                except (TypeError, ValueError): continue
+            if not isinstance(structure, dict):
+                continue
+            template_id = structure.get('template_id')
+            if template_id in PLANNER_TEMPLATES:
+                templates[template_id] += 1
+            for day_row in structure.get('days') or []:
+                for item in day_row.get('items') or []:
+                    item_id = item.get('item_id')
+                    if item_id in PLANNER_ITEM_CATEGORIES:
+                        items[item_id] += 1
+        return {
+            'total_inquiries': int(totals['total']),
+            'planned_inquiries': int(totals['planned']),
+            'templates': [{'template_id': key, 'count': count}
+                          for key, count in templates.most_common(10)],
+            'items': [{'item_id': key, 'category': PLANNER_ITEM_CATEGORIES[key],
+                       'count': count} for key, count in items.most_common(15)],
+        }
+    finally:
+        cur.close(); conn.close()
+
+
+@app.route('/api/admin/planner-insights', methods=['GET'])
+def planner_insights():
+    if not has_role('orders'):
+        return jsonify(ok=False, error='未授權'), 401
+    try:
+        days = int(request.args.get('days', 30))
+    except (TypeError, ValueError):
+        days = 30
+    if days not in (7, 30, 90):
+        days = 30
+    response = {'ok': True, 'days': days,
+                'ga4_configured': bool((os.environ.get('GA4_PROPERTY_ID') or '').strip() and
+                                       (os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON') or '').strip())}
+    try:
+        response['inquiries'] = _planner_database_insights(days)
+    except Exception as exc:
+        print(f'[PLANNER INSIGHTS DB] {exc}')
+        response['inquiries'] = {'total_inquiries': 0, 'planned_inquiries': 0,
+                                 'templates': [], 'items': []}
+        response['database_error'] = '站內詢價統計暫時無法讀取'
+    if response['ga4_configured']:
+        try:
+            response['ga4'] = _cached_planner_ga4(days)
+            response['data_since'] = response['ga4']['data_since']
+        except Exception as exc:
+            print(f'[PLANNER INSIGHTS GA4] {exc}')
+            response['ga4'] = {'funnel': {}, 'templates': [], 'items': []}
+            response['ga4_error'] = 'GA4 查詢失敗，詳細原因請看伺服器記錄'
+    else:
+        response['ga4'] = {'funnel': {}, 'templates': [], 'items': []}
+        response['data_since'] = max(date.today() - timedelta(days=days),
+                                     date(2026, 9, 30)).isoformat()
+    return jsonify(**response)
 
 
 # ─── 啟動 ──────────────────────────────────────────────────

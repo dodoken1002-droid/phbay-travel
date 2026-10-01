@@ -52,7 +52,7 @@
     planner_quote_submitted: ['day_bucket', 'completion_bucket', 'template_id']
   });
   const PLANNER_ENUMS = Object.freeze({
-    entry_source: ['quiz_result', 'direct'],
+    entry_source: ['quiz_result', 'home_quiz', 'home_block', 'nav', 'direct'],
     category: ['attraction', 'island', 'water', 'food', 'culture', 'rest', 'transport', 'shopping'],
     area: ['magong', 'north', 'south', 'huxi', 'xiyu', 'baisha', 'offshore'],
     slot: ['morning', 'noon', 'afternoon', 'evening'],
@@ -69,14 +69,15 @@
     completion_bucket: ['started', 'partial', 'complete']
   });
 
-  function track(eventName, params) {
+  function track(eventName, params, options) {
+    options = options || {};
     const extra = {};
     Object.keys(params || {}).forEach(function (key) {
       if (BLOCKED.test(key)) return;
       // 診斷維度不論從哪裡傳入都用同一個格式（陣列 → a|b），GA4 報表才不會分裂成兩種值
       extra[key] = ALLOWED.indexOf(key) !== -1 ? cleanValue(params[key]) : params[key];
     });
-    const payload = Object.assign({}, loadProfile(), extra);
+    const payload = Object.assign({}, options.includeProfile === false ? {} : loadProfile(), extra);
     if (typeof root.gtag === 'function') root.gtag('event', eventName, payload);
     return payload;
   }
@@ -105,7 +106,7 @@
 
   function trackPlanner(eventName, params) {
     if (!PLANNER_EVENT_FIELDS[eventName]) return {};
-    return track(eventName, sanitizePlannerParams(eventName, params));
+    return track(eventName, sanitizePlannerParams(eventName, params), { includeProfile: false });
   }
 
   const api = { STORAGE_KEY, ALLOWED, BLOCKED, PLANNER_EVENT_FIELDS, PLANNER_ENUMS,

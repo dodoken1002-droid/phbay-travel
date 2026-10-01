@@ -156,12 +156,19 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
   box-shadow:0 1px 6px rgba(0,0,0,.08);text-align:center}
 .stat-card .num{font-size:2rem;font-weight:900;color:var(--blue)}
 .stat-card .lbl{font-size:.82rem;color:var(--mid);margin-top:4px}
+.planner-insights{margin:18px 0 24px;padding:18px;background:#fff;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.planner-insights-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.planner-insights-head h3{margin:0}.planner-insights-note{color:var(--mid);font-size:.84rem;margin:8px 0 14px}
+.planner-rank-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.planner-rank-grid h4{margin:0 0 8px}
+.planner-rank-table{width:100%;border-collapse:collapse}.planner-rank-table th,.planner-rank-table td{padding:8px;border-bottom:1px solid #edf2f7;text-align:left}.planner-rank-table th:not(:first-child),.planner-rank-table td:not(:first-child){text-align:right}
+.planner-empty{color:var(--mid);padding:18px 0;text-align:center}
 /* ── 搜尋框 ── */
 .search-input{padding:8px 14px;border:2px solid #e2e8f0;border-radius:8px;
   font-size:.88rem;width:200px;outline:none}
 .search-input:focus{border-color:var(--blue)}
 @media(max-width:640px){
   .form-grid{grid-template-columns:1fr}
+  .planner-rank-grid{grid-template-columns:1fr}
   .admin-header h1 span{display:none}
 }
 </style>
@@ -393,6 +400,12 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
         </div>
       </div>
       <div id="conversion-summary" class="stats-row"></div>
+      <section class="planner-insights" aria-labelledby="planner-insights-title">
+        <div class="planner-insights-head"><h3 id="planner-insights-title">試排器熱門</h3><label>期間
+          <select id="planner-insights-days" onchange="loadPlannerInsights(this.value)"><option value="7">7 天</option><option value="30" selected>30 天</option><option value="90">90 天</option></select>
+        </label></div>
+        <div id="planner-insights-content">載入中…</div>
+      </section>
       <div id="contacts-list">載入中…</div>
     </div>
 
@@ -790,6 +803,7 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
 <!-- Toast 通知 -->
 <div class="toast" id="toast"></div>
 
+<script src="/itinerary-planner-data.js?v=20261001b"></script>
 <script>
 /* ══════════════════════════════════════
    全域狀態
@@ -1587,6 +1601,7 @@ function adjustMemberPoints(id){const delta=prompt('點數增減（例如 100 �
 ══════════════════════════════════════ */
 function loadContacts() {
   document.getElementById('contacts-list').innerHTML = '載入中…';
+  loadPlannerInsights(document.getElementById('planner-insights-days')?.value || 30);
   fetch(`/api/admin/conversion-summary?key=${encodeURIComponent(ADMIN_KEY)}`)
     .then(r=>r.json()).then(d=>{
       if(!d.ok)return;
@@ -1667,6 +1682,33 @@ function loadContacts() {
         </div>`;
       }).join('');
     });
+}
+
+function plannerEsc(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function plannerRankRows(gaRows,dbRows,key,limit){
+  const rows=new Map();
+  (gaRows||[]).forEach(r=>rows.set(r[key],{id:r[key],ga4:Number(r.count)||0,db:0,category:r.category||'',area:r.area||''}));
+  (dbRows||[]).forEach(r=>{const row=rows.get(r[key])||{id:r[key],ga4:0,db:0,category:r.category||'',area:r.area||''};row.db=Number(r.count)||0;rows.set(r[key],row);});
+  return [...rows.values()].filter(r=>r.id&&r.id!=='(not set)').sort((a,b)=>(b.ga4+b.db)-(a.ga4+a.db)).slice(0,limit);
+}
+function plannerRankTable(rows,type){
+  if(!rows.length)return '<div class="planner-empty">這個期間尚無資料</div>';
+  const cards=window.PhbayItineraryPlannerData?.CARD_INDEX||{};
+  return `<table class="planner-rank-table"><thead><tr><th>${type==='item'?'景點':'範本'}</th><th>GA4 次數</th><th>實際詢價次數</th></tr></thead><tbody>${rows.map(r=>{
+    const card=type==='item'&&cards[r.id];
+    const label=card?`${plannerEsc(card.name)}<small style="display:block;color:var(--mid)">${plannerEsc(card.category)}・${plannerEsc(card.area)}</small>`:plannerEsc(r.id);
+    return `<tr><td>${label}</td><td>${r.ga4||'—'}</td><td>${r.db||'—'}</td></tr>`;
+  }).join('')}</tbody></table>`;
+}
+function loadPlannerInsights(days){
+  days=[7,30,90].includes(Number(days))?Number(days):30;
+  const box=document.getElementById('planner-insights-content');if(!box)return;box.innerHTML='載入中…';
+  fetch(`/api/admin/planner-insights?days=${days}&key=${encodeURIComponent(ADMIN_KEY)}`).then(r=>r.json()).then(d=>{
+    if(!d.ok){box.innerHTML='<div class="planner-empty">無法載入試排器統計</div>';return;}
+    const ga=d.ga4||{},db=d.inquiries||{},f=ga.funnel||{},templates=plannerRankRows(ga.templates,db.templates,'template_id',10),items=plannerRankRows(ga.items,db.items,'item_id',15);
+    const gaNote=!d.ga4_configured?'GA4 尚未設定':d.ga4_error?`GA4 暫時無法讀取：${plannerEsc(d.ga4_error)}`:`GA4 資料自 ${plannerEsc(d.data_since||'2026-09-30')} 起`;
+    box.innerHTML=`<div class="stats-row"><div class="stat-card"><strong>${f.planner_start??'—'}</strong><span>開始</span></div><div class="stat-card"><strong>${f.planner_complete??'—'}</strong><span>完成</span></div><div class="stat-card"><strong>${f.planner_quote_click??'—'}</strong><span>點詢價</span></div><div class="stat-card"><strong>${f.planner_quote_submitted??'—'}</strong><span>送出詢價</span></div></div><p class="planner-insights-note">瀏覽行為（GA4）：${gaNote}｜實際詢價（站內資料庫）：${d.database_error?plannerEsc(d.database_error):`${db.planned_inquiries||0} / ${db.total_inquiries||0} 筆帶試排行程`}</p><div class="planner-rank-grid"><div><h4>熱門範本 Top 10</h4>${plannerRankTable(templates,'template')}</div><div><h4>熱門景點 Top 15</h4>${plannerRankTable(items,'item')}</div></div>`;
+  }).catch(()=>{box.innerHTML='<div class="planner-empty">無法載入試排器統計</div>';});
 }
 
 function saveLeadStatus(cid) {
