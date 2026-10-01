@@ -188,7 +188,7 @@
         if(q.key==='children_age'&&Number(answers.children)===0)answers.children_age=['none'];
         if(idx===0&&!started){started=true;track('quiz_start',{quiz_version:QUIZ_VERSION});}
         if(idx<QUESTIONS.length-1){idx++;draw(true);container.scrollIntoView({behavior:'smooth',block:'start'});return;}
-        const result=recommend(answers);saveState(answers);if(root.PhbayAnalytics)root.PhbayAnalytics.saveProfile(result.analytics);
+        const result=recommend(answers);answers.answered_at=Date.now();saveState(answers);if(root.PhbayAnalytics)root.PhbayAnalytics.saveProfile(result.analytics);
         track('quiz_complete',Object.assign({quiz_version:QUIZ_VERSION,itinerary_type:result.key},result.analytics));root.location.href='/penghu-itinerary-recommendations/result';
       });
       const back=container.querySelector('.iq-back');if(back)back.addEventListener('click',function(){idx--;draw(true);});

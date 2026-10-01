@@ -241,6 +241,10 @@ function initContactForm() {
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
     data.utm = getAttribution();
+    if (form.dataset.plannerStructure) {
+      try { data.planner_structure = JSON.parse(form.dataset.plannerStructure); }
+      catch (_) { delete data.planner_structure; }
+    }
 
     if (!data.name || !data.phone || !data.travel_date || !data.travel_date_end || !data.people || !data.transport) {
       showFormError('請填寫所有必填欄位（標示 * 的欄位）');
@@ -319,6 +323,7 @@ function initContactForm() {
         try {
           window.PhbayAnalytics.trackPlanner('planner_quote_submitted', JSON.parse(form.dataset.plannerAnalytics));
           delete form.dataset.plannerAnalytics;
+          delete form.dataset.plannerStructure;
           sessionStorage.removeItem('phbay_itinerary_prefill_v1');
         } catch (_) { /* 分析失敗不影響詢價成功 */ }
       }
@@ -1106,6 +1111,9 @@ function renderQuizResult(forcedKey, fromShare = false) {
         <button class="btn btn-outline" onclick="openQuizLead('${best}')">
           <i class="fas fa-file-lines"></i> 領取澎湖行程建議表
         </button>
+        <a href="/penghu-itinerary-recommendations/planner?src=home_quiz" class="btn btn-outline" data-i18n="planner.entry.quizCta" onclick="trackQuizCta('${best}','planner')">
+          <i class="fas fa-route"></i> 自己動手排行程
+        </a>
       </div>
       <div id="quiz-lead-box" style="display:none"></div>
       <div class="quiz-result-actions" style="margin-top:10px">
@@ -1124,6 +1132,7 @@ function renderQuizResult(forcedKey, fromShare = false) {
       </div>
       <div class="quiz-copy-toast" id="quiz-copy-toast">已複製分享連結！</div>
     </div>`;
+  if (typeof window.refreshI18n === 'function') window.refreshI18n(wrap);
   if (fromShare && location.hash !== '#quiz') location.hash = 'quiz';
   if (!fromShare && quizAnswerTexts.length) loadQuizAiNote(best);
 }

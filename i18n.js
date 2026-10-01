@@ -11,7 +11,8 @@ const DICT = {
   /* ─────────── English ─────────── */
   en: {
     'nav.home':'Home', 'nav.tours':'Tours', 'nav.quiz':'Trip Quiz', 'nav.about':'About', 'nav.faq':'FAQ', 'nav.blog':'Blog', 'nav.contact':'Contact',
-    'nav.preorder':'Pre-order', 'nav.neihai':'Small Town Story Inner Sea Cruise', 'nav.festival':'Music Festival', 'nav.travel':'Travel Info', 'nav.tides':'Tide Forecast', 'nav.articles':'Travel Articles', 'nav.reviews':'Reviews', 'nav.contactInfo':'Contact Info', 'nav.member':'100 Journeys',
+    'nav.preorder':'Pre-order', 'nav.neihai':'Small Town Story Inner Sea Cruise', 'nav.festival':'Music Festival', 'nav.travel':'Travel Info', 'nav.tides':'Tide Forecast', 'nav.planner':'Plan your own trip (Chinese)', 'nav.articles':'Travel Articles', 'nav.reviews':'Reviews', 'nav.contactInfo':'Contact Info', 'nav.member':'100 Journeys',
+    'planner.entry.title':'Want to plan it yourself?', 'planner.entry.desc':'Arrange places into each day on your phone, then ask Phbay to confirm ferries, tides and pricing.', 'planner.entry.cta':'Start planning (Chinese)', 'planner.entry.quizCta':'Plan it yourself (Chinese)',
     'member.kicker':'Penghu 100 Journeys', 'member.title':'Which Penghu journey is this for you?', 'member.desc':'Every trip booked through and completed with Phbay becomes a stamp in your travel passport.', 'member.join':'Join Penghu 100 Journeys', 'member.dashboard':'View my Penghu journeys',
     'slide.cta':'Ask About Tours',
     'partner.title':'Official Partner · 2026 Penghu Chasing-the-Wind Music & Light Festival','partner.subtitle':'Phbay Travel is on the official partner list alongside ezTravel, Lion Travel, Cola Tour, SET Tour, Starsunny, kkday and EverFun.',
@@ -86,7 +87,8 @@ const DICT = {
   /* ─────────── 日本語 ─────────── */
   ja: {
     'nav.home':'ホーム', 'nav.tours':'ツアー', 'nav.quiz':'旅行診断', 'nav.about':'会社紹介', 'nav.faq':'よくある質問', 'nav.blog':'ブログ', 'nav.contact':'お問い合わせ',
-    'nav.preorder':'事前予約', 'nav.neihai':'小城故事・内海クルーズ', 'nav.festival':'音楽祭', 'nav.travel':'旅の情報', 'nav.tides':'潮汐予報', 'nav.articles':'旅行記事', 'nav.reviews':'お客様の声', 'nav.contactInfo':'連絡先', 'nav.member':'澎湖百旅会員',
+    'nav.preorder':'事前予約', 'nav.neihai':'小城故事・内海クルーズ', 'nav.festival':'音楽祭', 'nav.travel':'旅の情報', 'nav.tides':'潮汐予報', 'nav.planner':'自分で旅程を組む (Chinese)', 'nav.articles':'旅行記事', 'nav.reviews':'お客様の声', 'nav.contactInfo':'連絡先', 'nav.member':'澎湖百旅会員',
+    'planner.entry.title':'自分で組んでみますか？', 'planner.entry.desc':'スマートフォンで行きたい場所を日ごとに並べ、船便・潮汐・料金を潮旅に確認できます。', 'planner.entry.cta':'旅程を試作する (Chinese)', 'planner.entry.quizCta':'自分で旅程を組む (Chinese)',
     'member.kicker':'澎湖百旅プログラム', 'member.title':'今回で何回目の澎湖旅行ですか？', 'member.desc':'潮旅を通じて予約し完了した旅は、旅行パスポートに記録されます。', 'member.join':'会員になる', 'member.dashboard':'私の澎湖旅行を見る',
     'slide.cta':'ツアーを相談する',
     'partner.title':'2026 澎湖追風音楽燈光祭 公式提携旅行社','partner.subtitle':'Phbay Travel は易遊網・雄獅・可楽・東南・星晴・佳期・kkday・長汎とともに公式提携リストに掲載されています。',
@@ -161,7 +163,8 @@ const DICT = {
   /* ─────────── 한국어 ─────────── */
   ko: {
     'nav.home':'홈', 'nav.tours':'투어', 'nav.quiz':'여행 진단', 'nav.about':'회사 소개', 'nav.faq':'자주 묻는 질문', 'nav.blog':'블로그', 'nav.contact':'문의하기',
-    'nav.preorder':'사전 예약', 'nav.neihai':'스몰타운 스토리 내해 크루즈', 'nav.festival':'음악 축제', 'nav.travel':'여행 정보', 'nav.tides':'조석 예보', 'nav.articles':'여행 아티클', 'nav.reviews':'여행 후기', 'nav.contactInfo':'연락처', 'nav.member':'펑후 백여행',
+    'nav.preorder':'사전 예약', 'nav.neihai':'스몰타운 스토리 내해 크루즈', 'nav.festival':'음악 축제', 'nav.travel':'여행 정보', 'nav.tides':'조석 예보', 'nav.planner':'직접 일정 짜기 (Chinese)', 'nav.articles':'여행 아티클', 'nav.reviews':'여행 후기', 'nav.contactInfo':'연락처', 'nav.member':'펑후 백여행',
+    'planner.entry.title':'직접 짜 보고 싶나요?', 'planner.entry.desc':'휴대폰에서 가고 싶은 곳을 날짜별로 배치한 뒤, 선편·조석·요금을 차오뤼에 확인하세요.', 'planner.entry.cta':'일정 시험 짜기 (Chinese)', 'planner.entry.quizCta':'직접 일정 짜기 (Chinese)',
     'member.kicker':'펑후 백여행 프로그램', 'member.title':'이번이 몇 번째 펑후 여행인가요?', 'member.desc':'차오뤼를 통해 예약하고 완료한 모든 여행이 여행 여권에 기록됩니다.', 'member.join':'회원 가입', 'member.dashboard':'내 펑후 여행 보기',
     'slide.cta':'투어 문의하기',
     'partner.title':'2026 펑후 추풍 음악조명축제 공식 제휴 여행사','partner.subtitle':'Phbay Travel은 ezTravel·라이언트래블·콜라투어·SET투어 등과 함께 공식 제휴 명단에 등재되어 있습니다.',
@@ -236,7 +239,8 @@ const DICT = {
   /* ─────────── 简体中文 ─────────── */
   'zh-cn': {
     'nav.home':'首页', 'nav.tours':'行程介绍', 'nav.quiz':'行程测验', 'nav.about':'关于我们', 'nav.faq':'常见问题', 'nav.blog':'博客', 'nav.contact':'联系我们',
-    'nav.preorder':'预购行程', 'nav.neihai':'小城故事内海巡礼', 'nav.festival':'追风音乐节', 'nav.travel':'旅游大小事', 'nav.tides':'潮汐查询系统', 'nav.articles':'旅游文章分享', 'nav.reviews':'旅客评价', 'nav.contactInfo':'联系资讯', 'nav.member':'澎湖百旅会员',
+    'nav.preorder':'预购行程', 'nav.neihai':'小城故事内海巡礼', 'nav.festival':'追风音乐节', 'nav.travel':'旅游大小事', 'nav.tides':'潮汐查询系统', 'nav.planner':'自己排行程', 'nav.articles':'旅游文章分享', 'nav.reviews':'旅客评价', 'nav.contactInfo':'联系资讯', 'nav.member':'澎湖百旅会员',
+    'planner.entry.title':'想自己排？', 'planner.entry.desc':'用手机把想去的景点排进每一天，排好再请潮旅帮你确认船班、潮汐与报价。', 'planner.entry.cta':'开始试排行程', 'planner.entry.quizCta':'自己动手排行程',
     'member.kicker':'澎湖百旅计划', 'member.title':'这是你的第几次澎湖旅程？', 'member.desc':'经潮旅报名完成的每一趟，都会成为旅行护照里的一次记录。', 'member.join':'加入澎湖百旅', 'member.dashboard':'查看我的澎湖旅程',
     'slide.cta':'咨询搭配行程',
     'partner.title':'2026 澎湖追风音乐灯光节 官方合作旅行社','partner.subtitle':'潮旅国际与易游网、雄狮、可乐、东南、星晴、佳期、kkday、长汎并列官方授权名单',
@@ -310,34 +314,39 @@ const DICT = {
 };
 
 /* ── 初始化：記錄原始內容 ── */
-function _i18nCapture() {
-  document.querySelectorAll('[data-i18n]').forEach(el => {
+function _i18nCapture(scope) {
+  scope = scope || document;
+  scope.querySelectorAll('[data-i18n]').forEach(el => {
+    if (el._i18nOrig !== undefined) return;
     el._i18nOrig = el.innerHTML;
     const f = el.firstElementChild;
     el._i18nIcon = (f && f.tagName === 'I') ? f.outerHTML + ' ' : '';
   });
-  document.querySelectorAll('[data-i18n-html]').forEach(el => { el._i18nOrigHtml = el.innerHTML; });
-  document.querySelectorAll('[data-i18n-ph]').forEach(el => { el._i18nOrigPh = el.getAttribute('placeholder') || ''; });
+  scope.querySelectorAll('[data-i18n-html]').forEach(el => { if (el._i18nOrigHtml === undefined) el._i18nOrigHtml = el.innerHTML; });
+  scope.querySelectorAll('[data-i18n-ph]').forEach(el => { if (el._i18nOrigPh === undefined) el._i18nOrigPh = el.getAttribute('placeholder') || ''; });
 }
 
 /* ── 套用語言 ── */
-function setLang(lang) {
+function _i18nApply(scope, lang) {
   const dict = DICT[lang] || {};
   const isDefault = (lang === 'zh-tw');
 
-  document.querySelectorAll('[data-i18n]').forEach(el => {
+  scope.querySelectorAll('[data-i18n]').forEach(el => {
     const t = dict[el.getAttribute('data-i18n')];
     el.innerHTML = (isDefault || !t) ? el._i18nOrig : (el._i18nIcon + t);
   });
-  document.querySelectorAll('[data-i18n-html]').forEach(el => {
+  scope.querySelectorAll('[data-i18n-html]').forEach(el => {
     const t = dict[el.getAttribute('data-i18n-html')];
     el.innerHTML = (isDefault || !t) ? el._i18nOrigHtml : t;
   });
-  document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+  scope.querySelectorAll('[data-i18n-ph]').forEach(el => {
     const t = dict[el.getAttribute('data-i18n-ph')];
     el.setAttribute('placeholder', (isDefault || !t) ? el._i18nOrigPh : t);
   });
+}
 
+function setLang(lang) {
+  _i18nApply(document, lang);
   document.documentElement.lang = LANG_HTML[lang] || 'zh-TW';
   window.__lang = lang;
   try { localStorage.setItem('phbay_lang', lang); } catch (e) {}
@@ -348,6 +357,7 @@ function setLang(lang) {
 }
 window.setLang = setLang;
 window.__lang = 'zh-tw';
+window.refreshI18n = function(scope) { scope = scope || document; _i18nCapture(scope); _i18nApply(scope, window.__lang || 'zh-tw'); };
 
 /* ── 切換選單與啟動 ── */
 document.addEventListener('DOMContentLoaded', () => {
