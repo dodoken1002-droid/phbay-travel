@@ -124,6 +124,16 @@ class PenghuAutumnWinterTests(unittest.TestCase):
         line = next(l for l in script.splitlines() if "text:'9–10 月（秋）'" in l)
         self.assertNotIn('festival', line)
 
+    def test_season_page_mobile_hero_and_top_note(self):
+        css = (ROOT / 'penghu-autumn-winter.css').read_text(encoding='utf-8')
+        # 375px 寬時 8 個字的標題要放得下，不可留下單獨的「湖。」
+        self.assertIn('.hero h1{font-size:clamp(32px,9.2vw,45px)}', css)
+        self.assertNotIn('.hero h1{font-size:45px}', css)
+        # 手機頂部資訊：先顯示每項，再隱藏分隔線與 LINE（順序反了 LINE 會被蓋回來）
+        hide = '.top-note .tn-sep,.top-note .tn-line{display:none}'
+        self.assertLess(css.index('.top-note .tn-item{display:block}'), css.index(hide))
+        self.assertIn('<span class="tn-item tn-line">官方 LINE @phbay2018</span>', self.page)
+
 
 if __name__ == '__main__':
     unittest.main()
