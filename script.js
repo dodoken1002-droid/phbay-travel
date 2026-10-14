@@ -957,9 +957,9 @@ const QUIZ_QUESTIONS = [
     q: '這趟你和誰一起來？',
     options: [
       { icon:'👨‍👩‍👧‍👦', text:'親子 / 全家出遊', sub:'帶著孩子一起探索',   scores:{ family:4, neihai:1 } },
-      { icon:'💑', text:'情侶 兩人',        sub:'浪漫慢步調',        scores:{ neihai:2, tides:2, festival:1 } },
-      { icon:'🎉', text:'一群朋友',          sub:'人多更熱鬧',        scores:{ festival:3, island:3 } },
-      { icon:'🏢', text:'公司員旅 / 揪團',   sub:'一起放鬆團體行',    scores:{ festival:2, island:2, family:1 } },
+      { icon:'💑', text:'情侶 兩人',        sub:'浪漫慢步調',        scores:{ neihai:2, tides:2 } },
+      { icon:'🎉', text:'一群朋友',          sub:'人多更熱鬧',        scores:{ island:3 } },
+      { icon:'🏢', text:'公司員旅 / 揪團',   sub:'一起放鬆團體行',    scores:{ island:2, family:1 } },
     ]
   },
   {
@@ -970,7 +970,6 @@ const QUIZ_QUESTIONS = [
       { icon:'📸', text:'拍照打卡', sub:'秘境美景收進相機',    scores:{ tides:3, neihai:2 } },
       { icon:'🍢', text:'在地美食', sub:'古厝老街、海味小吃',  scores:{ neihai:3, tides:1 } },
       { icon:'🍃', text:'慢旅行',   sub:'放空、看海、聽故事',  scores:{ neihai:3, tides:2 } },
-      { icon:'🎶', text:'音樂節',   sub:'夜間活動、熱鬧氣氛',  scores:{ festival:4 } },
     ]
   },
   {
@@ -978,9 +977,9 @@ const QUIZ_QUESTIONS = [
     q: '每人預算大概是？',
     options: [
       { icon:'💵', text:'NT$ 5,000 以下',    sub:'輕鬆玩就好',       scores:{ neihai:2, tides:2 } },
-      { icon:'💳', text:'NT$ 5,000–10,000',  sub:'合理預算體驗豐富', scores:{ family:2, island:2, festival:1 } },
-      { icon:'🌟', text:'NT$ 10,000 以上',   sub:'值得的體驗不計較', scores:{ festival:2, island:2, family:1 } },
-      { icon:'🤔', text:'還沒抓預算',         sub:'看推薦再決定',     scores:{ neihai:1, tides:1, family:1, island:1, festival:1 } },
+      { icon:'💳', text:'NT$ 5,000–10,000',  sub:'合理預算體驗豐富', scores:{ family:2, island:2 } },
+      { icon:'🌟', text:'NT$ 10,000 以上',   sub:'值得的體驗不計較', scores:{ island:2, family:1 } },
+      { icon:'🤔', text:'還沒抓預算',         sub:'看推薦再決定',     scores:{ neihai:1, tides:1, family:1, island:1 } },
     ]
   },
   {
@@ -989,7 +988,7 @@ const QUIZ_QUESTIONS = [
     options: [
       { icon:'⚡', text:'半天 / 一日',  sub:'順遊、時間有限',    scores:{ neihai:3, tides:2 } },
       { icon:'🌙', text:'2 天 1 夜',   sub:'週末快閃',          scores:{ neihai:2, tides:2, island:1 } },
-      { icon:'☀️', text:'3 天 2 夜',   sub:'剛剛好不趕又充實',  scores:{ festival:3, family:2, neihai:1 } },
+      { icon:'☀️', text:'3 天 2 夜',   sub:'剛剛好不趕又充實',  scores:{ family:2, neihai:1 } },
       { icon:'🏝️', text:'4 天 3 夜以上', sub:'深度慢遊玩個夠',   scores:{ island:3, family:1 } },
     ]
   },
@@ -1001,11 +1000,6 @@ const QUIZ_RESULTS = {
     desc: '你喜歡小而美、有人帶路的在地體驗。小城故事・內海巡禮很適合想輕鬆看海、聽故事、拍美照，也想避開大型人潮的旅人。',
     tour: { name:'小城故事・內海巡禮', duration:'約90分鐘', price:'試航價 NT$1,000 起', img:'/images/neihai-cruise-hero-2026.jpg', interest:'neihai', url:'/neihai-preorder.html', cta:'查看內海巡禮預購' },
   },
-  festival: {
-    type: '追風音樂節玩家 🎵',
-    desc: '你適合把白天的海島散步和晚上的音樂燈光節排在同一趟旅程裡。追風音樂節三天兩夜剛剛好，交通、住宿與活動節奏都交給潮旅協助安排。',
-    tour: { name:'追風音樂節三天兩夜', duration:'3天2夜', price:'專人報價', img:'/images/festival-poster.png', interest:'festival', url:'/preorder/festival', cta:'查看音樂節行程預購' },
-  },
   family: {
     type: '親子海島守護者 👨‍👩‍👧',
     desc: '家人的笑容是旅途中最美的風景！安全、溫馨又有趣的親子澎湖 3 天 2 夜，讓孩子與海洋親密接觸，留下一家人最珍貴的回憶。',
@@ -1016,12 +1010,43 @@ const QUIZ_RESULTS = {
     desc: '你熱愛海洋與探索，望安七美跳島最適合你！雙心石滬、綠蠵龜故鄉、大菓葉玄武岩，一次收集澎湖最經典的離島秘境。',
     tour: { name:'望安七美跳島', duration:'3–4天', price:'NT$ 6,999 起', img:'', interest:'turtle4d', cta:'立即諮詢這個行程' },
   },
+  indoor: {
+    type: '海島手作慢遊家 🐢',
+    desc: '冬天東北季風強，內海巡禮暫停預約，正好把行程換成室內手作：到赤崁博藤基地用養殖廢棄的蚵殼做小烏龜，再去湖西南寮社區磨豆漿、用海沙炒花生，風再大也玩得盡興。',
+    tour: { name:'冬季室內手作體驗', duration:'彈性安排', price:'專人報價', img:'', interest:'其他', note:'冬季室內手作：博藤蚵殼烏龜、南寮社區磨豆漿＋海沙炒花生', cta:'立即諮詢這個行程' },
+  },
   tides: {
     type: '潮汐秘境獵人 🌅',
     desc: '你懂得看時機玩澎湖！退潮才現身的摩西分海、S 彎沙灘與潮間帶秘境，跟著潮汐表安排，拍到別人拍不到的絕景。',
     tour: { name:'潮汐秘境玩法', duration:'彈性安排', price:'依行程報價', img:'/images/neihai-cruise-hero-2026.jpg', interest:'other', url:'/tides', cta:'查看潮汐查詢系統' },
   },
 };
+
+/* ── 封存：追風音樂節（2026-10-14 封存，活動 9/12–10/11 已結束）──
+   未被任何程式引用。明年活動公告後若要恢復：
+   1. 把 option 放回第三題「最想要的澎湖體驗」；2. 把 result 放回 QUIZ_RESULTS.festival；
+   3. totals 加回 festival:0；4. 依 weights 把 festival 加權放回各選項；
+   5. app.py 的 _QUIZ_AI_RESULTS 加回 'festival': '追風音樂節'。 */
+const QUIZ_ARCHIVED_FESTIVAL = {
+  option: { icon:'🎶', text:'音樂節',   sub:'夜間活動、熱鬧氣氛',  scores:{ festival:4 } },
+  result: {
+    type: '追風音樂節玩家 🎵',
+    desc: '你適合把白天的海島散步和晚上的音樂燈光節排在同一趟旅程裡。追風音樂節三天兩夜剛剛好，交通、住宿與活動節奏都交給潮旅協助安排。',
+    tour: { name:'追風音樂節三天兩夜', duration:'3天2夜', price:'專人報價', img:'/images/festival-poster.png', interest:'festival', url:'/preorder/festival', cta:'查看音樂節行程預購' },
+  },
+  weights: {
+    '情侶 兩人': 1, '一群朋友': 3, '公司員旅 / 揪團': 2,
+    'NT$ 5,000–10,000': 1, 'NT$ 10,000 以上': 2, '還沒抓預算': 1, '3 天 2 夜': 3,
+  },
+};
+
+// 內海巡禮暫停預約到這天（台灣時間，與 index.html 內海按鈕 data-open-from、app.py NEIHAI_CLOSED_PERIODS 一致）；
+// 之前算出內海的人改推冬季室內手作，到這天起自動恢復推薦內海。
+const QUIZ_NEIHAI_REOPEN = '2027-03-01';
+function quizSeasonalResult(key) {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
+  return (key === 'neihai' && today < QUIZ_NEIHAI_REOPEN) ? 'indoor' : key;
+}
 
 let quizAnswers = [];
 let quizAnswerTexts = [];   // 保留題目與選項文字，供 AI 個人化建議使用
@@ -1075,17 +1100,17 @@ window.quizAnswer = function(qIdx, optIdx) {
 };
 
 function renderQuizResult(forcedKey, fromShare = false) {
-  const totals = { neihai:0, festival:0, family:0, island:0, tides:0 };
+  const totals = { neihai:0, family:0, island:0, tides:0 };
   quizAnswers.forEach(s => Object.entries(s).forEach(([k,v]) => { if (k in totals) totals[k] = (totals[k]||0) + v; }));
-  const best = (forcedKey && QUIZ_RESULTS[forcedKey]) ? forcedKey
-    : Object.entries(totals).sort((a,b) => b[1]-a[1])[0][0];
+  const best = quizSeasonalResult((forcedKey && QUIZ_RESULTS[forcedKey]) ? forcedKey
+    : Object.entries(totals).sort((a,b) => b[1]-a[1])[0][0]);
   const r = QUIZ_RESULTS[best];
   const wrap = document.getElementById('quiz-wrap');
   const shareUrl = `${window.location.origin}${window.location.pathname}?quiz=${encodeURIComponent(best)}#quiz`;
   const primaryHref = r.tour.url || '#contact';
   const primaryAction = r.tour.url
     ? ` onclick="trackQuizCta('${best}','preorder')"`
-    : ` onclick="prefillTour('${r.tour.interest}');trackQuizCta('${best}','contact')"`;
+    : ` onclick="prefillTour('${r.tour.interest}','${r.tour.note || ''}');trackQuizCta('${best}','contact')"`;
   if (typeof gtag === 'function') {
     gtag('event', 'quiz_result', { result_type: r.type, content_name: r.tour.name });
   }
@@ -1115,7 +1140,7 @@ function renderQuizResult(forcedKey, fromShare = false) {
       </div>
       <p class="quiz-share-note">把結果傳給 LINE 專人幫你排，或留資料領取專屬的澎湖行程建議表，我們依你的玩法安排日期、交通與行程。</p>
       <div class="quiz-result-actions">
-        <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" rel="noopener noreferrer" class="btn btn-primary" onclick="prefillTour('${r.tour.interest}');trackQuizCta('${best}','line')">
+        <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" rel="noopener noreferrer" class="btn btn-primary" onclick="prefillTour('${r.tour.interest}','${r.tour.note || ''}');trackQuizCta('${best}','line')">
           <i class="fab fa-line"></i> 把結果傳給 LINE 專人幫我排
         </a>
         <button class="btn btn-outline" onclick="openQuizLead('${best}')">
@@ -1196,9 +1221,11 @@ function resetQuizShareUrl() {
 }
 window.resetQuizShareUrl = resetQuizShareUrl;
 
-function prefillTour(interest) {
+function prefillTour(interest, note) {
   const sel = document.getElementById('tour-interest');
   if (sel && interest) sel.value = interest;
+  const notes = document.getElementById('notes');
+  if (notes && note && !notes.value.trim()) notes.value = note;
 }
 window.prefillTour = prefillTour;
 
