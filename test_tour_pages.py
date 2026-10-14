@@ -188,7 +188,8 @@ class TourRouteTests(unittest.TestCase):
         self.assertIn('<html lang="en">', index_html)
         self.assertIn('Penghu South Sea Day Tours', index_html)
         self.assertIn('href="https://www.phbay.info/tours?type=south-sea&lang=en"', index_html)
-        self.assertIn('Official travel partner', index_html)
+        self.assertNotIn('Official travel partner', index_html)  # 追風音樂節已結束，資訊列不再宣傳
+        self.assertIn('交觀乙第1864號', index_html)
         self.assertIn('/tours?type=south-sea&lang=ja', index_html)
         self.assertEqual(detail.status_code, 200)
         self.assertIn('South Penghu Four Islands', detail_html)
