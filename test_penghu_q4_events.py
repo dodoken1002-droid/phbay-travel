@@ -91,6 +91,13 @@ class PenghuQ4EventAssetsTests(unittest.TestCase):
         for key in ('events.gallery.title', 'events.gallery.note'):
             self.assertEqual(i18n.count(f"'{key}'"), 4, key)
 
+    def test_bottom_banner_no_longer_promotes_ended_festival(self):
+        banner = re.search(r'<div class="bottom-banner" id="bottom-banner">(.*?)</div>',
+                           self.index, re.S).group(1)
+        self.assertNotIn('追風', banner)
+        self.assertNotIn('banner-festival', banner)
+        self.assertIn('class="banner-line-btn"', banner)
+
     def test_great_march_keeps_organizer_time_and_notice(self):
         self.assertIn('2026 澎湖大行軍 11/07 08:30–11:30', self.index)
         self.assertIn('時間依行前通知', self.index)
