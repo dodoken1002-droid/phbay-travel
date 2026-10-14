@@ -1364,6 +1364,12 @@ function initCarousel() {
   const dotsEl = document.getElementById('carousel-dots');
   if (!track) return;
 
+  // 活動格 data-event-end（台灣時間）過了就移除，避免首頁輪播掛著已結束的活動
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
+  track.querySelectorAll('.carousel-slide[data-event-end]').forEach(slide => {
+    if (slide.dataset.eventEnd < today) slide.remove();
+  });
+
   _carouselTotal = track.children.length;
 
   // 建立圓點
@@ -1395,7 +1401,11 @@ function initCarousel() {
 
 function carouselGoTo(idx) {
   _carouselIdx = (idx + _carouselTotal) % _carouselTotal;
-  document.getElementById('carousel-track').style.transform = `translateX(-${_carouselIdx * 100}%)`;
+  const track = document.getElementById('carousel-track');
+  track.style.transform = `translateX(-${_carouselIdx * 100}%)`;
+  // 活動 banner 的字在圖左側，手機版箭頭改放到上方照片區（見 style.css .on-banner）
+  document.getElementById('main-carousel').classList.toggle(
+    'on-banner', track.children[_carouselIdx].classList.contains('slide-banner'));
   document.querySelectorAll('.carousel-dot').forEach((d, i) => {
     d.classList.toggle('active', i === _carouselIdx);
   });

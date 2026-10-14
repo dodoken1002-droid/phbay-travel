@@ -39,7 +39,7 @@ class PlannerHomeEntryTests(unittest.TestCase):
         self.assertNotIn('(Chinese)', blocks['zh-cn'], '簡體中文讀得懂試排器，不需要標示')
         for name in ('faq.html', 'privacy.html', 'terms.html', 'tides.html', 'index.html'):
             source = (ROOT / name).read_text(encoding='utf-8')
-            self.assertNotRegex(source, r'i18n\.js\?v=(?!20261001b)',
+            self.assertNotRegex(source, r'i18n\.js\?v=(?!20261014b)',
                                 f'{name} 的 i18n.js 版本要更新，否則會吃到舊快取')
 
     def test_planner_stays_noindex_and_out_of_sitemap_contract(self):

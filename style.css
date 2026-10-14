@@ -305,6 +305,20 @@ ul { list-style: none; }
   display: block;
 }
 
+/* 活動 banner 格（桌機 1920×720、手機換 1080×1350）：字都在圖裡，一律 contain 不裁切 */
+.slide-banner {
+  height: 100vh;
+  background: linear-gradient(180deg, #eaf6f8 0%, #fdfbf6 100%);
+}
+.slide-banner-link,
+.slide-banner picture { display: block; width: 100%; height: 100%; }
+.slide-banner img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
 /* 潮旅主視覺（原 hero 樣式） */
 .slide-hero {
   min-height: 100vh;
@@ -1667,6 +1681,8 @@ ul { list-style: none; }
   /* 16:9 滿版圖在直式螢幕改為完整顯示（不裁字），高度縮為 60vh 減少上下留白 */
   .slide-cover { height: 60vh; }
   .slide-cover img { object-fit: contain; }
+  .slide-banner { height: 60vh; }
+  .carousel.on-banner .carousel-arrow { top: 28%; }
   .slide-poster, .slide-promo { height: 60vh; }
   .slide-poster img, .slide-promo img { max-height: 60vh; }
   .slide-hero { min-height: 60vh; }
@@ -1877,3 +1893,16 @@ ul { list-style: none; }
 
 /* 首頁活動快訊：已結束的單場日期 */
 .qa-card strong.event-past { text-decoration: line-through; opacity: .5; }
+
+/* 首頁活動快訊：10–12 月總覽與月曆圖（完整顯示，不裁切） */
+.event-gallery { margin-top: 36px; }
+.event-gallery-title { color: var(--blue-dark); font-size: 1.15rem; text-align: center; margin-bottom: 6px; }
+.event-gallery-note { color: var(--text-mid); font-size: .9rem; text-align: center; margin-bottom: 18px; }
+.event-gallery figure { margin: 0; }
+.event-gallery img {
+  display: block; width: 100%; height: auto;
+  border-radius: 14px; border: 1px solid #e6edf3; box-shadow: 0 2px 10px rgba(0,0,0,.05);
+  background: var(--white);
+}
+.event-gallery figure.event-gallery-main { margin-bottom: 20px; }
+.event-gallery-months { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }

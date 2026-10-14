@@ -51,7 +51,7 @@
   <!-- 預載首屏輪播 LCP 圖（WebP），加速最大內容繪製 -->
   <link rel="preload" as="image" href="/images/neihai-cruise-hero-2026.webp" type="image/webp" fetchpriority="high" />
 
-  <link rel="stylesheet" href="style.css?v=20261001b" />
+  <link rel="stylesheet" href="style.css?v=20261014b" />
   <!-- Font Awesome：非阻塞載入（先以 print 媒體載入，完成後切回 all），避免拖慢首屏渲染 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" media="print" onload="this.media='all'" />
   <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" /></noscript>
@@ -309,6 +309,52 @@
           </div>
         </div>
 
+        <!-- ─ 2026 Q4 澎湖活動（桌機 1920×720／手機 1080×1350，完整顯示不裁字）
+             data-event-end 過了由 script.js initCarousel() 移除該格。點圖捲到活動快訊。─ -->
+        <div class="carousel-slide slide-banner" data-event-end="2026-10-31">
+          <a class="slide-banner-link" href="#events-2026">
+            <picture>
+              <source media="(max-width: 768px)" srcset="/images/events/penghu-2026-q4/carousel-lintou-fishing-net-mobile.webp" type="image/webp" />
+              <source media="(max-width: 768px)" srcset="/images/events/penghu-2026-q4/carousel-lintou-fishing-net-mobile.png" />
+              <source srcset="/images/events/penghu-2026-q4/carousel-lintou-fishing-net.webp" type="image/webp" />
+              <img src="/images/events/penghu-2026-q4/carousel-lintou-fishing-net.png" alt="2026 林投牽罟趣 10/17、10/25、10/31，湖西鄉林投聚落／林投沙灘，10/11 梯次已結束，官方未公布時間，已公告" width="1920" height="720" loading="lazy" decoding="async" />
+            </picture>
+          </a>
+        </div>
+
+        <div class="carousel-slide slide-banner" data-event-end="2026-11-01">
+          <a class="slide-banner-link" href="#events-2026">
+            <picture>
+              <source media="(max-width: 768px)" srcset="/images/events/penghu-2026-q4/carousel-penghu-cross-sea-marathon-mobile.webp" type="image/webp" />
+              <source media="(max-width: 768px)" srcset="/images/events/penghu-2026-q4/carousel-penghu-cross-sea-marathon-mobile.png" />
+              <source srcset="/images/events/penghu-2026-q4/carousel-penghu-cross-sea-marathon.webp" type="image/webp" />
+              <img src="/images/events/penghu-2026-q4/carousel-penghu-cross-sea-marathon.png" alt="菊島澎湖跨海馬拉松 11/01 06:00–15:00，澎湖跨海賽道，已公告" width="1920" height="720" loading="lazy" decoding="async" />
+            </picture>
+          </a>
+        </div>
+
+        <div class="carousel-slide slide-banner" data-event-end="2026-11-07">
+          <a class="slide-banner-link" href="#events-2026">
+            <picture>
+              <source media="(max-width: 768px)" srcset="/images/events/penghu-2026-q4/carousel-penghu-great-march-mobile.webp" type="image/webp" />
+              <source media="(max-width: 768px)" srcset="/images/events/penghu-2026-q4/carousel-penghu-great-march-mobile.png" />
+              <source srcset="/images/events/penghu-2026-q4/carousel-penghu-great-march.webp" type="image/webp" />
+              <img src="/images/events/penghu-2026-q4/carousel-penghu-great-march.png" alt="2026 澎湖大行軍 11/07 08:30–11:30，縣府廣場、澎湖跨海大橋，時間依行前通知，已公告" width="1920" height="720" loading="lazy" decoding="async" />
+            </picture>
+          </a>
+        </div>
+
+        <div class="carousel-slide slide-banner" data-event-end="2027-01-31">
+          <a class="slide-banner-link" href="#events-2026">
+            <picture>
+              <source media="(max-width: 768px)" srcset="/images/events/penghu-2026-q4/carousel-like-penghu-slow-travel-mobile.webp" type="image/webp" />
+              <source media="(max-width: 768px)" srcset="/images/events/penghu-2026-q4/carousel-like-penghu-slow-travel-mobile.png" />
+              <source srcset="/images/events/penghu-2026-q4/carousel-like-penghu-slow-travel.webp" type="image/webp" />
+              <img src="/images/events/penghu-2026-q4/carousel-like-penghu-slow-travel.png" alt="Like 澎湖 幸福慢旅 10/16 起至 2027/01/31，澎湖全縣免費交通與 9 大場館，深度小旅行日期待官方公告，待確認" width="1920" height="720" loading="lazy" decoding="async" />
+            </picture>
+          </a>
+        </div>
+
         <!-- ─ 潮旅主視覺 ─ -->
         <div class="carousel-slide slide-hero">
           <div class="hero-overlay"></div>
@@ -414,6 +460,46 @@
         <div class="qa-card" data-event-end="2026-11-01">
           <h3><i class="fas fa-person-running"></i> <span data-i18n="events.e3.title">菊島澎湖跨海馬拉松｜11/1</span></h3>
           <p data-i18n-html="events.e3.desc"><strong>11/1（日）</strong>開跑，設全馬 42K、半馬 21K、體驗組 11K 與休閒組 5K，路線行經跨海大橋、飽覽海景。想邊跑邊玩，潮旅可協助安排住宿與賽後行程。</p>
+        </div>
+      </div>
+
+      <!-- 10–12 月活動總覽與月曆圖（WebP 為主、PNG 備援）；月曆過了該月由 markPastEvents() 隱藏 -->
+      <div class="event-gallery">
+        <h3 class="event-gallery-title" data-i18n="events.gallery.title">10–12 月活動總覽與行事曆</h3>
+        <p class="event-gallery-note" data-i18n="events.gallery.note">青綠＝已公告｜琥珀＝待確認。活動資訊以主辦單位最新公告為準。</p>
+        <figure class="event-gallery-main" data-event-end="2026-12-31">
+          <a href="/images/events/penghu-2026-q4/penghu-2026-q4-events-overview.webp" target="_blank" rel="noopener">
+            <picture>
+              <source srcset="/images/events/penghu-2026-q4/penghu-2026-q4-events-overview.webp" type="image/webp" />
+              <img src="/images/events/penghu-2026-q4/penghu-2026-q4-events-overview.png" alt="2026 澎湖秋冬活動總覽：林投牽罟趣 10/17、10/25、10/31；Like 澎湖免費遊 10/16 起；跨海馬拉松 11/01；澎湖大行軍 11/07 08:30–11:30（依行前通知）；湖東、成功、南寮、媽宮城主題小旅行日期待公布" width="1920" height="1080" loading="lazy" decoding="async" />
+            </picture>
+          </a>
+        </figure>
+        <div class="event-gallery-months">
+          <figure data-event-end="2026-10-31">
+            <a href="/images/events/penghu-2026-q4/penghu-2026-10-calendar.webp" target="_blank" rel="noopener">
+              <picture>
+                <source srcset="/images/events/penghu-2026-q4/penghu-2026-10-calendar.webp" type="image/webp" />
+                <img src="/images/events/penghu-2026-q4/penghu-2026-10-calendar.png" alt="2026 年 10 月澎湖活動行事曆" width="1400" height="1200" loading="lazy" decoding="async" />
+              </picture>
+            </a>
+          </figure>
+          <figure data-event-end="2026-11-30">
+            <a href="/images/events/penghu-2026-q4/penghu-2026-11-calendar.webp" target="_blank" rel="noopener">
+              <picture>
+                <source srcset="/images/events/penghu-2026-q4/penghu-2026-11-calendar.webp" type="image/webp" />
+                <img src="/images/events/penghu-2026-q4/penghu-2026-11-calendar.png" alt="2026 年 11 月澎湖活動行事曆" width="1400" height="1200" loading="lazy" decoding="async" />
+              </picture>
+            </a>
+          </figure>
+          <figure data-event-end="2026-12-31">
+            <a href="/images/events/penghu-2026-q4/penghu-2026-12-calendar.webp" target="_blank" rel="noopener">
+              <picture>
+                <source srcset="/images/events/penghu-2026-q4/penghu-2026-12-calendar.webp" type="image/webp" />
+                <img src="/images/events/penghu-2026-q4/penghu-2026-12-calendar.png" alt="2026 年 12 月澎湖活動行事曆" width="1400" height="1200" loading="lazy" decoding="async" />
+              </picture>
+            </a>
+          </figure>
         </div>
       </div>
     </div>
@@ -1004,10 +1090,10 @@
     <i class="fas fa-chevron-up"></i>
   </button>
 
-  <script src="i18n.js?v=20261001b"></script>
+  <script src="i18n.js?v=20261014b"></script>
   <script src="itinerary-analytics.js?v=20261001b"></script>
   <script src="itinerary-prefill.js?v=20261001b"></script>
-  <script src="script.js?v=20261014a"></script>
+  <script src="script.js?v=20261014b"></script>
   <a href="https://wa.me/886912151788" class="wa-float" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp 諮詢" title="WhatsApp 諮詢"><i class="fab fa-whatsapp"></i></a>
 </body>
 </html>
