@@ -1897,3 +1897,30 @@ ul { list-style: none; }
 }
 .event-gallery figure.event-gallery-main { margin-bottom: 20px; }
 .event-gallery-months { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+
+/* 2026 秋冬季節入口：首頁只保留單一入口，完整資訊集中到季節頁。 */
+.slide-autumn-entry { position: relative; min-height: min(720px, 72vh); overflow: hidden; background: #fff9ef; }
+.slide-autumn-entry > img { width: 100%; height: 100%; object-fit: cover; }
+.slide-autumn-shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(255,249,239,.98) 0%, rgba(255,249,239,.9) 43%, rgba(255,249,239,.1) 74%); }
+.slide-autumn-copy { position: absolute; z-index: 2; left: max(6vw, 64px); top: 50%; width: min(620px, 48vw); transform: translateY(-50%); color: #123f52; }
+.slide-autumn-copy p { margin: 0 0 10px; color: #b5482a; font-size: .8rem; font-weight: 900; letter-spacing: .18em; }
+.slide-autumn-copy h2 { margin: 0; font-family: "Noto Serif TC", serif; font-size: clamp(2.5rem, 5vw, 4.6rem); line-height: 1.14; }
+.slide-autumn-copy > span { display: block; margin: 18px 0 26px; color: #4f6b78; font-size: 1.05rem; }
+.season-entry { padding: 76px 0; background: linear-gradient(120deg, #fff9ef, #eef8f5); }
+.season-entry-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 58px; align-items: center; }
+.season-entry-copy h2 { margin: 8px 0 16px; color: #123f52; font-family: "Noto Serif TC", serif; font-size: clamp(1.7rem, 3.4vw, 2.75rem); line-height: 1.25; }
+.season-entry-copy > p { color: #4f6b78; font-size: 1.05rem; }
+.season-entry-actions { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; margin-top: 26px; }
+.season-entry-link { color: #075761; font-weight: 800; text-decoration: none; }
+.season-entry-image { display: block; border-radius: 26px; overflow: hidden; box-shadow: 0 18px 55px rgba(22,74,84,.14); }
+.season-entry-image img { display: block; width: 100%; aspect-ratio: 16/10; object-fit: cover; }
+@media (max-width: 768px) {
+  .slide-autumn-entry { min-height: 68vh; }
+  .slide-autumn-entry > img { object-position: 72% center; }
+  .slide-autumn-shade { background: linear-gradient(0deg, rgba(255,249,239,.98) 0%, rgba(255,249,239,.94) 52%, rgba(255,249,239,.1) 82%); }
+  .slide-autumn-copy { left: 24px; right: 24px; top: auto; bottom: 64px; width: auto; transform: none; }
+  .slide-autumn-copy h2 { font-size: clamp(2rem, 9.2vw, 3.2rem); }
+  .slide-autumn-copy > span { font-size: .95rem; }
+  .season-entry-grid { grid-template-columns: 1fr; gap: 30px; }
+  .season-entry { padding: 58px 0; }
+}
