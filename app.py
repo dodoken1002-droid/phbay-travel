@@ -3971,7 +3971,8 @@ def _quiz_ai_rate_ok(ip):
         _QUIZ_AI_HITS.clear()
     return True
 
-_QUIZ_AI_RESULTS = {'neihai': '內海慢遊', 'festival': '追風音樂節', 'family': '親子海島',
+# 'festival': '追風音樂節' 已於 2026-10-14 隨行程診斷音樂節結果一起封存（見 script.js QUIZ_ARCHIVED_FESTIVAL）
+_QUIZ_AI_RESULTS = {'neihai': '內海慢遊', 'family': '親子海島',
                     'island': '望安七美跳島', 'tides': '潮汐秘境'}
 
 @app.route('/api/quiz-ai', methods=['POST'])
