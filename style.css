@@ -385,15 +385,6 @@ ul { list-style: none; }
   transform: scale(1.25);
 }
 
-/* ── 底部 Banner 音樂節樣式 ── */
-.banner-festival {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0 6px;
-}
-.banner-festival-tag  { background:rgba(255,255,255,.2); border-radius:12px; padding:1px 8px; font-weight:800; }
-.banner-festival-name { font-weight:800; letter-spacing:.02em; }
 .d-mobile-none { }
 
 /* ── 保留舊 .hero 選擇器相容性 ── */
