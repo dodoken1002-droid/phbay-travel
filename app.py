@@ -920,6 +920,11 @@ def index():
     return send_from_directory('.', 'index.html')
 
 
+@app.route('/penghu-autumn-winter')
+def penghu_autumn_winter():
+    return send_from_directory('.', 'penghu-autumn-winter.html')
+
+
 @app.route('/penghu-100')
 @app.route('/member/dashboard')
 def member_pages():
@@ -5789,6 +5794,7 @@ def dynamic_sitemap():
     # 靜態頁不給 lastmod：Railway 每次建置都把檔案 mtime 重設成建置時間，
     # 以前用 mtime 會讓首頁等天天顯示「今天更新」，Google 會因此不再相信整份 lastmod。
     urls = [(f'{SITE}/', '1.0', 'weekly'),
+            (f'{SITE}/penghu-autumn-winter', '0.9', 'weekly'),
             (f'{SITE}/faq.html', '0.8', 'monthly'),
             (f'{SITE}/blog', '0.7', 'weekly'),
             (f'{SITE}/tides', '0.7', 'daily'),

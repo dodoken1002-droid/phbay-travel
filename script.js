@@ -948,7 +948,7 @@ const QUIZ_QUESTIONS = [
     options: [
       { icon:'🌸', text:'3–5 月（春）',  sub:'大潮季、秘境現身',      scores:{ tides:3, neihai:1 } },
       { icon:'☀️', text:'6–8 月（夏）',  sub:'跳島旺季、暑假出遊',    scores:{ island:3, family:2, neihai:1 } },
-      { icon:'🎆', text:'9–10 月（秋）', sub:'追風音樂燈光節登場',    scores:{ festival:4, neihai:1 } },
+      { icon:'🍂', text:'9–10 月（秋）', sub:'聚落慢旅與秋季活動',    scores:{ tides:3, family:1 } },
       { icon:'🧭', text:'冬季 / 還沒決定', sub:'看推薦再決定',          scores:{ neihai:2, tides:1, family:1 } },
     ]
   },
@@ -1403,9 +1403,9 @@ function carouselGoTo(idx) {
   _carouselIdx = (idx + _carouselTotal) % _carouselTotal;
   const track = document.getElementById('carousel-track');
   track.style.transform = `translateX(-${_carouselIdx * 100}%)`;
-  // 活動 banner 的字在圖左側，手機版箭頭改放到上方照片區（見 style.css .on-banner）
+  // 字壓在圖上的格（活動 banner、秋冬入口），手機版箭頭改放到上方照片區（見 style.css .on-banner）
   document.getElementById('main-carousel').classList.toggle(
-    'on-banner', track.children[_carouselIdx].classList.contains('slide-banner'));
+    'on-banner', track.children[_carouselIdx].matches('.slide-banner, .slide-autumn-entry'));
   document.querySelectorAll('.carousel-dot').forEach((d, i) => {
     d.classList.toggle('active', i === _carouselIdx);
   });
