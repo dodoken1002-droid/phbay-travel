@@ -2626,6 +2626,18 @@ NEIHAI_BASE_TIMES = ("09:00", "11:00")
 NEIHAI_THIRD_TIME = "16:30"                      # 2026-07-06 起每日加開第三時段
 NEIHAI_THIRD_TIME_START = date(2026, 7, 6)
 NEIHAI_FIREWORKS_TIME = "20:30"                  # 花火專船：2026 年 7、8 月每週二
+# 停止前台預約的期間（含首尾日）：前台顯示「已關閉」且不能送單；後台改單、匯入不受影響。
+NEIHAI_CLOSED_PERIODS = (
+    (date(2026, 10, 14), date(2027, 2, 28), "冬季暫停預約，2027/3/1 起開放"),
+)
+
+
+def _neihai_closed_reason(d):
+    """指定日期落在暫停預約期間就回傳原因，否則回傳 None。"""
+    for start, end, reason in NEIHAI_CLOSED_PERIODS:
+        if start <= d <= end:
+            return reason
+    return None
 
 
 def _neihai_times_for_date(d):
@@ -2842,7 +2854,12 @@ def _neihai_month_availability(start, end):
             min_people = int(row.get("min_people") or NEIHAI_MIN_PEOPLE)
             booked = int(row.get("booked") or 0)
             is_active = row.get("is_active", True)
+            closed_reason = _neihai_closed_reason(d)
+            if closed_reason:
+                is_active = False
             code, label, remaining, needed = _sailing_status(booked, capacity, min_people, is_active)
+            if closed_reason:
+                label = closed_reason
             items.append({
                 "id": row.get("id"),
                 "date": str(d),
@@ -2890,6 +2907,9 @@ def create_neihai_preorder():
         return jsonify(ok=False, error=str(e)), 400
     if _sailing_departed(sailing_date, sailing_time):
         return jsonify(ok=False, error="此船班已過出航時間，請重新整理頁面選擇其他日期"), 400
+    closed_reason = _neihai_closed_reason(sailing_date)
+    if closed_reason:
+        return jsonify(ok=False, error=f"此日期{closed_reason}"), 400
 
     passengers = data.get("passengers") or []
     if not isinstance(passengers, list) or not (1 <= len(passengers) <= NEIHAI_DEFAULT_CAPACITY):
@@ -5226,7 +5246,7 @@ def _blog_hreflang(path_no_lang, avail):
 def _render_blog(title, desc, canonical, body, head_extra='', image=None, lang='zh-tw', alt_links=''):
     img = image or f'{SITE}/images/festival-poster.jpg'
     nav = '''<div class="top-banner"><div class="banner-static"><span>潮旅國際旅行社</span><span class="banner-sep">｜</span><span>2026 澎湖追風音樂燈光節 官方合作旅行社</span><span class="banner-sep">｜</span><span>電話：06-9271288</span></div></div>
-<nav class="navbar" id="navbar"><div class="nav-container"><a href="/" class="nav-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a><button class="nav-toggle" id="nav-toggle" aria-label="選單"><span></span><span></span><span></span></button><ul class="nav-links" id="nav-links"><li><a href="/">首頁</a></li><li><a href="/tours">行程介紹</a></li><li class="nav-item has-submenu"><a href="/neihai-preorder.html">預購行程 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/neihai-preorder.html">小城故事內海巡禮</a></li><li><a href="/preorder/festival">追風音樂節</a></li></ul></li><li class="nav-item has-submenu"><a href="/blog">旅遊大小事 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/tides">潮汐查詢系統</a></li><li><a href="/penghu-itinerary-recommendations/planner?src=nav">自己排行程</a></li><li><a href="/blog">旅遊文章分享</a></li><li><a href="/faq.html">常見問題</a></li><li><a href="/reviews">旅客評價</a></li></ul></li><li class="nav-item has-submenu"><a href="/#about">關於我們 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/#contact">聯絡資訊</a></li></ul></li></ul></div></nav>'''
+<nav class="navbar" id="navbar"><div class="nav-container"><a href="/" class="nav-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a><button class="nav-toggle" id="nav-toggle" aria-label="選單"><span></span><span></span><span></span></button><ul class="nav-links" id="nav-links"><li><a href="/">首頁</a></li><li><a href="/tours">行程介紹</a></li><li class="nav-item has-submenu"><a href="/neihai-preorder.html">預購行程 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/neihai-preorder.html">小城故事內海巡禮</a></li></ul></li><li class="nav-item has-submenu"><a href="/blog">旅遊大小事 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/tides">潮汐查詢系統</a></li><li><a href="/penghu-itinerary-recommendations/planner?src=nav">自己排行程</a></li><li><a href="/blog">旅遊文章分享</a></li><li><a href="/faq.html">常見問題</a></li><li><a href="/reviews">旅客評價</a></li></ul></li><li class="nav-item has-submenu"><a href="/#about">關於我們 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/#contact">聯絡資訊</a></li></ul></li></ul></div></nav>'''
     footer = '''<footer class="footer"><div class="container"><div class="footer-bottom"><p>© 2026 潮旅國際旅行社 All Rights Reserved.｜<a href="/" style="color:inherit">官網</a>｜<a href="/blog" style="color:inherit">部落格</a>｜<a href="/reviews" style="color:inherit">旅客評價</a>｜<a href="/privacy" style="color:inherit">隱私權政策</a>｜<a href="/terms" style="color:inherit">使用條款</a></p></div></div></footer>
 <script>(function(){var t=document.getElementById('nav-toggle'),l=document.getElementById('nav-links');if(t)t.addEventListener('click',function(){l.classList.toggle('open')});var lb=document.getElementById('lang-btn'),lm=document.getElementById('lang-menu');if(lb)lb.addEventListener('click',function(e){e.stopPropagation();lm.classList.toggle('open')});document.addEventListener('click',function(){if(lm)lm.classList.remove('open')});})();</script>'''
     # 還沒有真實評價時不放「旅客評價」入口：一個點進去只寫「整理中」的頁面比沒有更扣信任感。
@@ -5530,7 +5550,6 @@ def blog_post(slug):
             f'<div class="blog-cta"><h3 style="color:var(--blue-dark);margin-bottom:10px">{ui["cta_h"]}</h3>'
             f'<a href="/#contact" class="btn btn-primary"><i class="fas fa-comment-dots"></i> {ui["consult"]}</a> '
             f'<a href="/neihai-preorder.html" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-ship"></i> {ui["neihai"]}</a> '
-            f'<a href="/preorder/festival" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-music"></i> {ui["festival"]}</a> '
             f'<a href="/#quiz" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-compass"></i> {ui["quiz"]}</a>'
             f'</div></article>')
     return _render_blog(f'{p["title"]} - 潮旅國際旅行社部落格', desc, canonical, body, head_extra,
