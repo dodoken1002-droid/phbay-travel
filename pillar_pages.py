@@ -748,7 +748,7 @@ def _build_pages():
         ld_blocks = ([_article_ld(slug, p['title'], p['desc'], p.get('published', '2026-07-19')),
                       _breadcrumb_ld(trail), _faq_ld(p['faq'])] + p['extra_ld'])
         head_extra = PILLAR_STYLE + ''.join(
-            '<script type="application/ld+json">' + json.dumps(d, ensure_ascii=False) + '</script>'
+            '<script type="application/ld+json">' + json.dumps(d, ensure_ascii=False).replace('</', '<\\/') + '</script>'
             for d in ld_blocks)
         pages[slug] = dict(title=p['title'], desc=p['desc'],
                            canonical=f'{SITE}/{slug}', body=p['body'],

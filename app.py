@@ -4898,7 +4898,7 @@ def _render_preorder_template(slug, product=None):
         f'  <meta name="twitter:title" content="{safe_title}" />\n'
         f'  <meta name="twitter:description" content="{safe_desc}" />\n'
         f'  <meta name="twitter:image" content="{safe_image}" />\n'
-        f'  <script type="application/ld+json">{json.dumps(seo["graph"], ensure_ascii=False)}</script>'
+        f'  {_ld_script(seo["graph"])}'
     )
     html_doc = re.sub(r'<title>.*?</title>', f'<title>{safe_title}</title>', html_doc, count=1, flags=re.S | re.I)
     html_doc = re.sub(
@@ -5034,6 +5034,23 @@ def load_reviews():
             'source': str(r.get('source') or '').strip(),
         })
     return out
+
+def _ld_script(obj):
+    """JSON-LD → <script> 標籤。'</' 必須跳脫：標題、FAQ、旅客評價裡若出現
+    </script>，會提早關閉標籤，後面的字串就變成可執行的 HTML。"""
+    return ('<script type="application/ld+json">'
+            + json.dumps(obj, ensure_ascii=False).replace('</', '<\\/') + '</script>')
+
+def _ld_abs_url(src):
+    """結構化資料的圖片要絕對網址；相對路徑補上 SITE，data: 等無法被抓取的回傳 None。"""
+    src = (src or '').strip()
+    if src.startswith(('http://', 'https://')):
+        return src
+    if src.startswith('//'):
+        return 'https:' + src
+    if not src or ':' in src.split('/', 1)[0]:
+        return None
+    return urllib.parse.urljoin(f'{SITE}/', src)
 
 def _breadcrumb_ld(trail):
     """trail: [(name, url), ...] → BreadcrumbList JSON-LD dict。"""
@@ -5429,8 +5446,7 @@ def blog_index():
     _path_no_lang = '/blog' + ('?' + '&'.join(_pnl_parts) if _pnl_parts else '')
     alt_links = _blog_hreflang(_path_no_lang, list(BLOG_LANGS))
     head_extra = (rel_links
-                  + '<script type="application/ld+json">' + json.dumps(_breadcrumb_ld(trail), ensure_ascii=False) + '</script>'
-                  + '<script type="application/ld+json">' + json.dumps(item_list, ensure_ascii=False) + '</script>')
+                  + _ld_script(_breadcrumb_ld(trail)) + _ld_script(item_list))
     return _render_blog(title, desc, canonical, body, head_extra, lang=lang, alt_links=alt_links)
 
 def _pillar_link_for_tags(tags):
@@ -5482,28 +5498,27 @@ def blog_post(slug):
     tags = ''.join(f'<span class="post-tag">{_html.escape(t.strip())}</span>' for t in (p.get('tags') or '').split(',') if t.strip())
     canonical = f'{SITE}/blog/{slug}' + (f'?lang={lang}' if lang != 'zh-tw' else '')
     ld = {
-        "@context": "https://schema.org", "@type": "Article",
+        "@context": "https://schema.org", "@type": "Article", "@id": f"{canonical}#article",
         "headline": p['title'], "description": desc,
         "datePublished": str(p.get('published_at') or p.get('created_at') or ''),
-        "dateModified": str(p.get('updated_at') or ''),
         "author": {"@type": "Organization", "name": p.get('author') or '潮旅國際旅行社'},
         "publisher": {"@type": "Organization", "name": "潮旅國際旅行社",
                       "logo": {"@type": "ImageObject", "url": f"{SITE}/images/festival-poster.jpg"}},
         "mainEntityOfPage": canonical, "url": canonical,
         "inLanguage": BLOG_HTML_LANG.get(lang, "zh-TW")
     }
+    if p.get('updated_at'):          # 空字串不是合法日期，沒有就整個不給
+        ld['dateModified'] = str(p['updated_at'])
     imgs = []
-    if p.get('cover_image'):
-        imgs.append(p['cover_image'])
-    for m in re.findall(r'<img[^>]+src="([^"]+)"', p.get('content') or ''):
-        if m not in imgs:
-            imgs.append(m)
+    for m in [p.get('cover_image')] + re.findall(r'<img[^>]+src="([^"]+)"', p.get('content') or ''):
+        u = _ld_abs_url(_html.unescape(m or ''))
+        if u and u not in imgs:
+            imgs.append(u)
     if imgs:
         ld['image'] = imgs
     breadcrumb = _breadcrumb_ld([("首頁", f"{SITE}/"), ("部落格", f"{SITE}/blog"),
                                  (p['title'], canonical)])
-    head_extra = ('<script type="application/ld+json">' + json.dumps(ld, ensure_ascii=False) + '</script>'
-                  '<script type="application/ld+json">' + json.dumps(breadcrumb, ensure_ascii=False) + '</script>')
+    head_extra = _ld_script(ld) + _ld_script(breadcrumb)
 
     ui = BLOG_UI.get(lang, BLOG_UI['zh-tw'])
     # 先講結論（AEO）：用 summary 產生，所有文章都有
@@ -5528,11 +5543,12 @@ def blog_post(slug):
         qa = ''.join(f'<details><summary>{_html.escape(str(x["q"]))}</summary>'
                      f'<p>{_html.escape(str(x["a"]))}</p></details>' for x in faq_items)
         faq_html = f'<section class="post-faq"><h2>{ui["faq"]}</h2>{qa}</section>'
-        faq_ld = {"@context": "https://schema.org", "@type": "FAQPage",
+        faq_ld = {"@context": "https://schema.org", "@type": "FAQPage", "@id": f"{canonical}#faq",
+                  "url": canonical, "inLanguage": BLOG_HTML_LANG.get(lang, "zh-TW"),
                   "mainEntity": [{"@type": "Question", "name": str(x["q"]),
                                   "acceptedAnswer": {"@type": "Answer", "text": str(x["a"])}}
                                  for x in faq_items]}
-        head_extra += '<script type="application/ld+json">' + json.dumps(faq_ld, ensure_ascii=False) + '</script>'
+        head_extra += _ld_script(faq_ld)
 
     # 主題攻略頁內鏈（依 tag 自動對應）
     pillar_html = ''
@@ -5775,7 +5791,7 @@ def reviews_page():
             "review": reviews_ld,
         })
     graph.append(_breadcrumb_ld([("首頁", f"{SITE}/"), ("旅客評價", canonical)]))
-    head_extra = ''.join('<script type="application/ld+json">' + json.dumps(g, ensure_ascii=False) + '</script>' for g in graph)
+    head_extra = ''.join(_ld_script(g) for g in graph)
     if not items:
         # 空頁不該被索引；有第一筆真實評價後自動解除
         head_extra += '<meta name="robots" content="noindex,follow"/>'
