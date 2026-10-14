@@ -1010,6 +1010,11 @@ const QUIZ_RESULTS = {
     desc: '你熱愛海洋與探索，望安七美跳島最適合你！雙心石滬、綠蠵龜故鄉、大菓葉玄武岩，一次收集澎湖最經典的離島秘境。',
     tour: { name:'望安七美跳島', duration:'3–4天', price:'NT$ 6,999 起', img:'', interest:'turtle4d', cta:'立即諮詢這個行程' },
   },
+  indoor: {
+    type: '海島手作慢遊家 🐢',
+    desc: '冬天東北季風強，內海巡禮暫停預約，正好把行程換成室內手作：到赤崁博藤基地用養殖廢棄的蚵殼做小烏龜，再去湖西南寮社區磨豆漿、用海沙炒花生，風再大也玩得盡興。',
+    tour: { name:'冬季室內手作體驗', duration:'彈性安排', price:'專人報價', img:'', interest:'其他', note:'冬季室內手作：博藤蚵殼烏龜、南寮社區磨豆漿＋海沙炒花生', cta:'立即諮詢這個行程' },
+  },
   tides: {
     type: '潮汐秘境獵人 🌅',
     desc: '你懂得看時機玩澎湖！退潮才現身的摩西分海、S 彎沙灘與潮間帶秘境，跟著潮汐表安排，拍到別人拍不到的絕景。',
@@ -1034,6 +1039,14 @@ const QUIZ_ARCHIVED_FESTIVAL = {
     'NT$ 5,000–10,000': 1, 'NT$ 10,000 以上': 2, '還沒抓預算': 1, '3 天 2 夜': 3,
   },
 };
+
+// 內海巡禮暫停預約到這天（台灣時間，與 index.html 內海按鈕 data-open-from、app.py NEIHAI_CLOSED_PERIODS 一致）；
+// 之前算出內海的人改推冬季室內手作，到這天起自動恢復推薦內海。
+const QUIZ_NEIHAI_REOPEN = '2027-03-01';
+function quizSeasonalResult(key) {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
+  return (key === 'neihai' && today < QUIZ_NEIHAI_REOPEN) ? 'indoor' : key;
+}
 
 let quizAnswers = [];
 let quizAnswerTexts = [];   // 保留題目與選項文字，供 AI 個人化建議使用
@@ -1089,15 +1102,15 @@ window.quizAnswer = function(qIdx, optIdx) {
 function renderQuizResult(forcedKey, fromShare = false) {
   const totals = { neihai:0, family:0, island:0, tides:0 };
   quizAnswers.forEach(s => Object.entries(s).forEach(([k,v]) => { if (k in totals) totals[k] = (totals[k]||0) + v; }));
-  const best = (forcedKey && QUIZ_RESULTS[forcedKey]) ? forcedKey
-    : Object.entries(totals).sort((a,b) => b[1]-a[1])[0][0];
+  const best = quizSeasonalResult((forcedKey && QUIZ_RESULTS[forcedKey]) ? forcedKey
+    : Object.entries(totals).sort((a,b) => b[1]-a[1])[0][0]);
   const r = QUIZ_RESULTS[best];
   const wrap = document.getElementById('quiz-wrap');
   const shareUrl = `${window.location.origin}${window.location.pathname}?quiz=${encodeURIComponent(best)}#quiz`;
   const primaryHref = r.tour.url || '#contact';
   const primaryAction = r.tour.url
     ? ` onclick="trackQuizCta('${best}','preorder')"`
-    : ` onclick="prefillTour('${r.tour.interest}');trackQuizCta('${best}','contact')"`;
+    : ` onclick="prefillTour('${r.tour.interest}','${r.tour.note || ''}');trackQuizCta('${best}','contact')"`;
   if (typeof gtag === 'function') {
     gtag('event', 'quiz_result', { result_type: r.type, content_name: r.tour.name });
   }
@@ -1127,7 +1140,7 @@ function renderQuizResult(forcedKey, fromShare = false) {
       </div>
       <p class="quiz-share-note">把結果傳給 LINE 專人幫你排，或留資料領取專屬的澎湖行程建議表，我們依你的玩法安排日期、交通與行程。</p>
       <div class="quiz-result-actions">
-        <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" rel="noopener noreferrer" class="btn btn-primary" onclick="prefillTour('${r.tour.interest}');trackQuizCta('${best}','line')">
+        <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" rel="noopener noreferrer" class="btn btn-primary" onclick="prefillTour('${r.tour.interest}','${r.tour.note || ''}');trackQuizCta('${best}','line')">
           <i class="fab fa-line"></i> 把結果傳給 LINE 專人幫我排
         </a>
         <button class="btn btn-outline" onclick="openQuizLead('${best}')">
@@ -1208,9 +1221,11 @@ function resetQuizShareUrl() {
 }
 window.resetQuizShareUrl = resetQuizShareUrl;
 
-function prefillTour(interest) {
+function prefillTour(interest, note) {
   const sel = document.getElementById('tour-interest');
   if (sel && interest) sel.value = interest;
+  const notes = document.getElementById('notes');
+  if (notes && note && !notes.value.trim()) notes.value = note;
 }
 window.prefillTour = prefillTour;
 
