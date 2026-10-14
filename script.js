@@ -701,6 +701,16 @@ function markPastEvents() {
 }
 document.addEventListener('DOMContentLoaded', markPastEvents);
 
+/* 暫停預約期間的按鈕：到 data-open-from（台灣時間）當天起換回 data-open-label。 */
+function restoreOpenedCtas() {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
+  document.querySelectorAll('[data-open-from]').forEach(el => {
+    const text = el.querySelector('.slide-cta-text');
+    if (text && el.dataset.openFrom <= today) text.textContent = el.dataset.openLabel;
+  });
+}
+document.addEventListener('DOMContentLoaded', restoreOpenedCtas);
+
 // 行程卡片／彈窗的固定 UI 字串（依語言）
 const TOUR_UI = {
   'zh-tw':{detail:'查看詳情',fullPage:'完整行程頁（可分享連結）',priceHdr:'出發地 × 價格',suitable:'適合',duration:'天數',notice:'注意事項',includes:'費用包含',notes:'備註',highlights:'行程亮點',dates:'出發日期',
