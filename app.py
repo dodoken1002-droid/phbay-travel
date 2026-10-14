@@ -2752,6 +2752,119 @@ def api_tides():
         return jsonify(ok=False, error='暫時無法取得潮汐資料，請稍後再試'), 502
 
 
+# ─── 中央氣象署鄉鎮天氣預報（F-D0047-045：澎湖縣未來 3 天、逐 3 小時）───
+# 一次取 6 個鄉市整份預報快取 2 小時；「現在」的數值在每次請求時才從時間序列挑，
+# 所以快取期間跨過 3 小時時段也會換到正確那一筆。
+WEATHER_TOWNS = tuple(name.replace('澎湖縣', '') for name in TIDE_LOCATIONS)
+WEATHER_CACHE_TTL = 2 * 3600
+WEATHER_STRONG_WIND_BEAUFORT = 6  # 蒲福風級達此級數，前台加「離島船班請先確認」提醒
+_weather_cache = {}  # {'at': epoch, 'data': {town: {...時間序列...}}}
+
+
+def _parse_beaufort(text):
+    """氣象署風級是字串，可能帶運算子（例：'>= 6'）。回傳 (級數, 是否為「以上」)，無法解析回 (None, False)。"""
+    m = re.match(r'\s*(>=|>)?\s*(\d+)', str(text or ''))
+    if not m:
+        return None, False
+    return int(m.group(2)), bool(m.group(1))
+
+
+def _parse_cwa_weather(raw):
+    """把 F-D0047-045 回應整理成 {鄉市: {element: [時段...]}}；格式不符直接丟錯，不回傳空資料。"""
+    if str(raw.get('success')) != 'true':
+        raise RuntimeError('氣象署回應異常')
+    towns = {}
+    for loc in raw['records']['Locations'][0]['Location']:
+        series = {}
+        for el in loc.get('WeatherElement') or []:
+            slots = []
+            for t in el.get('Time') or []:
+                value = (t.get('ElementValue') or [{}])[0]
+                slots.append({'start': t.get('StartTime') or t.get('DataTime'),
+                              'end': t.get('EndTime'), 'value': value})
+            series[el.get('ElementName')] = slots
+        towns[loc['LocationName']] = series
+    if not towns:
+        raise RuntimeError('氣象署回應沒有任何鄉市')
+    return towns
+
+
+def _weather_slot(slots, now_iso):
+    """挑出「現在」適用的時段：有起訖的取涵蓋現在那段；只有時間點的取不晚於現在的最後一筆；都沒有就取最早一筆。"""
+    if not slots:
+        return None
+    for s in slots:
+        if s['end'] and s['start'] <= now_iso < s['end']:
+            return s
+    past = [s for s in slots if not s['end'] and s['start'] <= now_iso]
+    return past[-1] if past else slots[0]
+
+
+def _weather_now(series, now_iso):
+    def val(element, key):
+        slot = _weather_slot(series.get(element) or [], now_iso)
+        return ((slot or {}).get('value') or {}).get(key), (slot or {}).get('start')
+    weather, weather_at = val('天氣現象', 'Weather')
+    code, _ = val('天氣現象', 'WeatherCode')
+    temp, temp_at = val('溫度', 'Temperature')
+    pop, _ = val('3小時降雨機率', 'ProbabilityOfPrecipitation')
+    wind_dir, _ = val('風向', 'WindDirection')
+    beaufort_raw, _ = val('風速', 'BeaufortScale')
+    level, or_more = _parse_beaufort(beaufort_raw)
+    return {
+        'weather': weather, 'weather_code': code,
+        'temp_c': int(temp) if str(temp or '').lstrip('-').isdigit() else None,
+        'pop_percent': int(pop) if str(pop or '').isdigit() else None,
+        'wind_direction': wind_dir,
+        'beaufort': level, 'beaufort_or_more': or_more,
+        'strong_wind': level is not None and level >= WEATHER_STRONG_WIND_BEAUFORT,
+        'forecast_time': temp_at or weather_at,
+    }
+
+
+def _fetch_cwa_weather():
+    import urllib.request
+    import urllib.parse
+    import time as _time
+    import ssl
+    cached = _weather_cache.get('all')
+    if cached and _time.time() - cached['at'] < WEATHER_CACHE_TTL:
+        return cached['data']
+    qs = urllib.parse.urlencode({'Authorization': CWA_API_KEY, 'LocationName': ','.join(WEATHER_TOWNS)})
+    url = f'https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-D0047-045?{qs}'
+    ctx = ssl.create_default_context()          # 同潮汐：氣象署憑證缺 SKI，僅關閉 VERIFY_X509_STRICT
+    ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
+    with urllib.request.urlopen(url, timeout=15, context=ctx) as resp:
+        data = _parse_cwa_weather(json.load(resp))
+    _weather_cache['all'] = {'at': _time.time(), 'data': data}
+    return data
+
+
+@app.route('/api/weather')
+def api_weather():
+    location = (request.args.get('location') or WEATHER_TOWNS[0]).strip()
+    if location not in WEATHER_TOWNS:
+        return jsonify(ok=False, error='地點僅限澎湖縣各鄉市'), 400
+    if not CWA_API_KEY:
+        return jsonify(ok=False, error='天氣服務尚未設定'), 503
+    now_iso = datetime.now(timezone(timedelta(hours=8))).isoformat(timespec='seconds')  # 台灣無日光節約，固定 +08:00
+    stale = False
+    try:
+        towns = _fetch_cwa_weather()
+    except Exception:
+        # 氣象署暫時故障時用上一次的資料（時段仍依現在時間挑選）
+        cached = _weather_cache.get('all')
+        if not cached:
+            return jsonify(ok=False, error='暫時無法取得天氣資料，請稍後再試'), 502
+        towns, stale = cached['data'], True
+    if location not in towns:
+        return jsonify(ok=False, error='暫時無法取得天氣資料，請稍後再試'), 502
+    resp = jsonify(ok=True, source='中央氣象署', location=location, stale=stale,
+                   **_weather_now(towns[location], now_iso))
+    resp.headers['Cache-Control'] = 'public, max-age=600'
+    return resp
+
+
 @app.route('/tides')
 def tides_page():
     return send_from_directory('.', 'tides.html')
@@ -5252,10 +5365,10 @@ def _blog_hreflang(path_no_lang, avail):
 
 def _render_blog(title, desc, canonical, body, head_extra='', image=None, lang='zh-tw', alt_links=''):
     img = image or f'{SITE}/images/festival-poster.jpg'
-    nav = '''<div class="top-banner"><div class="banner-static"><span>潮旅國際旅行社</span><span class="banner-sep">｜</span><span>2026 澎湖追風音樂燈光節 官方合作旅行社</span><span class="banner-sep">｜</span><span>電話：06-9271288</span></div></div>
+    nav = '''<div class="top-banner"><div class="banner-static"><span>潮旅國際旅行社</span><span class="banner-sep">｜</span><span>交觀乙第1864號・品保澎字第0188號</span><span class="banner-sep">｜</span><span>電話：06-9271288</span></div></div>
 <nav class="navbar" id="navbar"><div class="nav-container"><a href="/" class="nav-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a><button class="nav-toggle" id="nav-toggle" aria-label="選單"><span></span><span></span><span></span></button><ul class="nav-links" id="nav-links"><li><a href="/">首頁</a></li><li><a href="/tours">行程介紹</a></li><li class="nav-item has-submenu"><a href="/neihai-preorder.html">預購行程 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/neihai-preorder.html">小城故事內海巡禮</a></li></ul></li><li class="nav-item has-submenu"><a href="/blog">旅遊大小事 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/tides">潮汐查詢系統</a></li><li><a href="/penghu-itinerary-recommendations/planner?src=nav">自己排行程</a></li><li><a href="/blog">旅遊文章分享</a></li><li><a href="/faq.html">常見問題</a></li><li><a href="/reviews">旅客評價</a></li></ul></li><li class="nav-item has-submenu"><a href="/#about">關於我們 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/#contact">聯絡資訊</a></li></ul></li></ul></div></nav>'''
     footer = '''<footer class="footer"><div class="container"><div class="footer-bottom"><p>© 2026 潮旅國際旅行社 All Rights Reserved.｜<a href="/" style="color:inherit">官網</a>｜<a href="/blog" style="color:inherit">部落格</a>｜<a href="/reviews" style="color:inherit">旅客評價</a>｜<a href="/privacy" style="color:inherit">隱私權政策</a>｜<a href="/terms" style="color:inherit">使用條款</a></p></div></div></footer>
-<script>(function(){var t=document.getElementById('nav-toggle'),l=document.getElementById('nav-links');if(t)t.addEventListener('click',function(){l.classList.toggle('open')});var lb=document.getElementById('lang-btn'),lm=document.getElementById('lang-menu');if(lb)lb.addEventListener('click',function(e){e.stopPropagation();lm.classList.toggle('open')});document.addEventListener('click',function(){if(lm)lm.classList.remove('open')});})();</script>'''
+<script>(function(){var t=document.getElementById('nav-toggle'),l=document.getElementById('nav-links');if(t)t.addEventListener('click',function(){l.classList.toggle('open')});var lb=document.getElementById('lang-btn'),lm=document.getElementById('lang-menu');if(lb)lb.addEventListener('click',function(e){e.stopPropagation();lm.classList.toggle('open')});document.addEventListener('click',function(){if(lm)lm.classList.remove('open')});})();</script><script src="/weather-banner.js?v=20261014a" defer></script>'''
     # 還沒有真實評價時不放「旅客評價」入口：一個點進去只寫「整理中」的頁面比沒有更扣信任感。
     # 靜態頁（index.html 等）的入口已移除；content/reviews.json 有資料後要一併加回，見 content/REVIEWS.md。
     if not load_reviews():
@@ -5656,10 +5769,10 @@ _TOUR_ERROR_UI = {
 }
 
 SHELL_REPLACEMENTS = {
-    'en': {'潮旅國際旅行社': 'PH Bay Travel', '2026 澎湖追風音樂燈光節 官方合作旅行社': 'Official travel partner of the 2026 Penghu Music & Light Festival', '電話：': 'Tel: ', '選單': 'Menu', '首頁': 'Home', '行程介紹': 'Tours', '預購行程': 'Pre-order', '小城故事內海巡禮': 'Inner-Sea Cruise', '追風音樂節': 'Music Festival', '旅遊大小事': 'Travel Info', '潮汐查詢系統': 'Tide Forecast', '旅遊文章分享': 'Travel Blog', '常見問題': 'FAQ', '旅客評價': 'Reviews', '關於我們': 'About Us', '聯絡資訊': 'Contact', '官網': 'Website', '部落格': 'Blog', '隱私權政策': 'Privacy', '使用條款': 'Terms', 'WhatsApp 諮詢': 'WhatsApp enquiry'},
-    'ja': {'潮旅國際旅行社': '潮旅国際旅行社', '2026 澎湖追風音樂燈光節 官方合作旅行社': '2026澎湖音楽・ライトフェスティバル公式旅行会社', '選單': 'メニュー', '首頁': 'ホーム', '行程介紹': 'ツアー', '預購行程': '事前予約', '小城故事內海巡禮': '内海クルーズ', '追風音樂節': '音楽祭', '旅遊大小事': '旅行情報', '潮汐查詢系統': '潮汐情報', '旅遊文章分享': '旅行ブログ', '常見問題': 'よくある質問', '旅客評價': '旅行者レビュー', '關於我們': '会社案内', '聯絡資訊': 'お問い合わせ', '官網': '公式サイト', '部落格': 'ブログ', '隱私權政策': 'プライバシー', '使用條款': '利用規約', 'WhatsApp 諮詢': 'WhatsAppで相談'},
-    'ko': {'潮旅國際旅行社': 'PH Bay Travel', '2026 澎湖追風音樂燈光節 官方合作旅行社': '2026 펑후 음악·빛 축제 공식 여행사', '電話：': '전화: ', '選單': '메뉴', '首頁': '홈', '行程介紹': '투어', '預購行程': '사전 예약', '小城故事內海巡禮': '내해 크루즈', '追風音樂節': '음악 축제', '旅遊大小事': '여행 정보', '潮汐查詢系統': '조석 정보', '旅遊文章分享': '여행 블로그', '常見問題': '자주 묻는 질문', '旅客評價': '여행자 후기', '關於我們': '회사 소개', '聯絡資訊': '문의', '官網': '공식 사이트', '部落格': '블로그', '隱私權政策': '개인정보 처리방침', '使用條款': '이용약관', 'WhatsApp 諮詢': 'WhatsApp 문의'},
-    'zh-cn': {'潮旅國際旅行社': '潮旅国际旅行社', '2026 澎湖追風音樂燈光節 官方合作旅行社': '2026 澎湖追风音乐灯光节 官方合作旅行社', '電話：': '电话：', '選單': '菜单', '首頁': '首页', '行程介紹': '行程介绍', '預購行程': '预购行程', '小城故事內海巡禮': '小城故事内海巡礼', '追風音樂節': '追风音乐节', '旅遊大小事': '旅游资讯', '潮汐查詢系統': '潮汐查询系统', '旅遊文章分享': '旅游文章分享', '常見問題': '常见问题', '旅客評價': '旅客评价', '關於我們': '关于我们', '聯絡資訊': '联系信息', '官網': '官网', '部落格': '博客', '隱私權政策': '隐私权政策', '使用條款': '使用条款', 'WhatsApp 諮詢': 'WhatsApp 咨询'},
+    'en': {'潮旅國際旅行社': 'PH Bay Travel', '電話：': 'Tel: ', '選單': 'Menu', '首頁': 'Home', '行程介紹': 'Tours', '預購行程': 'Pre-order', '小城故事內海巡禮': 'Inner-Sea Cruise', '追風音樂節': 'Music Festival', '旅遊大小事': 'Travel Info', '潮汐查詢系統': 'Tide Forecast', '旅遊文章分享': 'Travel Blog', '常見問題': 'FAQ', '旅客評價': 'Reviews', '關於我們': 'About Us', '聯絡資訊': 'Contact', '官網': 'Website', '部落格': 'Blog', '隱私權政策': 'Privacy', '使用條款': 'Terms', 'WhatsApp 諮詢': 'WhatsApp enquiry'},
+    'ja': {'潮旅國際旅行社': '潮旅国際旅行社', '選單': 'メニュー', '首頁': 'ホーム', '行程介紹': 'ツアー', '預購行程': '事前予約', '小城故事內海巡禮': '内海クルーズ', '追風音樂節': '音楽祭', '旅遊大小事': '旅行情報', '潮汐查詢系統': '潮汐情報', '旅遊文章分享': '旅行ブログ', '常見問題': 'よくある質問', '旅客評價': '旅行者レビュー', '關於我們': '会社案内', '聯絡資訊': 'お問い合わせ', '官網': '公式サイト', '部落格': 'ブログ', '隱私權政策': 'プライバシー', '使用條款': '利用規約', 'WhatsApp 諮詢': 'WhatsAppで相談'},
+    'ko': {'潮旅國際旅行社': 'PH Bay Travel', '電話：': '전화: ', '選單': '메뉴', '首頁': '홈', '行程介紹': '투어', '預購行程': '사전 예약', '小城故事內海巡禮': '내해 크루즈', '追風音樂節': '음악 축제', '旅遊大小事': '여행 정보', '潮汐查詢系統': '조석 정보', '旅遊文章分享': '여행 블로그', '常見問題': '자주 묻는 질문', '旅客評價': '여행자 후기', '關於我們': '회사 소개', '聯絡資訊': '문의', '官網': '공식 사이트', '部落格': '블로그', '隱私權政策': '개인정보 처리방침', '使用條款': '이용약관', 'WhatsApp 諮詢': 'WhatsApp 문의'},
+    'zh-cn': {'潮旅國際旅行社': '潮旅国际旅行社', '電話：': '电话：', '選單': '菜单', '首頁': '首页', '行程介紹': '行程介绍', '預購行程': '预购行程', '小城故事內海巡禮': '小城故事内海巡礼', '追風音樂節': '追风音乐节', '旅遊大小事': '旅游资讯', '潮汐查詢系統': '潮汐查询系统', '旅遊文章分享': '旅游文章分享', '常見問題': '常见问题', '旅客評價': '旅客评价', '關於我們': '关于我们', '聯絡資訊': '联系信息', '官網': '官网', '部落格': '博客', '隱私權政策': '隐私权政策', '使用條款': '使用条款', 'WhatsApp 諮詢': 'WhatsApp 咨询'},
 }
 
 
