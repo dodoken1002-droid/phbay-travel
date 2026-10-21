@@ -132,6 +132,30 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
 /* ── 圖片預覽 ── */
 .img-preview{width:100%;height:140px;object-fit:cover;border-radius:8px;
   border:2px solid #e2e8f0;margin-top:6px;display:none}
+/* ── 部落格封面：規格、裁切、預覽 ── */
+.cover-spec{background:#f7fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:.8rem}
+.cover-spec summary{cursor:pointer;font-weight:700;color:var(--blue-dk)}
+.cover-spec table{width:100%;border-collapse:collapse;margin-top:6px}
+.cover-spec th{text-align:left;white-space:nowrap;color:#4a5568;padding:4px 10px 4px 0;vertical-align:top;width:1%}
+.cover-spec td{color:#4a5568;padding:4px 0;border-bottom:1px dashed #edf2f7}
+.cover-cropper{border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:10px;background:#fff}
+.cover-crop-frame{position:relative;width:100%;aspect-ratio:1200/630;border-radius:6px;overflow:hidden;background:#1a202c;touch-action:none}
+.cover-crop-frame canvas{width:100%;height:100%;display:block;cursor:grab}
+.cover-crop-frame canvas:active{cursor:grabbing}
+.cover-safe{position:absolute;left:15%;right:15%;top:10%;bottom:10%;border:2px dashed rgba(255,255,255,.85);border-radius:4px;pointer-events:none;box-shadow:0 0 0 9999px rgba(0,0,0,.18)}
+.cover-crop-ctrl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:.82rem}
+.cover-crop-ctrl input[type=range]{flex:1;min-width:120px}
+.cover-hint{font-size:.76rem;color:#a0aec0;margin-top:6px}
+.cover-warn{background:#fffaf0;border:1px solid #f6ad55;color:#9c4221;border-radius:6px;padding:6px 10px;font-size:.8rem;margin-bottom:8px}
+.cover-previews{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px}
+.cover-pv-label{font-size:.75rem;color:#718096;margin-bottom:4px}
+.cover-pv-card{width:240px;border:1px solid #e6edf3;border-radius:10px;overflow:hidden;background:#fff}
+.cover-pv-card img{width:100%;height:146px;object-fit:cover;display:block}
+.cover-pv-card-title{padding:8px 10px;font-size:.8rem;font-weight:700;color:var(--blue-dk);line-height:1.4}
+.cover-pv-social{width:300px;border:1px solid #dadde1;background:#f0f2f5}
+.cover-pv-social img{width:100%;aspect-ratio:1200/630;object-fit:cover;display:block}
+.cover-pv-social-meta{padding:6px 10px;font-size:.72rem;color:#606770;display:flex;flex-direction:column;gap:2px}
+.cover-pv-social-meta strong{color:#1c1e21;font-size:.82rem;line-height:1.35}
 /* ── 通知 Toast ── */
 .toast{position:fixed;bottom:24px;right:24px;background:#2d3748;color:#fff;
   padding:12px 20px;border-radius:10px;font-size:.9rem;z-index:999;
@@ -585,17 +609,52 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
       </div>
       <div class="form-group full">
         <label>封面圖（選填）</label>
+        <details class="cover-spec" open>
+          <summary>封面規格（上傳前請先確認）</summary>
+          <table>
+            <tr><th>輸出尺寸</th><td><strong>1200 × 630 px</strong>（1.91 : 1，FB／LINE 分享預覽的標準比例）</td></tr>
+            <tr><th>原圖解析度</th><td>寬至少 1200 px、高至少 630 px；建議 2400 × 1260 px 以上，裁切後仍清晰</td></tr>
+            <tr><th>可上傳格式</th><td>JPG、PNG、WebP（iPhone 的 HEIC 請先轉成 JPG）</td></tr>
+            <tr><th>原檔大小</th><td>10 MB 以內；系統會自動壓成 JPEG，約 200–350 KB</td></tr>
+            <tr><th>構圖</th><td>主體放在虛線框內（左右各留 15%、上下各留 10%）；文章列表卡片會依螢幕寬度裁掉邊緣</td></tr>
+            <tr><th>文字</th><td>圖上盡量不放字；需要的話離邊緣至少 60 px，字級夠大，手機上也看得清楚</td></tr>
+            <tr><th>來源</th><td>自己拍攝或有授權的照片；不可使用其他網站或攻略文章的圖</td></tr>
+          </table>
+        </details>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
-          <input type="file" id="p-cover-file" accept="image/*" style="display:none" onchange="handleCoverUpload(this)" />
+          <input type="file" id="p-cover-file" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="handleCoverUpload(this)" />
           <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('p-cover-file').click()">
             <i class="fas fa-image"></i> 選擇圖片上傳
           </button>
           <button type="button" class="btn btn-sm btn-ghost" onclick="clearCover()">清除</button>
           <span id="cover-status" style="font-size:.82rem;color:#718096"></span>
         </div>
-        <img id="cover-preview" style="display:none;max-width:240px;max-height:150px;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:8px" />
+        <div id="cover-cropper" class="cover-cropper" style="display:none">
+          <div id="cover-warn" class="cover-warn" style="display:none"></div>
+          <div class="cover-crop-frame">
+            <canvas id="cover-crop-canvas" width="1200" height="630"></canvas>
+            <div class="cover-safe" aria-hidden="true"></div>
+          </div>
+          <div class="cover-crop-ctrl">
+            <label for="cover-zoom"><i class="fas fa-search-plus"></i> 縮放</label>
+            <input type="range" id="cover-zoom" min="1" max="3" step="0.01" value="1" oninput="coverCropZoom(this.value)" />
+            <button type="button" class="btn btn-sm btn-primary" onclick="applyCoverCrop()"><i class="fas fa-crop-alt"></i> 套用裁切</button>
+            <button type="button" class="btn btn-sm btn-ghost" onclick="hideCoverCropper()">取消</button>
+          </div>
+          <p class="cover-hint">拖曳圖片調整位置、用滑桿放大縮小；虛線框內是安全區，重要主體請放在框內。</p>
+        </div>
+        <div id="cover-previews" class="cover-previews" style="display:none">
+          <div>
+            <div class="cover-pv-label">文章列表卡片</div>
+            <div class="cover-pv-card"><img id="cover-pv-card" alt="" /><div class="cover-pv-card-title" id="cover-pv-card-title"></div></div>
+          </div>
+          <div>
+            <div class="cover-pv-label">FB／LINE 分享預覽</div>
+            <div class="cover-pv-social"><img id="cover-preview" alt="" /><div class="cover-pv-social-meta"><span>WWW.PHBAY.INFO</span><strong id="cover-pv-social-title"></strong></div></div>
+          </div>
+        </div>
         <input id="p-cover" placeholder="也可直接貼圖片網址 https://...jpg" oninput="syncCoverPreview()" style="font-size:.85rem" />
-        <p style="font-size:.78rem;color:#a0aec0;margin-top:4px">上傳的圖片會自動縮圖、壓縮並存進資料庫，免擔心尺寸與部署消失問題。</p>
+        <p style="font-size:.78rem;color:#a0aec0;margin-top:4px">上傳的圖片會裁成 1200 × 630、壓縮後存進資料庫，部署不會消失；對外會以 /blog/cover/&lt;slug&gt;.jpg 提供，分享預覽也會用到這張圖。</p>
       </div>
       <div class="form-group full">
         <label>內文（可用基本 HTML：<code>&lt;h2&gt; &lt;p&gt; &lt;strong&gt; &lt;ul&gt;&lt;li&gt; &lt;img&gt; &lt;a&gt;</code>；
@@ -2978,48 +3037,137 @@ function editPost(id) {
   document.getElementById('p-pub').value = String(!!p.is_published);
   document.getElementById('p-faq').value = '';   // 編輯既有文章不帶 faq，儲存時不覆蓋原值
   document.getElementById('cover-status').textContent = '';
+  hideCoverCropper();
   syncCoverPreview();
   document.getElementById('post-modal').classList.add('open');
 }
 
 function closePostModal() { document.getElementById('post-modal').classList.remove('open'); }
 
-// ── 封面圖：上傳 → 瀏覽器自動縮圖壓縮 → 存成 data URI ──
+// ── 封面圖：選圖 → 裁成 1200×630（1.91:1）→ 壓縮成 JPEG data URI ──
+// 規格與後端 COVER_MIME / COVER_MAX_CHARS 一致；改規格時兩邊要一起改。
+const COVER_W = 1200, COVER_H = 630;
+const COVER_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const COVER_MAX_FILE = 10 * 1024 * 1024;
+const COVER_MAX_URI = 480000;               // 約 350 KB
+let _coverCrop = null;                      // { img, base, zoom, x, y }
+
 function handleCoverUpload(input) {
   const file = input.files && input.files[0];
+  input.value = '';
   if (!file) return;
-  if (!file.type.startsWith('image/')) { showToast('請選擇圖片檔', 'error'); return; }
   const status = document.getElementById('cover-status');
-  status.textContent = '處理中…';
+  if (!COVER_TYPES.includes(file.type)) {
+    showToast('請上傳 JPG、PNG 或 WebP（iPhone 的 HEIC 請先轉成 JPG）', 'error'); return;
+  }
+  if (file.size > COVER_MAX_FILE) {
+    showToast(`原檔 ${(file.size / 1048576).toFixed(1)} MB，超過 10 MB 上限`, 'error'); return;
+  }
+  status.textContent = '讀取中…';
   const reader = new FileReader();
   reader.onload = e => {
     const img = new Image();
-    img.onload = () => {
-      const MAX = 1200;                         // 最長邊縮到 1200px
-      let { width, height } = img;
-      if (width > MAX || height > MAX) {
-        if (width >= height) { height = Math.round(height * MAX / width); width = MAX; }
-        else { width = Math.round(width * MAX / height); height = MAX; }
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = width; canvas.height = height;
-      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-      let q = 0.82, dataUri = canvas.toDataURL('image/jpeg', q);
-      // 若仍偏大，逐步降品質（控制在約 ≤ 350KB）
-      while (dataUri.length > 480000 && q > 0.45) { q -= 0.1; dataUri = canvas.toDataURL('image/jpeg', q); }
-      document.getElementById('p-cover').value = dataUri;
-      syncCoverPreview();
-      const kb = Math.round(dataUri.length * 0.75 / 1024);
-      status.textContent = `✅ 已縮圖 ${width}×${height}，約 ${kb} KB`;
-    };
+    img.onload = () => { status.textContent = ''; openCoverCropper(img); };
     img.onerror = () => { status.textContent = '圖片讀取失敗'; };
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
-  input.value = '';
+}
+
+function openCoverCropper(img) {
+  const w = img.naturalWidth, h = img.naturalHeight;
+  const base = Math.max(COVER_W / w, COVER_H / h);       // 剛好蓋滿畫框的縮放
+  _coverCrop = { img, base, zoom: 1, x: (COVER_W - w * base) / 2, y: (COVER_H - h * base) / 2 };
+  const warns = [];
+  if (w < COVER_W || h < COVER_H) {
+    warns.push(`⚠️ 解析度不足：原圖 ${w}×${h}，低於 1200×630，放大後會模糊，建議換一張較大的照片。`);
+  }
+  const ratio = w / h;
+  if (ratio < 1.3 || ratio > 2.6) {
+    warns.push(`ℹ️ 原圖比例 ${ratio.toFixed(2)} : 1 與 1.91 : 1 差距大（例如直式照片），會裁掉較多畫面，請確認主體位置。`);
+  }
+  const warn = document.getElementById('cover-warn');
+  warn.innerHTML = warns.join('<br>');
+  warn.style.display = warns.length ? 'block' : 'none';
+  document.getElementById('cover-zoom').value = 1;
+  document.getElementById('cover-cropper').style.display = 'block';
+  drawCoverCrop();
+}
+
+function _clampCoverCrop() {
+  const c = _coverCrop, s = c.base * c.zoom;
+  const dw = c.img.naturalWidth * s, dh = c.img.naturalHeight * s;
+  c.x = Math.min(0, Math.max(COVER_W - dw, c.x));
+  c.y = Math.min(0, Math.max(COVER_H - dh, c.y));
+}
+
+function drawCoverCrop(canvas) {
+  const c = _coverCrop;
+  if (!c) return;
+  _clampCoverCrop();
+  canvas = canvas || document.getElementById('cover-crop-canvas');
+  const ctx = canvas.getContext('2d');
+  const s = c.base * c.zoom;
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, COVER_W, COVER_H);                   // PNG 透明處補白，避免轉 JPEG 變黑
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(c.img, c.x, c.y, c.img.naturalWidth * s, c.img.naturalHeight * s);
+}
+
+function coverCropZoom(v) {
+  const c = _coverCrop;
+  if (!c) return;
+  // 以畫框中心為基準縮放
+  const old = c.base * c.zoom, next = c.base * Number(v);
+  c.x = COVER_W / 2 - (COVER_W / 2 - c.x) * next / old;
+  c.y = COVER_H / 2 - (COVER_H / 2 - c.y) * next / old;
+  c.zoom = Number(v);
+  drawCoverCrop();
+}
+
+(function initCoverDrag() {
+  const canvas = document.getElementById('cover-crop-canvas');
+  if (!canvas) return;
+  let drag = null;
+  canvas.addEventListener('pointerdown', e => {
+    if (!_coverCrop) return;
+    drag = { px: e.clientX, py: e.clientY, x: _coverCrop.x, y: _coverCrop.y };
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!drag || !_coverCrop) return;
+    const k = COVER_W / canvas.clientWidth;                // 畫面像素 → 輸出像素
+    _coverCrop.x = drag.x + (e.clientX - drag.px) * k;
+    _coverCrop.y = drag.y + (e.clientY - drag.py) * k;
+    drawCoverCrop();
+  });
+  const end = () => { drag = null; };
+  canvas.addEventListener('pointerup', end);
+  canvas.addEventListener('pointercancel', end);
+})();
+
+function applyCoverCrop() {
+  if (!_coverCrop) return;
+  const out = document.createElement('canvas');
+  out.width = COVER_W; out.height = COVER_H;
+  drawCoverCrop(out);
+  let q = 0.85, dataUri = out.toDataURL('image/jpeg', q);
+  while (dataUri.length > COVER_MAX_URI && q > 0.45) { q -= 0.08; dataUri = out.toDataURL('image/jpeg', q); }
+  document.getElementById('p-cover').value = dataUri;
+  hideCoverCropper();
+  syncCoverPreview();
+  const kb = Math.round(dataUri.length * 0.75 / 1024);
+  document.getElementById('cover-status').textContent = `✅ 已裁切為 ${COVER_W}×${COVER_H}，約 ${kb} KB（記得按儲存）`;
+}
+
+function hideCoverCropper() {
+  _coverCrop = null;
+  const box = document.getElementById('cover-cropper');
+  if (box) box.style.display = 'none';
 }
 
 function clearCover() {
+  hideCoverCropper();
   document.getElementById('p-cover').value = '';
   document.getElementById('cover-status').textContent = '';
   syncCoverPreview();
@@ -3027,9 +3175,15 @@ function clearCover() {
 
 function syncCoverPreview() {
   const v = document.getElementById('p-cover').value.trim();
-  const prev = document.getElementById('cover-preview');
-  if (v) { prev.src = v; prev.style.display = 'block'; }
-  else { prev.removeAttribute('src'); prev.style.display = 'none'; }
+  const wrap = document.getElementById('cover-previews');
+  const title = document.getElementById('p-title').value.trim() || '（文章標題）';
+  document.getElementById('cover-pv-card-title').textContent = title;
+  document.getElementById('cover-pv-social-title').textContent = title;
+  ['cover-preview', 'cover-pv-card'].forEach(id => {
+    const el = document.getElementById(id);
+    if (v) el.src = v; else el.removeAttribute('src');
+  });
+  wrap.style.display = v ? 'flex' : 'none';
 }
 
 // 純文字自動轉段落（若內容沒有 HTML 標籤）
