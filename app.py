@@ -137,6 +137,9 @@ def _set_cache_headers(resp):
     if resp.status_code >= 400:
         resp.headers['Cache-Control'] = 'no-store'
         return resp
+    # 封面網址不帶 ?v 時不能長快取（換圖後會卡舊圖），由 blog_cover() 自己決定
+    if path.startswith('/blog/cover/'):
+        return resp
     if path.endswith(_LONG_CACHE_EXT):
         resp.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
     elif resp.mimetype == 'text/html':
