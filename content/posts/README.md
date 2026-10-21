@@ -16,7 +16,9 @@ Required fields:
 
 Optional fields:
 
-- `cover_image`: use an empty string unless the image is licensed and stable
+- `cover_image`: use an empty string unless the image is licensed and stable.
+  Covers are normally uploaded later in the admin editor (cropped to
+  1200 × 630); see `docs/blog-cover-spec.md` for the full cover spec
 - `source_urls`: an array of fact-checking sources retained in version history
 - `faq`: a non-empty list of `{q, a}` objects (renders as an FAQ block + FAQPage schema)
 - `info_box`: a non-empty object of `label: value` (renders as an info table)

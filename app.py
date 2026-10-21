@@ -5172,6 +5172,52 @@ def _ld_abs_url(src):
         return None
     return urllib.parse.urljoin(f'{SITE}/', src)
 
+# ── 部落格封面 ──
+# 後台上傳的封面以 data URI 存在 posts.cover_image。data URI 不能當 og:image、
+# 也不會進 JSON-LD，列表頁還得把整張圖塞進 HTML，所以對外一律改用
+# /blog/cover/<slug>.jpg 從資料庫讀圖。只放行點陣圖格式：SVG/HTML 若從本站網域
+# 直接送出，等於開了 XSS 的門。
+COVER_MIME = {'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp'}
+COVER_MAX_CHARS = 2_000_000          # data URI 上限（約 1.4MB 圖檔）；後台壓縮後約 0.3MB
+_COVER_DATA_RE = re.compile(r'data:(image/[a-z]+);base64,([A-Za-z0-9+/=\s]+)\Z')
+
+
+def _cover_data(cover):
+    """data URI → (mime, bytes)；不是允許的點陣圖 data URI 就回傳 None。"""
+    m = _COVER_DATA_RE.match((cover or '').strip())
+    if not m or m.group(1) not in COVER_MIME:
+        return None
+    try:
+        return m.group(1), base64.b64decode(m.group(2), validate=False)
+    except (ValueError, TypeError):
+        return None
+
+
+def _post_cover_url(p):
+    """對外使用的封面網址：data URI 換成 /blog/cover/<slug>.jpg?v=<hash>，其他原樣回傳。"""
+    cover = (p.get('cover_image') or '').strip()
+    if not cover.startswith('data:'):
+        return cover
+    if not _cover_data(cover):
+        return ''
+    ver = hashlib.md5(cover.encode('ascii', 'ignore')).hexdigest()[:10]
+    return f'/blog/cover/{urllib.parse.quote(p["slug"])}.jpg?v={ver}'
+
+
+def _cover_input_error(cover):
+    """後台存檔前檢查封面欄位；沒問題回傳 None。"""
+    cover = (cover or '').strip()
+    if (not cover or cover.startswith(('http://', 'https://', '/'))
+            or ':' not in cover.split('/', 1)[0]):          # 相對路徑 images/x.jpg
+        return None
+    if cover.startswith('data:'):
+        if len(cover) > COVER_MAX_CHARS:
+            return '封面圖太大，請重新上傳（系統會自動壓縮）'
+        if not _cover_data(cover):
+            return '封面圖格式不支援，請上傳 JPG、PNG 或 WebP'
+        return None
+    return '封面圖請上傳圖片，或填 https:// 開頭的網址'
+
 def _breadcrumb_ld(trail):
     """trail: [(name, url), ...] → BreadcrumbList JSON-LD dict。"""
     return {
@@ -5258,6 +5304,8 @@ def admin_get_posts():
 def admin_create_post():
     if not has_role('editor'): return jsonify(ok=False, error='未授權'), 401
     d = request.get_json(force=True, silent=True) or {}
+    cover_err = _cover_input_error(d.get('cover_image'))
+    if cover_err: return jsonify(ok=False, error=cover_err), 400
     try:
         pub = bool(d.get('is_published'))
         faq = d.get('faq') if isinstance(d.get('faq'), list) else None
@@ -5277,6 +5325,8 @@ def admin_create_post():
 def admin_update_post(pid):
     if not has_role('editor'): return jsonify(ok=False, error='未授權'), 401
     d = request.get_json(force=True, silent=True) or {}
+    cover_err = _cover_input_error(d.get('cover_image'))
+    if cover_err: return jsonify(ok=False, error=cover_err), 400
     try:
         conn = get_db(); cur = conn.cursor()
         # 首次發布才寫入 published_at
@@ -5440,7 +5490,7 @@ def _render_blog(title, desc, canonical, body, head_extra='', image=None, lang='
         f'<link rel="stylesheet" href="/style.css?v={ASSET_VERSION}"/>'
         '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" media="print" onload="this.media=\'all\'"/>'
         '<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/></noscript>'
-        '<style>.blog-wrap{max-width:820px;margin:0 auto;padding:36px 20px 60px}.blog-wrap h1{font-size:clamp(1.5rem,4vw,2.1rem);color:var(--blue-dark);font-weight:800;line-height:1.35;margin-bottom:12px}.blog-meta{color:var(--text-light);font-size:.9rem;margin-bottom:20px}.blog-cover{width:100%;border-radius:14px;margin-bottom:24px}.blog-body{font-size:1.04rem;line-height:1.9;color:var(--text-dark)}.blog-body h2{font-size:1.4rem;color:var(--blue-dark);margin:28px 0 12px;font-weight:800}.blog-body h3{font-size:1.15rem;color:var(--blue-main);margin:22px 0 10px;font-weight:700}.blog-body p{margin-bottom:16px}.blog-body img{max-width:100%;border-radius:10px;margin:12px 0}.blog-body ul,.blog-body ol{margin:0 0 16px 22px}.blog-body li{margin-bottom:6px}.blog-body a{color:var(--blue-main);text-decoration:underline}.post-card{display:block;background:var(--white);border:1px solid #e6edf3;border-radius:14px;overflow:hidden;transition:.2s;box-shadow:0 2px 10px rgba(0,0,0,.05)}.post-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-hover)}.post-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;margin-top:28px}.post-card img{width:100%;height:170px;object-fit:cover}.post-card-body{padding:16px 18px}.post-card-body h2{font-size:1.1rem;color:var(--blue-dark);margin-bottom:8px;line-height:1.4}.post-card-body p{color:var(--text-mid);font-size:.9rem;line-height:1.6}.post-tags{margin-top:10px}.post-tag{display:inline-block;background:var(--blue-pale);color:var(--blue-main);font-size:.74rem;padding:2px 9px;border-radius:20px;margin:2px 4px 2px 0}.blog-cta{margin-top:40px;background:var(--blue-pale);border-radius:16px;padding:28px;text-align:center}.blog-cta a{margin:4px}.blog-back{display:inline-block;margin-bottom:18px;color:var(--blue-main);font-weight:600}.rv-summary{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:8px 0 24px;padding:16px 20px;background:var(--blue-pale);border-radius:14px}.rv-avg{font-size:2.2rem;font-weight:800;color:var(--blue-dark);line-height:1}.rv-avg-stars{color:#f5a623;font-size:1.2rem;letter-spacing:2px}.rv-count{color:var(--text-mid);font-size:.95rem}.rv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-top:8px}.rv-card{background:var(--white);border:1px solid #e6edf3;border-radius:14px;padding:18px 20px;box-shadow:0 2px 10px rgba(0,0,0,.05)}.rv-stars{color:#f5a623;letter-spacing:2px;font-size:1.05rem}.rv-num{color:var(--text-mid);font-size:.85rem;margin-left:8px;letter-spacing:0}.rv-body{margin:10px 0 14px;line-height:1.8;color:var(--text-dark)}.rv-meta{color:var(--text-light);font-size:.86rem;border-top:1px solid #eef2f5;padding-top:10px}.blog-cats{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 8px}.blog-cats .post-tag{margin:0;font-size:.82rem;padding:5px 12px;cursor:pointer}.blog-cats .post-tag.active{background:var(--blue-main);color:#fff}.blog-pager{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:36px}.pager-btn{display:inline-block;padding:9px 18px;border-radius:24px;background:var(--blue-pale);color:var(--blue-main);font-weight:600;text-decoration:none}.pager-btn:hover{background:var(--blue-main);color:#fff}.pager-btn.disabled{opacity:.4;pointer-events:none}.pager-info{color:var(--text-mid);font-size:.9rem}'
+        '<style>.blog-wrap{max-width:820px;margin:0 auto;padding:36px 20px 60px}.blog-wrap h1{font-size:clamp(1.5rem,4vw,2.1rem);color:var(--blue-dark);font-weight:800;line-height:1.35;margin-bottom:12px}.blog-meta{color:var(--text-light);font-size:.9rem;margin-bottom:20px}.blog-cover{width:100%;height:auto;border-radius:14px;margin-bottom:24px}.blog-body{font-size:1.04rem;line-height:1.9;color:var(--text-dark)}.blog-body h2{font-size:1.4rem;color:var(--blue-dark);margin:28px 0 12px;font-weight:800}.blog-body h3{font-size:1.15rem;color:var(--blue-main);margin:22px 0 10px;font-weight:700}.blog-body p{margin-bottom:16px}.blog-body img{max-width:100%;border-radius:10px;margin:12px 0}.blog-body ul,.blog-body ol{margin:0 0 16px 22px}.blog-body li{margin-bottom:6px}.blog-body a{color:var(--blue-main);text-decoration:underline}.post-card{display:block;background:var(--white);border:1px solid #e6edf3;border-radius:14px;overflow:hidden;transition:.2s;box-shadow:0 2px 10px rgba(0,0,0,.05)}.post-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-hover)}.post-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;margin-top:28px}.post-card img{width:100%;height:170px;object-fit:cover}.post-card-body{padding:16px 18px}.post-card-body h2{font-size:1.1rem;color:var(--blue-dark);margin-bottom:8px;line-height:1.4}.post-card-body p{color:var(--text-mid);font-size:.9rem;line-height:1.6}.post-tags{margin-top:10px}.post-tag{display:inline-block;background:var(--blue-pale);color:var(--blue-main);font-size:.74rem;padding:2px 9px;border-radius:20px;margin:2px 4px 2px 0}.blog-cta{margin-top:40px;background:var(--blue-pale);border-radius:16px;padding:28px;text-align:center}.blog-cta a{margin:4px}.blog-back{display:inline-block;margin-bottom:18px;color:var(--blue-main);font-weight:600}.rv-summary{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:8px 0 24px;padding:16px 20px;background:var(--blue-pale);border-radius:14px}.rv-avg{font-size:2.2rem;font-weight:800;color:var(--blue-dark);line-height:1}.rv-avg-stars{color:#f5a623;font-size:1.2rem;letter-spacing:2px}.rv-count{color:var(--text-mid);font-size:.95rem}.rv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-top:8px}.rv-card{background:var(--white);border:1px solid #e6edf3;border-radius:14px;padding:18px 20px;box-shadow:0 2px 10px rgba(0,0,0,.05)}.rv-stars{color:#f5a623;letter-spacing:2px;font-size:1.05rem}.rv-num{color:var(--text-mid);font-size:.85rem;margin-left:8px;letter-spacing:0}.rv-body{margin:10px 0 14px;line-height:1.8;color:var(--text-dark)}.rv-meta{color:var(--text-light);font-size:.86rem;border-top:1px solid #eef2f5;padding-top:10px}.blog-cats{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 8px}.blog-cats .post-tag{margin:0;font-size:.82rem;padding:5px 12px;cursor:pointer}.blog-cats .post-tag.active{background:var(--blue-main);color:#fff}.blog-pager{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:36px}.pager-btn{display:inline-block;padding:9px 18px;border-radius:24px;background:var(--blue-pale);color:var(--blue-main);font-weight:600;text-decoration:none}.pager-btn:hover{background:var(--blue-main);color:#fff}.pager-btn.disabled{opacity:.4;pointer-events:none}.pager-info{color:var(--text-mid);font-size:.9rem}'
         '.post-tldr{background:var(--blue-pale);border-left:4px solid var(--blue-main);border-radius:10px;padding:16px 20px;margin:0 0 18px}.post-tldr-label{display:inline-block;font-weight:800;color:var(--blue-dark);font-size:.85rem;background:#fff;border-radius:20px;padding:2px 12px;margin-bottom:8px}.post-tldr p{margin:6px 0 0;line-height:1.8;color:var(--text-dark)}'
         '.post-infobox{border:1px solid #e6edf3;border-radius:12px;padding:6px 18px;margin:0 0 20px;background:#fff}.post-info-row{display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #f0f4f7;font-size:.95rem}.post-info-row:last-child{border-bottom:none}.post-info-k{flex:0 0 auto;min-width:96px;font-weight:700;color:var(--blue-dark)}.post-info-v{color:var(--text-mid);line-height:1.7}'
         '.post-faq{margin-top:36px}.post-faq h2{font-size:1.4rem;color:var(--blue-dark);font-weight:800;margin-bottom:14px}.post-faq details{background:#fff;border:1px solid #e6edf3;border-radius:12px;margin-bottom:10px;padding:0 18px}.post-faq summary{cursor:pointer;font-weight:700;color:var(--blue-dark);padding:14px 0;list-style-position:inside}.post-faq details[open] summary{border-bottom:1px solid #eef2f5}.post-faq details p{padding:12px 0 16px;color:var(--text-mid);line-height:1.8}</style>'
@@ -5492,7 +5542,8 @@ def blog_index():
     cards = ''
     for p in page_posts:
         lp = _localize_post(p, lang)
-        img = f'<img src="{_html.escape(lp["cover_image"])}" alt="{_html.escape(lp["title"])}" loading="lazy"/>' if lp.get('cover_image') else ''
+        cover_url = _post_cover_url(lp)
+        img = f'<img src="{_html.escape(cover_url)}" alt="{_html.escape(lp["title"])}" loading="lazy" width="1200" height="630"/>' if cover_url else ''
         tags = ''.join(f'<a class="post-tag" href="/blog?tag={_html.escape(t.strip())}{_tagq}">{_html.escape(t.strip())}</a>' for t in (lp.get('tags') or '').split(',') if t.strip())
         cards += (f'<a class="post-card" href="/blog/{_html.escape(lp["slug"])}{_langq}">{img}'
                   f'<div class="post-card-body"><h2>{_html.escape(lp["title"])}</h2>'
@@ -5584,6 +5635,25 @@ def _pillar_link_for_tags(tags):
         return ('/penghu-3days-itinerary', '澎湖三天兩夜行程規劃')
     return None
 
+@app.route('/blog/cover/<slug>.jpg')
+def blog_cover(slug):
+    """從資料庫送出後台上傳的封面（data URI 解碼）。網址帶 ?v=<hash>，換圖就換網址，可長快取。"""
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("SELECT cover_image FROM posts WHERE slug=%s AND is_published=TRUE", (slug,))
+        row = cur.fetchone(); cur.close(); conn.close()
+    except Exception:
+        row = None
+    data = _cover_data((row or {}).get('cover_image'))
+    if not data:
+        return ('', 404)
+    mime, raw = data
+    resp = app.response_class(raw, mimetype=mime)
+    resp.headers['Cache-Control'] = ('public, max-age=31536000, immutable' if request.args.get('v')
+                                     else 'public, max-age=3600')
+    resp.headers['X-Content-Type-Options'] = 'nosniff'
+    return resp
+
 @app.route('/blog/<slug>')
 def blog_post(slug):
     try:
@@ -5614,7 +5684,8 @@ def blog_post(slug):
     p = _localize_post(p, lang)          # 逐欄位翻譯，缺者回退中文
     desc = (p.get('summary') or _html.unescape(re.sub('<[^>]+>', '', p.get('content') or ''))[:140])
     pub = str(p.get('published_at') or p.get('created_at') or '')[:10]
-    cover = f'<img class="blog-cover" src="{_html.escape(p["cover_image"])}" alt="{_html.escape(p["title"])}"/>' if p.get('cover_image') else ''
+    cover_url = _post_cover_url(p)
+    cover = f'<img class="blog-cover" src="{_html.escape(cover_url)}" alt="{_html.escape(p["title"])}" width="1200" height="630"/>' if cover_url else ''
     tags = ''.join(f'<span class="post-tag">{_html.escape(t.strip())}</span>' for t in (p.get('tags') or '').split(',') if t.strip())
     canonical = f'{SITE}/blog/{slug}' + (f'?lang={lang}' if lang != 'zh-tw' else '')
     ld = {
@@ -5630,7 +5701,7 @@ def blog_post(slug):
     if p.get('updated_at'):          # 空字串不是合法日期，沒有就整個不給
         ld['dateModified'] = str(p['updated_at'])
     imgs = []
-    for m in [p.get('cover_image')] + re.findall(r'<img[^>]+src="([^"]+)"', p.get('content') or ''):
+    for m in [cover_url] + re.findall(r'<img[^>]+src="([^"]+)"', p.get('content') or ''):
         u = _ld_abs_url(_html.unescape(m or ''))
         if u and u not in imgs:
             imgs.append(u)
