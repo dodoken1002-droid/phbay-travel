@@ -63,6 +63,16 @@ class CoverRouteTests(unittest.TestCase):
         self.assertIn('immutable', resp.headers['Cache-Control'])
         self.assertEqual(resp.headers['X-Content-Type-Options'], 'nosniff')
 
+    def test_unversioned_url_gets_short_cache(self):
+        # 全域 .jpg 長快取不能蓋掉：沒帶 ?v 的網址換圖後要能更新
+        resp = self.get('/blog/cover/kueibi.jpg', {'cover_image': JPEG_URI})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.headers['Cache-Control'], 'public, max-age=3600')
+
+    def test_missing_cover_is_not_cached(self):
+        resp = self.get('/blog/cover/none.jpg', None)
+        self.assertEqual(resp.headers['Cache-Control'], 'no-store')
+
     def test_missing_or_unsafe_cover_is_404(self):
         self.assertEqual(self.get('/blog/cover/none.jpg', None).status_code, 404)
         self.assertEqual(self.get('/blog/cover/x.jpg', {'cover_image': '/images/a.jpg'}).status_code, 404)
