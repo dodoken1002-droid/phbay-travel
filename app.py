@@ -4985,7 +4985,19 @@ def _preorder_seo_data(slug, product=None):
                     'addressCountry': 'TW'
                 }
             },
-            'organizer': {'@type': 'TravelAgency', 'name': '潮旅國際旅行社', 'url': SITE}
+            'organizer': {
+                '@type': 'GovernmentOrganization',
+                'name': '交通部觀光署澎湖國家風景區管理處',
+                'url': 'https://www.penghu-nsa.gov.tw/'
+            },
+            'offers': {
+                '@type': 'Offer',
+                'price': '0',
+                'priceCurrency': 'TWD',
+                'availability': 'https://schema.org/InStock',
+                'validFrom': '2026-06-01',
+                'url': canonical
+            }
         })
         graph.append({
             '@context': 'https://schema.org',

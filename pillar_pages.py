@@ -11,6 +11,13 @@ import html as _html
 import json
 
 SITE = 'https://www.phbay.info'
+
+# 追風音樂燈光節實際主辦單位（Google Event 結構化資料 organizer 欄位）
+FESTIVAL_ORGANIZER = {
+    "@type": "GovernmentOrganization",
+    "name": "交通部觀光署澎湖國家風景區管理處",
+    "url": "https://www.penghu-nsa.gov.tw/",
+}
 # 攻略頁最後更新日：同時供 JSON-LD dateModified 與 sitemap <lastmod> 使用。
 # 改動任一攻略頁內容時請一併更新，讓 Google 收到正確的更新訊號。
 LAST_MODIFIED = '2026-09-03'
@@ -725,6 +732,13 @@ def _page_festival():
                       ["圭賢（Super Junior）", "盧廣仲", "TRASH", "理想混蛋", "宇宙人", "帕拉斯",
                        "美秀集團", "芒果醬", "椅子樂團", "胡凱兒", "玖壹壹", "高爾宣", "PIZZALI",
                        "周湯豪", "安心亞", "怕胖團"]],
+        "image": [f"{SITE}/images/festival-poster.jpg"],
+        "url": f"{SITE}/penghu-2026-festival-guide",
+        "organizer": FESTIVAL_ORGANIZER,
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "TWD",
+                   "availability": "https://schema.org/InStock",
+                   "validFrom": "2026-06-01",
+                   "url": f"{SITE}/penghu-2026-festival-guide"},
     }
     trip_ld = {
         "@context": "https://schema.org", "@type": "TouristTrip",
