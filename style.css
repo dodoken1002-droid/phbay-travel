@@ -1032,6 +1032,19 @@ ul { list-style: none; }
 }
 .form-success i { font-size: 3rem; color: #2ea86e; margin-bottom: 16px; }
 .form-success p { margin-bottom: 8px; }
+.btn-line-handoff {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px 22px;
+  white-space: nowrap;
+  background: #06C755;
+  color: #fff;
+  border-color: #06C755;
+}
+.btn-line-handoff:hover { background: #05a948; border-color: #05a948; color: #fff; }
+.form-success .btn-line-handoff i { font-size: 1.25rem; color: #fff; margin-bottom: 0; }
 
 /* ═══════════════════════════════════════════════
    2026 跟著海龜漫旅 — 特殊卡片樣式

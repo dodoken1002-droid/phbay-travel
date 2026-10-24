@@ -11,6 +11,15 @@ class ConversionContractTests(unittest.TestCase):
         self.assertIn("method:        'contact_form'", script)
         self.assertIn('data.utm = getAttribution()', script)
 
+    def test_contact_success_hands_off_to_line(self):
+        html = (ROOT / 'index.html').read_text(encoding='utf-8')
+        script = (ROOT / 'script.js').read_text(encoding='utf-8')
+        i18n = (ROOT / 'i18n.js').read_text(encoding='utf-8')
+        self.assertIn('id="form-success-line"', html)
+        self.assertIn('https://go.mantago.co/bDsNKJ', html)
+        self.assertIn("gtag('event', 'line_handoff_click'", script)
+        self.assertEqual(i18n.count("'form.lineCta'"), 4)
+
     def test_preorders_track_attempt_success_failure(self):
         for filename, method in (('preorder.html', "method:'preorder'"),
                                  ('neihai-preorder.html', "method:'neihai_preorder'")):

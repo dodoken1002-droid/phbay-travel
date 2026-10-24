@@ -225,6 +225,20 @@ function initContactForm() {
   const success = document.getElementById('form-success');
   if (!form) return;
 
+  // 送出成功後導 LINE：MantaGO 引流連結會自動貼標並回覆「已收到詢價」，
+  // 記一筆 line_handoff_click，可與 generate_lead 相比看詢價→加 LINE 的接續率。
+  const lineHandoff = document.getElementById('form-success-line');
+  if (lineHandoff) {
+    lineHandoff.addEventListener('click', () => {
+      if (typeof gtag === 'function') {
+        gtag('event', 'line_handoff_click', {
+          method:      'contact_form',
+          destination: 'mantago_inquiry',
+        });
+      }
+    });
+  }
+
   // 日期區間：回程不能早於出發日
   const startInput = document.getElementById('travel-date-start');
   const endInput   = document.getElementById('travel-date-end');
