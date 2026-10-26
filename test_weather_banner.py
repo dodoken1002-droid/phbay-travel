@@ -95,7 +95,7 @@ class WeatherApiTests(unittest.TestCase):
 
 class WeatherBannerPagesTests(unittest.TestCase):
     def test_every_public_page_loads_the_banner_script(self):
-        tag = '<script src="/weather-banner.js?v=20261014a" defer></script>'
+        tag = '<script src="/weather-banner.js?v=20261027a" defer></script>'
         for name in PAGES_WITH_BANNER:
             with self.subTest(page=name):
                 self.assertIn(tag, (ROOT / name).read_text(encoding='utf-8'))

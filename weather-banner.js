@@ -19,7 +19,7 @@
     '@media (max-width:768px){',
     /* 手機只放得下一行：只留天氣，公司資訊在頁尾都有 */
     '.top-banner.has-weather .banner-static{justify-content:center;-webkit-mask-image:none;mask-image:none}',
-    '.top-banner.has-weather .banner-static>:not(.banner-weather){display:none}',
+    '.top-banner.has-weather .banner-static>:not(.banner-weather):not(.banner-sailing){display:none}',
     '.top-note.has-weather .tn-phone{display:none}',  /* 秋冬專頁：手機留天氣＋字號兩行 */
     '.banner-weather .bw-pop,.banner-weather .bw-pop-sep{display:none}',
     /* 強風時手機優先講風：隱藏天氣概況，提醒改短版 */
@@ -67,7 +67,7 @@
       a.appendChild(span(p[0], p[1]));
     });
     if (w.strong_wind) {
-      a.appendChild(span('bw-sep', '｜'));
+      a.appendChild(span('bw-sep bw-alert-sep', '｜'));
       var alert = span('bw-alert', '');
       alert.appendChild(span('bw-alert-long', '風浪較大，離島船班請先確認'));
       alert.appendChild(span('bw-alert-short', '⚠️ 離島船班請先確認'));
@@ -88,12 +88,57 @@
       document.head.appendChild(st);
     }
     var link = build(w, banner ? '' : ' tn-item');
-    host.insertBefore(span((banner ? 'banner-sep' : 'tn-sep') + ' banner-weather-sep', '｜'), host.firstChild);
-    host.insertBefore(link, host.firstChild);
+    // 船班公告若已先顯示，天氣排在它後面
+    var sailing = host.querySelector('.banner-sailing');
+    var ref = sailing ? sailing.nextSibling : host.firstChild;
+    host.insertBefore(span((banner ? 'banner-sep' : 'tn-sep') + ' banner-weather-sep', '｜'), ref);
+    host.insertBefore(link, host.querySelector('.banner-weather-sep'));
     (banner ? banner.closest('.top-banner') : note).classList.add('has-weather');
   }
 
+  /* 船班公告（/api/sailing-notice，後台「內海預購」分頁手動設定）：
+     正常時不顯示；減班＝黃、停駛＝紅，點了到 FAQ 的風浪船班說明。
+     強風提醒與船班公告同時存在時，只留船班公告（資訊更明確）。 */
+  var SAILING_CSS = [
+    '.banner-sailing{display:inline-block;white-space:nowrap;font-weight:700;text-decoration:none;border-radius:999px;padding:1px 10px;margin-right:6px}',
+    '.banner-sailing.is-caution{background:#F2B441;color:#4A3200}',
+    '.banner-sailing.is-suspended{background:#C53030;color:#fff}',
+    '.banner-sailing:hover{text-decoration:underline}',
+    '.has-sailing .banner-weather .bw-alert,.has-sailing .banner-weather .bw-alert-sep{display:none}',
+    /* 手機只有一行：船班公告優先，天氣整段讓位 */
+    '@media (max-width:768px){.has-sailing .banner-weather,.has-sailing .banner-weather-sep{display:none!important}}'
+  ].join('');
+
+  function renderSailing(n) {
+    if (!n || !n.ok || (n.level !== 'caution' && n.level !== 'suspended') || !n.message) return;
+    var banner = document.querySelector('.top-banner .banner-static');
+    var host = banner || document.querySelector('.top-note');
+    if (!host || host.querySelector('.banner-sailing')) return;
+    if (!document.getElementById('banner-sailing-css')) {
+      var st = document.createElement('style');
+      st.id = 'banner-sailing-css';
+      st.textContent = SAILING_CSS;
+      document.head.appendChild(st);
+    }
+    var a = document.createElement('a');
+    a.className = 'banner-sailing is-' + n.level + (banner ? '' : ' tn-item');
+    a.href = '/faq#autumn-sailing';
+    a.textContent = (n.level === 'suspended' ? '⛔ ' : '⚠️ ') + n.message;
+    host.insertBefore(a, host.firstChild);
+    (banner ? banner.closest('.top-banner') : host).classList.add('has-sailing');
+    if (banner) banner.closest('.top-banner').classList.add('has-weather');  // 套用手機單行版面
+    try { if (window.gtag) window.gtag('event', 'sailing_notice_view', { level: n.level }); } catch (e) {}
+  }
+
+  function loadSailing() {
+    fetch('/api/sailing-notice', { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(renderSailing)
+      .catch(function () { /* 抓不到就不顯示 */ });
+  }
+
   function load() {
+    loadSailing();
     try {
       var c = JSON.parse(sessionStorage.getItem(CACHE_KEY) || 'null');
       if (c && Date.now() - c.at < CACHE_MS) { render(c.data); return; }

@@ -17,3 +17,7 @@
 @media(max-width:900px){.hero-image{background:linear-gradient(180deg,rgba(255,249,239,.08) 0,rgba(255,249,239,.08) 150px,rgba(255,249,239,.96) 270px,var(--sand) 100%),url("/images/autumn-winter/hero-slow-travel.webp") 69% top/auto 54% no-repeat,var(--sand)}}
 
 .top-note .tn-sep{margin:0 10px;opacity:.6}.top-note .tn-item{white-space:nowrap}
+
+/* 風大也照樣好玩（秋冬移動／避風／海鮮） */
+.wind-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}.wind-card{background:#fff;border:1px solid var(--line);border-radius:24px;padding:30px;display:flex;flex-direction:column;box-shadow:var(--shadow)}.wind-card h3{font-size:24px;margin:6px 0 12px}.wind-card>p:not(.idea-tag){color:var(--muted);margin:0 0 14px}.wind-card ul{padding-left:18px;margin:0 0 20px;flex:1}.wind-card li{margin:6px 0}.wind-card li a{color:var(--teal-dark);font-weight:700}.wind-cta{align-self:flex-start;font-weight:900;color:var(--coral);text-decoration:none}.wind-cta:hover{text-decoration:underline}.event-more{display:inline-block;margin-left:6px;color:var(--teal-dark);font-weight:800;white-space:nowrap}
+@media(max-width:900px){.wind-grid{grid-template-columns:1fr}.wind-card{padding:24px}}

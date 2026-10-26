@@ -464,6 +464,19 @@ def init_db():
     """)
     cur.execute("INSERT INTO qigui_config (id, win_rate_pct) VALUES (1, 40) ON CONFLICT (id) DO NOTHING")
 
+    # 船班公告（全站頂部資訊列）：秋冬東北季風期由訂位人員每日手動更新；單列 id=1
+    # level：normal=正常（不顯示）、caution=部分減班、suspended=部分航線停駛
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS sailing_notice (
+            id          INT PRIMARY KEY DEFAULT 1,
+            level       VARCHAR(16) NOT NULL DEFAULT 'normal',
+            message     VARCHAR(80) NOT NULL DEFAULT '',
+            updated_by  VARCHAR(80) DEFAULT '',
+            updated_at  TIMESTAMP DEFAULT NOW()
+        )
+    """)
+    cur.execute("INSERT INTO sailing_notice (id) VALUES (1) ON CONFLICT (id) DO NOTHING")
+
     # LINE 官方帳號互動用戶（webhook 記錄，用於取得 userId 與對照訂單）
     cur.execute("""
         CREATE TABLE IF NOT EXISTS line_users (
@@ -1109,6 +1122,78 @@ def admin_qigui_win_rate():
         row = cur.fetchone()
         conn.commit(); cur.close(); conn.close()
         return jsonify(ok=True, win_rate_pct=int(row['win_rate_pct']))
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+SAILING_LEVELS = ('normal', 'caution', 'suspended')
+SAILING_DEFAULT_MESSAGES = {
+    'caution': '今日部分船班減班，出發前請先確認',
+    'suspended': '今日部分航線停駛，已訂行程我們會主動聯繫',
+}
+SAILING_NOTICE_TTL_HOURS = 20   # 超過這個時數沒更新就自動視為正常，避免忘了關掉的停駛公告一直掛著
+
+
+@app.route('/api/sailing-notice')
+def api_sailing_notice():
+    """全站頂部資訊列用的船班公告。任何錯誤都回 normal（不顯示），不影響頁面。"""
+    level, message = 'normal', ''
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("""
+            SELECT level, message,
+                   (NOW() - updated_at) > (%s * INTERVAL '1 hour') AS expired
+            FROM sailing_notice WHERE id = 1
+        """, (SAILING_NOTICE_TTL_HOURS,))
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        if row and row['level'] in SAILING_LEVELS and not row['expired']:
+            level = row['level']
+            message = row['message'] or SAILING_DEFAULT_MESSAGES.get(level, '')
+    except Exception:
+        pass
+    if level == 'normal':
+        message = ''
+    resp = jsonify(ok=True, level=level, message=message)
+    resp.headers['Cache-Control'] = 'public, max-age=120'
+    return resp
+
+
+@app.route('/api/admin/sailing-notice', methods=['GET', 'PATCH'])
+def admin_sailing_notice():
+    """讀取／更新船班公告（owner 或訂位人員）。"""
+    if not has_role('orders'):
+        return jsonify(ok=False, error='未授權'), 401
+    try:
+        conn = get_db(); cur = conn.cursor()
+        if request.method == 'PATCH':
+            data = request.get_json(force=True, silent=True) or {}
+            level = str(data.get('level') or '').strip()
+            message = str(data.get('message') or '').strip()
+            if level not in SAILING_LEVELS:
+                cur.close(); conn.close()
+                return jsonify(ok=False, error='狀態只能是正常、減班或停駛'), 400
+            if len(message) > 40:
+                cur.close(); conn.close()
+                return jsonify(ok=False, error='公告文字請在 40 字以內（手機一行放得下）'), 400
+            u = current_admin() or {}
+            cur.execute("""
+                INSERT INTO sailing_notice (id, level, message, updated_by, updated_at)
+                VALUES (1, %s, %s, %s, NOW())
+                ON CONFLICT (id) DO UPDATE SET level = EXCLUDED.level, message = EXCLUDED.message,
+                    updated_by = EXCLUDED.updated_by, updated_at = NOW()
+            """, (level, message, u.get('name') or u.get('username') or ''))
+            conn.commit()
+        cur.execute("""
+            SELECT level, message, updated_by,
+                   TO_CHAR(updated_at, 'YYYY-MM-DD HH24:MI') AS updated_at,
+                   (NOW() - updated_at) > (%s * INTERVAL '1 hour') AS expired
+            FROM sailing_notice WHERE id = 1
+        """, (SAILING_NOTICE_TTL_HOURS,))
+        row = cur.fetchone() or {}
+        cur.close(); conn.close()
+        return jsonify(ok=True, notice=dict(row), ttl_hours=SAILING_NOTICE_TTL_HOURS,
+                       default_messages=SAILING_DEFAULT_MESSAGES)
     except Exception as e:
         return jsonify(ok=False, error=str(e)), 500
 
@@ -5450,7 +5535,7 @@ def _render_blog(title, desc, canonical, body, head_extra='', image=None, lang='
     nav = '''<div class="top-banner"><div class="banner-static"><span>潮旅國際旅行社</span><span class="banner-sep">｜</span><span>交觀乙第1864號・品保澎字第0188號</span><span class="banner-sep">｜</span><span>電話：06-9271288</span></div></div>
 <nav class="navbar" id="navbar"><div class="nav-container"><a href="/" class="nav-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a><button class="nav-toggle" id="nav-toggle" aria-label="選單"><span></span><span></span><span></span></button><ul class="nav-links" id="nav-links"><li><a href="/">首頁</a></li><li><a href="/tours">行程介紹</a></li><li class="nav-item has-submenu"><a href="/neihai-preorder.html">預購行程 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/neihai-preorder.html">小城故事內海巡禮</a></li></ul></li><li class="nav-item has-submenu"><a href="/blog">旅遊大小事 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/tides">潮汐查詢系統</a></li><li><a href="/penghu-itinerary-recommendations/planner?src=nav">自己排行程</a></li><li><a href="/blog">旅遊文章分享</a></li><li><a href="/faq.html">常見問題</a></li><li><a href="/reviews">旅客評價</a></li></ul></li><li class="nav-item has-submenu"><a href="/#about">關於我們 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/#contact">聯絡資訊</a></li></ul></li></ul></div></nav>'''
     footer = '''<footer class="footer"><div class="container"><div class="footer-bottom"><p>© 2026 潮旅國際旅行社 All Rights Reserved.｜<a href="/" style="color:inherit">官網</a>｜<a href="/blog" style="color:inherit">部落格</a>｜<a href="/reviews" style="color:inherit">旅客評價</a>｜<a href="/privacy" style="color:inherit">隱私權政策</a>｜<a href="/terms" style="color:inherit">使用條款</a></p></div></div></footer>
-<script>(function(){var t=document.getElementById('nav-toggle'),l=document.getElementById('nav-links');if(t)t.addEventListener('click',function(){l.classList.toggle('open')});var lb=document.getElementById('lang-btn'),lm=document.getElementById('lang-menu');if(lb)lb.addEventListener('click',function(e){e.stopPropagation();lm.classList.toggle('open')});document.addEventListener('click',function(){if(lm)lm.classList.remove('open')});})();</script><script src="/weather-banner.js?v=20261014a" defer></script>'''
+<script>(function(){var t=document.getElementById('nav-toggle'),l=document.getElementById('nav-links');if(t)t.addEventListener('click',function(){l.classList.toggle('open')});var lb=document.getElementById('lang-btn'),lm=document.getElementById('lang-menu');if(lb)lb.addEventListener('click',function(e){e.stopPropagation();lm.classList.toggle('open')});document.addEventListener('click',function(){if(lm)lm.classList.remove('open')});})();</script><script src="/weather-banner.js?v=20261027a" defer></script>'''
     # 還沒有真實評價時不放「旅客評價」入口：一個點進去只寫「整理中」的頁面比沒有更扣信任感。
     # 靜態頁（index.html 等）的入口已移除；content/reviews.json 有資料後要一併加回，見 content/REVIEWS.md。
     if not load_reviews():
