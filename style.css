@@ -1937,3 +1937,8 @@ ul { list-style: none; }
   .season-entry-grid { grid-template-columns: 1fr; gap: 30px; }
   .season-entry { padding: 58px 0; }
 }
+
+/* 首頁秋冬入口：快速標籤（對應秋冬熱門搜尋） */
+.season-quick { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 18px 0 0; }
+.season-quick a { display: inline-block; padding: 6px 14px; border-radius: 999px; border: 1px solid rgba(26,107,158,.28); background: #fff; color: #1a6b9e; font-size: .9rem; font-weight: 700; text-decoration: none; transition: background .2s, color .2s; }
+.season-quick a:hover { background: #1a6b9e; color: #fff; }

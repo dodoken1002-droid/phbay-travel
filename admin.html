@@ -337,6 +337,24 @@ input:checked + .toggle-track::after{transform:translateX(20px)}
 
     <!-- ── 小城故事・內海巡禮預購 ── -->
     <div class="tab-content" id="tab-neihai">
+      <div class="sailing-card" style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px 18px;margin-bottom:18px">
+        <h3 style="margin:0 0 4px;font-size:1.02rem"><i class="fas fa-ship"></i> 全站船班公告（頂部資訊列）</h3>
+        <p style="margin:0 0 12px;color:var(--mid);font-size:.86rem">東北季風期每天早上依航運單位公告更新一次。超過 20 小時未更新會自動恢復「正常」，不會一直掛著停駛。</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+          <label style="font-size:.85rem">狀態<br>
+            <select id="sailing-level" onchange="sailingLevelChanged()" style="padding:9px;border:1px solid #e2e8f0;border-radius:8px;min-width:150px">
+              <option value="normal">🟢 正常（不顯示）</option>
+              <option value="caution">🟡 部分減班</option>
+              <option value="suspended">🔴 部分航線停駛</option>
+            </select>
+          </label>
+          <label style="font-size:.85rem;flex:1;min-width:240px">公告文字（40 字內，空白用預設）<br>
+            <input id="sailing-message" maxlength="40" placeholder="例：今日七美、望安航線停駛，已訂行程我們會主動聯繫" style="width:100%;padding:9px;border:1px solid #e2e8f0;border-radius:8px" />
+          </label>
+          <button class="btn btn-primary" onclick="saveSailingNotice()"><i class="fas fa-save"></i> 發布</button>
+        </div>
+        <div id="sailing-msg" style="margin-top:10px;font-size:.88rem;color:var(--mid)"></div>
+      </div>
       <div class="toolbar">
         <h2>小城故事・內海巡禮預購訂單</h2>
         <div class="toolbar-right">
@@ -1290,6 +1308,46 @@ function claimQiguiCode() {
 /* ══════════════════════════════════════
    Tab 切換
 ══════════════════════════════════════ */
+/* ══════════════════════════════════════
+   全站船班公告
+══════════════════════════════════════ */
+let SAILING_DEFAULTS = {};
+const SAILING_LABEL = { normal: '正常（不顯示）', caution: '部分減班', suspended: '部分航線停駛' };
+function showSailingState(d) {
+  const n = d.notice || {};
+  SAILING_DEFAULTS = d.default_messages || {};
+  document.getElementById('sailing-level').value = n.level || 'normal';
+  document.getElementById('sailing-message').value = n.message || '';
+  sailingLevelChanged();
+  const live = (n.level && n.level !== 'normal' && !n.expired) ? SAILING_LABEL[n.level] : '正常（不顯示）';
+  document.getElementById('sailing-msg').textContent =
+    `目前前台：${live}` + (n.updated_at ? `｜最後更新 ${n.updated_at}${n.updated_by ? '（' + n.updated_by + '）' : ''}` : '') +
+    (n.expired && n.level !== 'normal' ? '｜已超過 20 小時，前台已自動恢復正常' : '');
+}
+function sailingLevelChanged() {
+  const lv = document.getElementById('sailing-level').value;
+  const input = document.getElementById('sailing-message');
+  input.disabled = lv === 'normal';
+  input.placeholder = SAILING_DEFAULTS[lv] ? `預設：${SAILING_DEFAULTS[lv]}` : '正常時不顯示公告';
+}
+function loadSailingNotice() {
+  fetch(`/api/admin/sailing-notice?key=${encodeURIComponent(ADMIN_KEY)}`)
+    .then(r => r.json()).then(d => { if (d.ok) showSailingState(d); })
+    .catch(() => {});
+}
+function saveSailingNotice() {
+  const msg = document.getElementById('sailing-msg');
+  const level = document.getElementById('sailing-level').value;
+  const message = level === 'normal' ? '' : document.getElementById('sailing-message').value.trim();
+  fetch(`/api/admin/sailing-notice?key=${encodeURIComponent(ADMIN_KEY)}`, {
+    method: 'PATCH', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ level, message, _key: ADMIN_KEY }),
+  }).then(r => r.json()).then(d => {
+    if (d.ok) { showSailingState(d); msg.style.color = '#2f855a'; msg.textContent = '✔ 已發布（前台約 2 分鐘內更新）｜' + msg.textContent; }
+    else { msg.style.color = '#c53030'; msg.textContent = d.error || '發布失敗'; }
+  }).catch(() => { msg.style.color = '#c53030'; msg.textContent = '發布失敗，請稍後再試'; });
+}
+
 function switchTab(name, btn) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tab-nav button').forEach(b => b.classList.remove('active'));
@@ -1299,7 +1357,7 @@ function switchTab(name, btn) {
   if (name === 'members')  { loadMembers(); loadTripPolicy(); }
   if (name === 'slots')    loadSlots();
   if (name === 'posts')    loadPosts();
-  if (name === 'neihai')   loadNeihaiOrders();
+  if (name === 'neihai')   { loadNeihaiOrders(); loadSailingNotice(); }
   if (name === 'preorder') loadPreorderOrders();
   if (name === 'users')    loadUsers();
   if (name === 'tours')    loadTours();

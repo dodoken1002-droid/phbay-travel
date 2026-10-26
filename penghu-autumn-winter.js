@@ -22,3 +22,10 @@ document.querySelectorAll('a[href*="line.me"], a[href^="tel:"]').forEach(link =>
     }
   });
 });
+
+// 秋冬入口卡片點擊：GA4 cta_click（label＝data-track），用來比較移動／避風／美食哪個入口最常被點
+document.querySelectorAll('[data-track]').forEach(link => {
+  link.addEventListener('click', () => {
+    if (typeof gtag === 'function') gtag('event', 'cta_click', { label: link.dataset.track, page: 'autumn_winter' });
+  });
+});
