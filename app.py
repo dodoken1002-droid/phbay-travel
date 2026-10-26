@@ -6106,6 +6106,15 @@ def submit_contact():
     if missing:
         return jsonify(ok=False, error=f'缺少必填欄位：{", ".join(missing)}'), 400
 
+    # 旅遊人數須為確切整數，才能估價（不接受「3-5」這類區間）
+    try:
+        people_count = int(str(data['people']).strip())
+    except (TypeError, ValueError):
+        people_count = 0
+    if not 1 <= people_count <= 999:
+        return jsonify(ok=False, error='旅遊人數請填寫確切人數（1 以上的整數）'), 400
+    data['people'] = str(people_count)
+
     slot_id    = data.get('slot_id')
     planner_structure = sanitize_planner_structure(data.get('planner_structure'))
     is_waitlist = False

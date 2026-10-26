@@ -791,13 +791,7 @@
             <div class="form-row">
               <div class="form-group">
                 <label for="people"><i class="fas fa-users"></i> <span data-i18n="form.people">旅遊人數</span> <span class="required">*</span></label>
-                <select id="people" name="people" required>
-                  <option value="" data-i18n="form.peoplePh">請選擇人數</option>
-                  <option value="1-2">1 - 2 人</option>
-                  <option value="3-5">3 - 5 人</option>
-                  <option value="6-10">6 - 10 人</option>
-                  <option value="11+">11 人以上（團體）</option>
-                </select>
+                <input type="number" id="people" name="people" required min="1" max="999" step="1" inputmode="numeric" placeholder="請輸入確切人數，例：4" data-i18n-ph="form.peoplePh" />
               </div>
               <div class="form-group">
                 <label><i class="fas fa-plane"></i> <span data-i18n="form.transport">往返交通方式</span> <span class="required">*</span></label>

@@ -19,7 +19,7 @@
     const parts=start.split('-').map(Number),d=new Date(parts[0],parts[1]-1,parts[2]);d.setDate(d.getDate()+dayCount(days)-1);
     const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
   }
-  function peopleRange(adults,children){const n=Math.max(1,Number(adults||0)+Number(children||0));return n<=2?'1-2':n<=5?'3-5':n<=10?'6-10':'11+';}
+  function peopleRange(adults,children){const n=Math.max(1,Number(adults||0)+Number(children||0));return String(n);}
   function transportValue(method){return String(method||'').startsWith('flight')?'飛機':String(method||'').startsWith('ferry')?'搭船':'';}
   function budgetValue(v){return ({under_5k:'under5000','5k_8k':'5000-8000','8k_12k':'8000-12000',quality_first:'12000-18000'})[v]||'';}
   function summary(payload){

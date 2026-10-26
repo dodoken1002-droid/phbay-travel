@@ -265,6 +265,13 @@ function initContactForm() {
       return;
     }
 
+    const peopleCount = Number(String(data.people).trim());
+    if (!Number.isInteger(peopleCount) || peopleCount < 1 || peopleCount > 999) {
+      showFormError('旅遊人數請填寫確切人數（1 以上的整數），以便估價。');
+      return;
+    }
+    data.people = String(peopleCount);
+
     const contractBox = document.getElementById('contract-consent');
     if (contractBox && !contractBox.checked) {
       showFormError('請先閱讀並勾選同意《國內旅遊定型化契約》再送出。');

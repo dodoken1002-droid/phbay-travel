@@ -79,7 +79,7 @@ assert.deepStrictEqual(estimate.rows.find(row => row.key === 'product').range, [
 const prefillPayload = quiz.buildPrefillPayload(base({travel_date:'2026-10-10',travel_days:'3d2n',adults:2,children:2,arrival_method:'ferry_booked'}), family, quiz.resolveRecommendedProduct('family_slow', [], liveTours));
 const form = prefill.formValues(prefillPayload);
 assert.strictEqual(form.travel_date_end, '2026-10-12');
-assert.strictEqual(form.people, '3-5');
+assert.strictEqual(form.people, '4', '2 大 2 小應帶入確切人數 4');
 assert.strictEqual(form.transport, '搭船');
 assert(form.notes.includes('30 秒行程診斷'));
 assert(!('name' in prefillPayload.answers) && !('phone' in prefillPayload.answers) && !('email' in prefillPayload.answers));
