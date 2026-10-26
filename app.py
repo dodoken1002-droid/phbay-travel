@@ -6197,7 +6197,15 @@ def submit_quiz_lead():
     month = (data.get('month') or '').strip()
     result_type = (data.get('result_type') or '').strip()
     result_name = (data.get('result_name') or '').strip()
-    people = (data.get('people') or '').strip()
+    people = str(data.get('people') or '').strip()
+    if people:
+        try:
+            people_count = int(people)
+        except ValueError:
+            people_count = 0
+        if not 1 <= people_count <= 999:
+            return jsonify(ok=False, error='人數請填寫確切人數（1 以上的整數），或留空'), 400
+        people = str(people_count)
     notes = f"【行程診斷名單】結果：{result_type or '—'}｜想玩：{result_name or '—'}" \
             f"｜預計月份：{month or '未填'}｜人數：{people or '未填'}"
     try:

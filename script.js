@@ -1279,7 +1279,7 @@ function openQuizLead(key) {
         <input id="qlead-name" placeholder="稱呼 *" style="padding:10px;border:1px solid #cde0ee;border-radius:10px;width:100%" />
         <input id="qlead-phone" placeholder="電話 / LINE ID *" style="padding:10px;border:1px solid #cde0ee;border-radius:10px;width:100%" />
         <input id="qlead-month" placeholder="預計月份（選填）" style="padding:10px;border:1px solid #cde0ee;border-radius:10px;width:100%" />
-        <input id="qlead-people" placeholder="人數（選填）" style="padding:10px;border:1px solid #cde0ee;border-radius:10px;width:100%" />
+        <input id="qlead-people" type="number" min="1" max="999" step="1" inputmode="numeric" placeholder="確切人數（選填），例：4" style="padding:10px;border:1px solid #cde0ee;border-radius:10px;width:100%" />
       </div>
       <button class="btn btn-primary" style="margin-top:12px;width:100%;justify-content:center" onclick="submitQuizLead('${key}')">
         <i class="fas fa-paper-plane"></i> 送出，領取行程建議表
@@ -1295,13 +1295,18 @@ async function submitQuizLead(key) {
   const name = g('qlead-name').trim(), phone = g('qlead-phone').trim();
   const msg = document.getElementById('qlead-msg');
   if (!name || !phone) { msg.style.color = '#c53030'; msg.textContent = '請填寫稱呼與聯絡方式。'; return; }
+  const peopleRaw = g('qlead-people').trim();
+  const peopleCount = Number(peopleRaw);
+  if (peopleRaw && (!Number.isInteger(peopleCount) || peopleCount < 1 || peopleCount > 999)) {
+    msg.style.color = '#c53030'; msg.textContent = '人數請填寫確切人數（1 以上的整數），或留空。'; return;
+  }
   const btn = document.querySelector('#quiz-lead-box .btn-primary');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 送出中...'; }
   try {
     const res = await fetch('/api/quiz-lead', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name, phone, month: g('qlead-month').trim(), people: g('qlead-people').trim(),
+        name, phone, month: g('qlead-month').trim(), people: peopleRaw ? String(peopleCount) : '',
         result_type: r ? r.type : key, result_name: r ? r.tour.name : '',
       }),
     });
