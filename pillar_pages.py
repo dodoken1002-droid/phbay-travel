@@ -62,20 +62,25 @@ PILLAR_STYLE = (
     '</style>'
 )
 
-_LINE_URL = 'https://line.me/R/ti/p/@phbay2018'
+# 官網 → LINE 一律走 MantaGO 對話互動引流（@phbay2018 與 @ont0739i 同一帳號），
+# 加好友時自動貼「來源_官網／興趣_xxx」並回覆對應模組；點擊由 /line-cta.js 送 GA4。
+_LINE_URL = 'https://go.mantago.co/QnBsyj'          # 官網-通用LINE諮詢
+_LINE_3DAYS = 'https://go.mantago.co/yjC7QY'        # 官網-三天兩夜頁
+_LINE_FAMILY = 'https://go.mantago.co/fSNKzY'       # 官網-親子旅遊頁
+_LINE_DIAGNOSIS = 'https://go.mantago.co/4ATZyb'    # 官網-行程診斷
 
 
-def _cta_row(extra=''):
+def _cta_row(extra='', line_url=_LINE_URL, source='pillar'):
     return ('<div class="pp-cta-row">'
-            f'<a href="{_LINE_URL}" target="_blank" rel="noopener noreferrer" class="btn btn-primary"><i class="fab fa-line"></i> LINE 諮詢 @phbay2018</a>'
+            f'<a href="{line_url}" data-line-source="{source}_cta" target="_blank" rel="noopener noreferrer" class="btn btn-primary"><i class="fab fa-line"></i> LINE 諮詢 @phbay2018</a>'
             '<a href="/tours" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-map-marked-alt"></i> 看推薦行程</a>'
             f'{extra}</div>')
 
 
-def _bottom_cta(lead, quiz_href='/#quiz'):
+def _bottom_cta(lead, quiz_href='/#quiz', line_url=_LINE_URL, source='pillar'):
     return ('<div class="pp-bottom-cta"><h2>想把行程交給在地人排？</h2>'
             f'<p>{lead}</p>'
-            f'<a href="{_LINE_URL}" target="_blank" rel="noopener noreferrer" class="btn btn-primary"><i class="fab fa-line"></i> LINE @phbay2018</a> '
+            f'<a href="{line_url}" data-line-source="{source}_bottom" target="_blank" rel="noopener noreferrer" class="btn btn-primary"><i class="fab fa-line"></i> LINE @phbay2018</a> '
             '<a href="tel:06-9271288" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-phone"></i> 電話 06-9271288</a> '
             '<a href="/#contact" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-comment-dots"></i> 線上諮詢表單</a> '
             f'<a href="{quiz_href}" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-compass"></i> 30 秒行程診斷</a>'
@@ -238,7 +243,7 @@ def _page_3days():
         '這頁由澎湖在地旅行社整理：怎麼取捨海域、怎麼配天數與季節、預算怎麼抓，'
         '並附上可以直接照走的範例動線。</p>'
         '<img class="pp-hero-image" src="/images/tours/t201.jpg" alt="澎湖三天兩夜行程中的漁翁島燈塔與旅客合照" width="768" height="512" loading="eager">'
-        + _cta_row('<a href="/penghu-itinerary-recommendations" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-route"></i> 比較推薦行程</a>')
+        + _cta_row('<a href="/penghu-itinerary-recommendations" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-route"></i> 比較推薦行程</a>', _LINE_3DAYS, '3days')
         + '<section class="pp-conclusion"><h2 style="margin:0 0 10px">先講結論</h2><p>'
         + conclusion + '</p></section>'
         + '<h2>快速決策表</h2>' + table
@@ -248,7 +253,7 @@ def _page_3days():
         + cost
         + '<h2>延伸閱讀：把每一站看得更細</h2>' + links
         + _faq_html(faq)
-        + _bottom_cta('把想去的點傳給我們，在地嚮導幫你排成順路又不趕的三天兩夜。')
+        + _bottom_cta('把想去的點傳給我們，在地嚮導幫你排成順路又不趕的三天兩夜。', line_url=_LINE_3DAYS, source='3days')
         + '</div>')
     trip_ld = {
         "@context": "https://schema.org", "@type": "TouristTrip",
@@ -382,7 +387,7 @@ def _page_family():
         '這頁整理不同年齡層的玩法、太熱與下雨的備案、以及親子行程最常見的踩雷點，'
         '照著排就能玩得輕鬆。</p>'
         '<img class="pp-hero-image" src="/images/tours/t102.jpg" alt="親子家庭在澎湖潮間帶觀察海洋生物" width="768" height="512" loading="eager">'
-        + _cta_row('<a href="/penghu-itinerary-recommendations" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-route"></i> 比較親子推薦行程</a>')
+        + _cta_row('<a href="/penghu-itinerary-recommendations" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-route"></i> 比較親子推薦行程</a>', _LINE_FAMILY, 'family')
         + '<section class="pp-conclusion"><h2 style="margin:0 0 10px">先講結論</h2><p>'
         + conclusion + '</p></section>'
         + '<h2>快速決策表</h2>' + table
@@ -392,7 +397,7 @@ def _page_family():
         + tips
         + '<h2>延伸閱讀</h2>' + links
         + _faq_html(faq)
-        + _bottom_cta('告訴我們孩子的年齡與想玩的天數，幫你排一趟大人小孩都盡興的澎湖。')
+        + _bottom_cta('告訴我們孩子的年齡與想玩的天數，幫你排一趟大人小孩都盡興的澎湖。', line_url=_LINE_FAMILY, source='family')
         + '</div>')
     trip_ld = {
         "@context": "https://schema.org", "@type": "TouristTrip",
@@ -495,7 +500,7 @@ def _page_itinerary_recommendations():
         '幫你先選對澎湖旅遊行程的骨架，再決定跳島、玩水或深度聚落，'
         '自由行與套裝行程的差別也一次講清楚。</p>'
         '<img class="pp-hero-image" src="/images/neihai-cruise-hero-2026.webp" alt="澎湖行程推薦中的內海巡禮船遊與沙洲體驗" width="1400" height="788" loading="eager">'
-        + _cta_row('<a href="#itinerary-quiz-v1" class="btn btn-primary"><i class="fas fa-compass"></i> 開始 30 秒行程診斷</a>')
+        + _cta_row('<a href="#itinerary-quiz-v1" class="btn btn-primary"><i class="fas fa-compass"></i> 開始 30 秒行程診斷</a>', _LINE_DIAGNOSIS, 'itinerary_reco')
         + '<section class="iq-shell" id="itinerary-quiz-v1" aria-live="polite">'
           '<noscript>請開啟 JavaScript 使用行程診斷；也可以透過 LINE @phbay2018 請顧問協助。</noscript>'
           '</section>'
@@ -505,7 +510,7 @@ def _page_itinerary_recommendations():
         + chooser
         + '<h2>延伸閱讀</h2>' + links
         + _faq_html(faq)
-        + _bottom_cta('把日期、人數與最想玩的三件事傳給我們，收到不繞路的澎湖行程建議。', '#itinerary-quiz-v1')
+        + _bottom_cta('把日期、人數與最想玩的三件事傳給我們，收到不繞路的澎湖行程建議。', '#itinerary-quiz-v1', line_url=_LINE_DIAGNOSIS, source='itinerary_reco')
         + '</div>')
     trip_ld = {
         "@context": "https://schema.org", "@type": "TouristTrip",
@@ -599,14 +604,14 @@ def _page_food():
         '<p class="pp-intro">從清晨的魚湯鹹粥到晚上的現流海鮮，澎湖的味道跟著海走。'
         '這頁把我們寫過的美食文章整理成一張地圖：按時段吃、順路吃，'
         '不用為了排隊犧牲行程。</p>'
-        + _cta_row()
+        + _cta_row(source='food')
         + '<section class="pp-conclusion"><h2 style="margin:0 0 10px">先講結論</h2><p>'
         + conclusion + '</p></section>'
         + '<h2>快速決策表</h2>' + table
         + how
         + '<h2>美食文章總整理</h2>' + sections_html
         + _faq_html(faq)
-        + _bottom_cta('想吃什麼直接說，在地嚮導幫你把餐期與行程排在同一條順路上。')
+        + _bottom_cta('想吃什麼直接說，在地嚮導幫你把餐期與行程排在同一條順路上。', source='food')
         + '</div>')
     item_ld = {
         "@context": "https://schema.org", "@type": "ItemList",
@@ -706,14 +711,14 @@ def _page_festival():
         '<p class="pp-intro">追風音樂燈光節是澎湖 9–10 月的重頭戲：觀音亭園區的燈光展演加上'
         '多場藝人演出。這頁由官方合作旅行社整理白天行程、住宿與交通的安排方式，'
         '讓你晚上看展演、白天把澎湖玩完整。</p>'
-        + _cta_row('<a href="/preorder/festival" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-music"></i> 主題行程預購</a>')
+        + _cta_row('<a href="/preorder/festival" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-music"></i> 主題行程預購</a>', source='festival')
         + '<section class="pp-conclusion"><h2 style="margin:0 0 10px">先講結論</h2><p>'
         + conclusion + '</p></section>'
         + '<h2>活動速覽</h2>' + table
         + day_plan
         + '<h2>延伸閱讀：把白天行程排好</h2>' + links
         + _faq_html(faq)
-        + _bottom_cta('想邊看音樂節邊玩澎湖？把日期傳給我們，官方合作旅行社幫你排到好。')
+        + _bottom_cta('想邊看音樂節邊玩澎湖？把日期傳給我們，官方合作旅行社幫你排到好。', source='festival')
         + '</div>')
     event_ld = {
         "@context": "https://schema.org", "@type": "Event",

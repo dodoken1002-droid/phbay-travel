@@ -65,7 +65,7 @@ class PenghuAutumnWinterTests(unittest.TestCase):
         for href in (
             '/penghu-itinerary-recommendations/planner?src=autumn_winter',
             '/tides', '/tours', '/faq.html',
-            'https://line.me/R/ti/p/@phbay2018',
+            'https://go.mantago.co/iCy82S',
         ):
             self.assertIn(f'href="{href}"', self.page)
 

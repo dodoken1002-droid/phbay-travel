@@ -13,7 +13,7 @@ menu?.addEventListener('click', event => {
 });
 
 // 諮詢點擊：LINE / 電話各送 GA4 contact_click；LINE 另記 Meta Lead（與首頁諮詢一致）
-document.querySelectorAll('a[href*="line.me"], a[href^="tel:"]').forEach(link => {
+document.querySelectorAll('a[href*="line.me"], a[href*="go.mantago.co"], a[href^="tel:"]').forEach(link => {
   link.addEventListener('click', () => {
     const channel = link.href.startsWith('tel:') ? 'phone' : 'line';
     if (typeof gtag === 'function') gtag('event', 'contact_click', { channel, page: 'autumn_winter' });

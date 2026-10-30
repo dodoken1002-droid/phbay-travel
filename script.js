@@ -394,7 +394,7 @@ function showFormFallback(reason) {
     <p class="form-fallback-title"><i class="fas fa-triangle-exclamation"></i> ${t.title}</p>
     <p class="form-fallback-desc">${t.desc}</p>
     <div class="form-fallback-btns">
-      <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" rel="noopener noreferrer"
+      <a href="https://go.mantago.co/QnBsyj" data-line-source="contact_form_fallback" target="_blank" rel="noopener noreferrer"
          onclick="trackFallbackClick('line')"><i class="fab fa-line"></i> LINE</a>
       <a href="https://wa.me/886912151788" target="_blank" rel="noopener noreferrer"
          onclick="trackFallbackClick('whatsapp')"><i class="fab fa-whatsapp"></i> WhatsApp</a>
@@ -1161,7 +1161,7 @@ function renderQuizResult(forcedKey, fromShare = false) {
       </div>
       <p class="quiz-share-note">把結果傳給 LINE 專人幫你排，或留資料領取專屬的澎湖行程建議表，我們依你的玩法安排日期、交通與行程。</p>
       <div class="quiz-result-actions">
-        <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" rel="noopener noreferrer" class="btn btn-primary" onclick="prefillTour('${r.tour.interest}','${r.tour.note || ''}');trackQuizCta('${best}','line')">
+        <a href="https://go.mantago.co/4ATZyb" data-line-source="home_quiz_result" target="_blank" rel="noopener noreferrer" class="btn btn-primary" onclick="prefillTour('${r.tour.interest}','${r.tour.note || ''}');trackQuizCta('${best}','line')">
           <i class="fab fa-line"></i> 把結果傳給 LINE 專人幫我排
         </a>
         <button class="btn btn-outline" onclick="openQuizLead('${best}')">

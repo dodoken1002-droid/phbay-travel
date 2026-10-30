@@ -109,7 +109,7 @@
         <div style="display:flex;align-items:center;gap:10px;background:#e9fbf1;border:1px solid #9ae6b4;border-radius:12px;padding:12px 14px;margin:14px 0;font-size:.92rem;line-height:1.6;color:#0d5c3a">
           <i class="fab fa-line" style="font-size:1.5rem;color:#06c755;flex-shrink:0"></i>
           <span>如需<strong>客製化包船</strong>或<strong>團體大量訂位</strong>，歡迎私訊我們的官方 LINE
-            <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" rel="noopener noreferrer"
+            <a href="https://go.mantago.co/QnBsyj" data-line-source="preorder_page" target="_blank" rel="noopener noreferrer"
                style="color:#06a04a;font-weight:800;text-decoration:underline">@phbay2018</a>，由專人為您安排。</span>
         </div>
         <div class="privacy">
@@ -290,7 +290,7 @@
         if (!json.ok) throw new Error(json.error || '送出失敗');
         resultBox.className = 'result ok';
         resultBox.innerHTML = `預購已送出！<br>訂單編號：<strong>${esc(json.booking_ref)}</strong><br>${esc(json.message)}。潮旅將再與您確認行程細節與付款方式。<br>
-          <a href="https://line.me/R/ti/p/@phbay2018" target="_blank" rel="noopener noreferrer" onclick="window.PhbayAnalytics&&PhbayAnalytics.track('line_click',{source:'preorder_success',item_id:SLUG})"
+          <a href="https://go.mantago.co/QnBsyj" data-line-source="preorder_success" target="_blank" rel="noopener noreferrer" onclick="window.PhbayAnalytics&&PhbayAnalytics.track('line_click',{source:'preorder_success',item_id:SLUG})"
              style="display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:#06c755;color:#fff;font-weight:800;padding:12px 22px;border-radius:30px;text-decoration:none">
             <i class="fab fa-line" style="font-size:1.3rem"></i> 加入官方 LINE（@phbay2018），行程通知不漏接
           </a><br>
@@ -352,5 +352,6 @@
   </script>
   <a href="https://wa.me/886912151788" class="wa-float" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp 諮詢" title="WhatsApp 諮詢"><i class="fab fa-whatsapp"></i></a>
   <script src="/weather-banner.js?v=20261027a" defer></script>
+  <script src="/line-cta.js?v=20261030a" defer></script>
 </body>
 </html>
