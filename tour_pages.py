@@ -14,7 +14,7 @@ from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlencode
 
 SITE = 'https://www.phbay.info'
-LINE_URL = 'https://line.me/R/ti/p/@phbay2018'
+LINE_URL = 'https://go.mantago.co/QnBsyj'  # MantaGO 引流：官網-通用LINE諮詢（@phbay2018 同一帳號，加好友自動貼「來源_官網」）
 TAIPEI = timezone(timedelta(hours=8))
 
 # 分頁鍵與首頁行程區塊一致（script.js TAB_KEYS、app.py get_tours() 分組）
@@ -611,7 +611,7 @@ def _bottom_cta(lead, contact_href='/#contact', lang='zh-tw'):
     ui = _ui(lang)
     return (f'<div class="tp-bottom"><h2>{_e(ui["cta_heading"])}</h2>'
             f'<p>{_e(lead)}</p>'
-            f'<a href="{LINE_URL}" target="_blank" rel="noopener noreferrer" class="btn btn-primary"><i class="fab fa-line"></i> LINE @phbay2018</a> '
+            f'<a href="{LINE_URL}" data-line-source="tour_page" target="_blank" rel="noopener noreferrer" class="btn btn-primary"><i class="fab fa-line"></i> LINE @phbay2018</a> '
             f'<a href="{contact_href}" class="btn btn-outline" {_OUTLINE}><i class="fas fa-comment-dots"></i> {_e(ui["form"])}</a> '
             f'<a href="tel:06-9271288" class="btn btn-outline" {_OUTLINE}><i class="fas fa-phone"></i> 06-9271288</a>'
             '</div>')
@@ -674,7 +674,7 @@ def render_tour_page(tour, posts=(), siblings=(), today=None, lang='zh-tw'):
         cta += f'<a href="{booking}" class="btn btn-primary"><i class="fas fa-ticket"></i> {_e(ui["book"])}</a>'
     cta += (f'<a href="{contact_href}" class="btn {"btn-outline" if booking else "btn-primary"}" {_OUTLINE if booking else ""}>'
             f'<i class="fas fa-comment-dots"></i> {_e(ui["ask"])}</a>'
-            f'<a href="{LINE_URL}" target="_blank" rel="noopener noreferrer" class="btn btn-outline" {_OUTLINE}><i class="fab fa-line"></i> {_e(ui["line"])}</a>'
+            f'<a href="{LINE_URL}" data-line-source="tour_page" target="_blank" rel="noopener noreferrer" class="btn btn-outline" {_OUTLINE}><i class="fab fa-line"></i> {_e(ui["line"])}</a>'
             '</div>')
     badge = f'<span class="tp-tag">{_e(tour["badge_text"])}</span>' if tour.get('badge_text') else ''
     subtitle = f'<p class="tp-subtitle">{_e(md["subtitle"])}</p>' if md.get('subtitle') else ''
