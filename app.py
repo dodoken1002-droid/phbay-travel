@@ -1524,8 +1524,6 @@ def get_tours():
             r = dict(r)
             r['created_at'] = str(r.get('created_at', ''))
             r['updated_at'] = str(r.get('updated_at', ''))
-            if tour_pages.preorder_closed(r.get('preorder_slug')):
-                r['preorder_slug'] = None  # 預購已結束：行程卡不再顯示預購按鈕
             for tab in (r.get('tabs') or ['featured']):
                 if tab in grouped:
                     grouped[tab].append(r)
@@ -4218,8 +4216,6 @@ PREORDER_VALID_STATUSES = {'pending_departure', 'confirmed_departure', 'confirme
 
 
 def _get_product(slug, cur):
-    if tour_pages.preorder_closed(slug):  # 活動已結束：對外一律當作沒有這個產品
-        return None
     cur.execute("SELECT * FROM preorder_products WHERE slug=%s AND is_active=TRUE", (slug,))
     return cur.fetchone()
 
@@ -5139,9 +5135,6 @@ def _render_preorder_template(slug, product=None):
 @app.route('/preorder/<slug>')
 def preorder_page(slug):
     # 通用預購頁：同一模板，前端依 slug 讀取行程設定；後端先補 SEO/社群預覽/結構化資料。
-    closed_to = tour_pages.preorder_closed(slug)
-    if closed_to:  # 活動已結束：轉到攻略頁，不再顯示預購表單
-        return redirect(closed_to, code=302)
     product = None
     try:
         conn = get_db(); cur = conn.cursor()
@@ -5542,7 +5535,7 @@ def _render_blog(title, desc, canonical, body, head_extra='', image=None, lang='
     nav = '''<div class="top-banner"><div class="banner-static"><span>潮旅國際旅行社</span><span class="banner-sep">｜</span><span>交觀乙第1864號・品保澎字第0188號</span><span class="banner-sep">｜</span><span>電話：06-9271288</span></div></div>
 <nav class="navbar" id="navbar"><div class="nav-container"><a href="/" class="nav-logo"><i class="fas fa-water"></i> 潮旅國際旅行社</a><button class="nav-toggle" id="nav-toggle" aria-label="選單"><span></span><span></span><span></span></button><ul class="nav-links" id="nav-links"><li><a href="/">首頁</a></li><li><a href="/tours">行程介紹</a></li><li class="nav-item has-submenu"><a href="/neihai-preorder.html">預購行程 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/neihai-preorder.html">小城故事內海巡禮</a></li></ul></li><li class="nav-item has-submenu"><a href="/blog">旅遊大小事 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/tides">潮汐查詢系統</a></li><li><a href="/penghu-itinerary-recommendations/planner?src=nav">自己排行程</a></li><li><a href="/blog">旅遊文章分享</a></li><li><a href="/faq.html">常見問題</a></li><li><a href="/reviews">旅客評價</a></li></ul></li><li class="nav-item has-submenu"><a href="/#about">關於我們 <i class="fas fa-chevron-down nav-caret"></i></a><ul class="nav-submenu"><li><a href="/#contact">聯絡資訊</a></li></ul></li></ul></div></nav>'''
     footer = '''<footer class="footer"><div class="container"><div class="footer-bottom"><p>© 2026 潮旅國際旅行社 All Rights Reserved.｜<a href="/" style="color:inherit">官網</a>｜<a href="/blog" style="color:inherit">部落格</a>｜<a href="/reviews" style="color:inherit">旅客評價</a>｜<a href="/privacy" style="color:inherit">隱私權政策</a>｜<a href="/terms" style="color:inherit">使用條款</a></p></div></div></footer>
-<script>(function(){var t=document.getElementById('nav-toggle'),l=document.getElementById('nav-links');if(t)t.addEventListener('click',function(){l.classList.toggle('open')});var lb=document.getElementById('lang-btn'),lm=document.getElementById('lang-menu');if(lb)lb.addEventListener('click',function(e){e.stopPropagation();lm.classList.toggle('open')});document.addEventListener('click',function(){if(lm)lm.classList.remove('open')});})();</script><script src="/weather-banner.js?v=20261027a" defer></script><script src="/line-cta.js?v=20261030a" defer></script>'''
+<script>(function(){var t=document.getElementById('nav-toggle'),l=document.getElementById('nav-links');if(t)t.addEventListener('click',function(){l.classList.toggle('open')});var lb=document.getElementById('lang-btn'),lm=document.getElementById('lang-menu');if(lb)lb.addEventListener('click',function(e){e.stopPropagation();lm.classList.toggle('open')});document.addEventListener('click',function(){if(lm)lm.classList.remove('open')});})();</script><script src="/weather-banner.js?v=20261027a" defer></script><script src="/line-cta.js?v=20261030b" defer></script>'''
     # 還沒有真實評價時不放「旅客評價」入口：一個點進去只寫「整理中」的頁面比沒有更扣信任感。
     # 靜態頁（index.html 等）的入口已移除；content/reviews.json 有資料後要一併加回，見 content/REVIEWS.md。
     if not load_reviews():
@@ -6129,8 +6122,6 @@ def dynamic_sitemap():
             urls.append((f'{SITE}/tours/{r["id"]}', '0.8', 'weekly', str(r['updated_at'] or '')[:10]))
         cur.execute("SELECT slug FROM preorder_products WHERE is_active=TRUE")
         for r in cur.fetchall():
-            if tour_pages.preorder_closed(r['slug']):
-                continue
             urls.append((f'{SITE}/preorder/{r["slug"]}', '0.8', 'weekly'))
         cur.close(); conn.close()
     except Exception:
