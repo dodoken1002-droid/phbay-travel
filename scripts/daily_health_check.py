@@ -91,7 +91,7 @@ def public_checks(site, expected_sha=""):
         code, payload, ms = fetch_json(f"{site}/api/tours")
         groups = (payload or {}).get("tours") or {}
         count = sum(len(rows) for rows in groups.values() if isinstance(rows, list))
-        tour_path = os.environ.get("HEALTH_TOUR_PATH", "/preorder/festival")
+        tour_path = os.environ.get("HEALTH_TOUR_PATH", "/tours")
         page_code, page_body, page_ms = fetch(f"{site}{tour_path}")
         page_ok = page_code == 200 and len(page_body) > 1000
         ok = code == 200 and (payload or {}).get("ok") and count > 0 and page_ok

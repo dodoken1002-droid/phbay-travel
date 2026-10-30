@@ -402,7 +402,24 @@ def _image_html(tour, eager=False, lang='zh-tw'):
     return f'<img src="{_e(src)}" alt="{_e(tour.get("title"))}"{loading} decoding="async"/>'
 
 
-def booking_link(tour):
+# 已結束、不再對外開放的預購產品：slug → (最後開放日, 預購頁改導向的網址)。
+# 過了最後開放日：預購頁轉址、API 視為找不到、行程卡不再給預購連結、sitemap 移除。
+# 明年活動要重開：改這裡的日期（或刪掉該筆），並確認後台產品的 date_start/date_end。
+CLOSED_PREORDERS = {
+    'festival': (date(2026, 10, 11), '/penghu-2026-festival-guide'),  # 2026 追風音樂燈光節 9/12–10/11
+}
+
+
+def preorder_closed(slug, today=None):
+    """預購已結束就回傳改導向網址，否則 None。"""
+    rule = CLOSED_PREORDERS.get(str(slug or '').strip())
+    if not rule:
+        return None
+    last_day, redirect_to = rule
+    return redirect_to if (today or today_taipei()) > last_day else None
+
+
+def booking_link(tour, today=None):
     """有對應預購產品才給預購連結。
 
     只認 tours.preorder_slug 與「小城故事」本身；不能用標題關鍵字（例如「追風」）
@@ -410,7 +427,7 @@ def booking_link(tour):
     """
     slug = str(tour.get('preorder_slug') or '').strip()
     if slug and re.fullmatch(r'[a-z0-9-]+', slug):
-        return f'/preorder/{slug}'
+        return None if preorder_closed(slug, today) else f'/preorder/{slug}'
     if str(tour.get('title') or '').startswith('小城故事'):
         return '/neihai-preorder.html'
     return None

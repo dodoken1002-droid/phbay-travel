@@ -34,7 +34,6 @@ SITEMAP_URL = f"{SITE}/sitemap.xml"
 # （固定清單＋自動加上 content/posts 最新 3 篇，避免清單過期）
 KEY_URLS = [
     f"{SITE}/",
-    f"{SITE}/preorder/festival",
     f"{SITE}/neihai-preorder.html",
     f"{SITE}/penghu-3days-itinerary",
     f"{SITE}/penghu-family-travel",

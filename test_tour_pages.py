@@ -97,7 +97,7 @@ class TourPageRenderTests(unittest.TestCase):
         self.assertIn('"itinerary"', head)
 
     def test_booking_link_only_from_preorder_slug_or_neihai(self):
-        self.assertEqual(tour_pages.booking_link(make_tour(preorder_slug='festival')), '/preorder/festival')
+        self.assertEqual(tour_pages.booking_link(make_tour(preorder_slug='festival'), today=date(2026, 10, 1)), '/preorder/festival')
         self.assertEqual(tour_pages.booking_link(make_tour(title='小城故事・內海巡禮')), '/neihai-preorder.html')
         # 別家旅行社標題含「追風」「內海巡禮」不能被導到潮旅的預購頁
         self.assertIsNone(tour_pages.booking_link(make_tour(title='澎湖追風派對 風浪板四天三夜')))

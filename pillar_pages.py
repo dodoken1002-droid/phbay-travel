@@ -640,7 +640,7 @@ def _page_festival():
                   '藝人展演集中在 9/12、9/13、9/19、9/26、10/3。'
                   '最順的玩法是「白天玩澎湖、傍晚回觀音亭」：住宿選馬公市區走路就能到會場，'
                   '白天排北環或市區行程，晚上看展演。潮旅是官方合作旅行社，'
-                  '有搭配活動的三天兩夜主題行程可線上預購。')
+                  '2026 年活動已於 10/11 結束，主題行程預購已關閉。')
     table = _decision_table([
         ('活動地點', '澎湖觀音亭園區（馬公市區，近市中心）'),
         ('燈光展演', '2026/9/12 – 10/11'),
@@ -649,7 +649,7 @@ def _page_festival():
                   '10/3 周湯豪、安心亞、怕胖團'),
         ('住宿建議', '馬公市區優先，步行即可往返會場，看完展演不用開夜車'),
         ('交通建議', '9–10 月為活動檔期，機票與住宿建議提早訂；藝人展演日人潮較多'),
-        ('主題行程', '<a href="/preorder/festival">三天兩夜主題行程預購</a>（花路追風之旅、追風海龜療癒行，兩人成行）'),
+        ('主題行程', '2026 活動已結束，三天兩夜主題行程預購已關閉；其他澎湖行程可加 LINE @phbay2018 諮詢'),
     ])
     day_plan = (
         '<h2>晚上看展演，白天怎麼排</h2>'
@@ -671,10 +671,10 @@ def _page_festival():
         '出發地與航班選擇可參考<a href="/blog/2026-07-16-penghu-airport-bus-budget-meme-guide">澎湖交通動線整理</a>。</li>'
         '<li><strong>租車／接駁：</strong>白天行程用租車或包車，晚上回市區後步行即可，'
         '不用擔心會場周邊停車。</li></ul>'
-        '<h2>誰適合直接預購主題行程</h2>'
-        '<p>不想自己搶住宿、排動線的人。潮旅是 2026 澎湖追風音樂燈光節官方合作旅行社，'
-        '主題行程（花路追風之旅、追風海龜療癒行）把機加酒、白天行程與看展演的節奏一次排好，'
-        '兩人成行，可直接在<a href="/preorder/festival">預購頁</a>下訂，專人會與你確認細節。</p>'
+        '<h2>2026 主題行程預購已結束</h2>'
+        '<p>潮旅是 2026 澎湖追風音樂燈光節官方合作旅行社，活動已於 10/11 結束，'
+        '音樂節三天兩夜主題行程預購已關閉。想安排其他澎湖行程，可加官方 LINE @phbay2018 '
+        '或<a href="/tours">看推薦行程</a>。</p>'
     )
     links = _article_links([
         ('2026-06-29-penghu-tianhou-temple-magang-walk-guide', '天后宮與中央老街：會場附近的半日散步'),
@@ -698,11 +698,9 @@ def _page_festival():
         ('機票和交通要注意什麼？',
          '9–10 月的週末與藝人展演日航班需求高，機票建議提早開票。島上移動以租車或包車最方便，晚上會場周邊人多，住市區就能步行前往。'),
         ('潮旅的音樂節主題行程是什麼？',
-         '潮旅是 2026 澎湖追風音樂燈光節官方合作旅行社，推出三天兩夜主題行程（花路追風之旅、追風海龜療癒行），把住宿、白天行程與看展演的節奏一次排好，兩人成行，可在預購頁線上下訂。'),
-        ('主題行程適合誰？',
-         '適合不想自己搶住宿、排動線的人，以及想順便把澎湖玩完整的旅客。預購後專人會與你確認日期與細節，再完成後續安排。'),
+         '潮旅是 2026 澎湖追風音樂燈光節官方合作旅行社，活動期間推出三天兩夜主題行程（花路追風之旅、追風海龜療癒行）。活動已於 10/11 結束，預購已關閉。'),
         ('怎麼諮詢或預訂？',
-         '線上預購走 /preorder/festival 預購頁；想先問問題可加官方 LINE @phbay2018 或電話 06-9271288（週一至週五 08:30–17:30）。'),
+         '2026 音樂節主題行程預購已結束。其他澎湖行程可加官方 LINE @phbay2018 或電話 06-9271288（週一至週五 08:30–17:30）諮詢。'),
     ]
     body = (
         '<div class="pp-wrap">'
@@ -711,7 +709,7 @@ def _page_festival():
         '<p class="pp-intro">追風音樂燈光節是澎湖 9–10 月的重頭戲：觀音亭園區的燈光展演加上'
         '多場藝人演出。這頁由官方合作旅行社整理白天行程、住宿與交通的安排方式，'
         '讓你晚上看展演、白天把澎湖玩完整。</p>'
-        + _cta_row('<a href="/preorder/festival" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-music"></i> 主題行程預購</a>', source='festival')
+        + _cta_row(source='festival')
         + '<section class="pp-conclusion"><h2 style="margin:0 0 10px">先講結論</h2><p>'
         + conclusion + '</p></section>'
         + '<h2>活動速覽</h2>' + table
@@ -745,15 +743,8 @@ def _page_festival():
                    "validFrom": "2026-06-01",
                    "url": f"{SITE}/penghu-2026-festival-guide"},
     }
-    trip_ld = {
-        "@context": "https://schema.org", "@type": "TouristTrip",
-        "name": "2026 澎湖追風音樂燈光節主題行程",
-        "description": "官方合作旅行社潮旅國際的三天兩夜音樂節主題行程：白天玩澎湖、晚上看展演。",
-        "url": f"{SITE}/preorder/festival",
-        "provider": {"@type": "TravelAgency", "name": "潮旅國際旅行社", "url": f"{SITE}/"},
-    }
     return dict(slug=slug, title=title, desc=desc, body=body,
-                extra_ld=[event_ld, trip_ld], faq=faq,
+                extra_ld=[event_ld], faq=faq,
                 breadcrumb_name='2026 澎湖追風音樂燈光節攻略')
 
 
