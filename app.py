@@ -1524,6 +1524,8 @@ def get_tours():
             r = dict(r)
             r['created_at'] = str(r.get('created_at', ''))
             r['updated_at'] = str(r.get('updated_at', ''))
+            if tour_pages.preorder_closed(r.get('preorder_slug')):
+                r['preorder_slug'] = None  # 預購已結束：行程卡不再顯示預購按鈕
             for tab in (r.get('tabs') or ['featured']):
                 if tab in grouped:
                     grouped[tab].append(r)
@@ -4216,6 +4218,8 @@ PREORDER_VALID_STATUSES = {'pending_departure', 'confirmed_departure', 'confirme
 
 
 def _get_product(slug, cur):
+    if tour_pages.preorder_closed(slug):  # 活動已結束：對外一律當作沒有這個產品
+        return None
     cur.execute("SELECT * FROM preorder_products WHERE slug=%s AND is_active=TRUE", (slug,))
     return cur.fetchone()
 
@@ -5135,6 +5139,9 @@ def _render_preorder_template(slug, product=None):
 @app.route('/preorder/<slug>')
 def preorder_page(slug):
     # 通用預購頁：同一模板，前端依 slug 讀取行程設定；後端先補 SEO/社群預覽/結構化資料。
+    closed_to = tour_pages.preorder_closed(slug)
+    if closed_to:  # 活動已結束：轉到攻略頁，不再顯示預購表單
+        return redirect(closed_to, code=302)
     product = None
     try:
         conn = get_db(); cur = conn.cursor()
@@ -6122,6 +6129,8 @@ def dynamic_sitemap():
             urls.append((f'{SITE}/tours/{r["id"]}', '0.8', 'weekly', str(r['updated_at'] or '')[:10]))
         cur.execute("SELECT slug FROM preorder_products WHERE is_active=TRUE")
         for r in cur.fetchall():
+            if tour_pages.preorder_closed(r['slug']):
+                continue
             urls.append((f'{SITE}/preorder/{r["slug"]}', '0.8', 'weekly'))
         cur.close(); conn.close()
     except Exception:
