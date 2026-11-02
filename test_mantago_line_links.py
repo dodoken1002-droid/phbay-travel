@@ -48,6 +48,18 @@ class MantagoLineLinkTests(unittest.TestCase):
         self.assertIn('link_id', js)
         self.assertIn('data-line-source', js)
 
+    def test_desktop_qr_assets_cover_every_linked_code(self):
+        js = (ROOT / 'line-cta.js').read_text(encoding='utf-8')
+        self.assertIn("open_mode: desktopQr ? 'desktop_qr' : 'direct'", js)
+        codes = set()
+        for path in list(PAGE_LINKS) + ['qigui/qigui-i18n.js']:
+            codes |= set(re.findall(r'go\.mantago\.co/([A-Za-z0-9]+)', (ROOT / path).read_text(encoding='utf-8')))
+        for code in codes:
+            self.assertIn(f"'{code}'", js, f'line-cta.js QR_CODES 缺 {code}')
+            svg = ROOT / 'images' / 'line-qr' / f'{code}.svg'
+            self.assertTrue(svg.exists(), svg)
+            self.assertIn('<svg', svg.read_text(encoding='utf-8'))
+
     def test_pillar_pages_render_topic_specific_links(self):
         import pillar_pages
         pages = pillar_pages.PILLAR_PAGES
