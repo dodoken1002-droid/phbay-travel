@@ -62,17 +62,73 @@ def fetch_json(url, **kwargs):
     return status, payload, elapsed
 
 
-def _translated_post():
+def _translated_posts():
     candidates = sorted((ROOT / "content" / "posts").glob("*.json"), reverse=True)
     needed = set(LANGS) - {"zh-tw"}
+    posts = []
     for path in candidates:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except Exception:
             continue
         if needed.issubset((payload.get("i18n") or {}).keys()):
-            return payload
-    return None
+            posts.append(payload)
+    return posts
+
+
+def _probe_translated_post(site, post):
+    failures = []
+    observations = {}
+    slug = post["slug"]
+    titles = {"zh-tw": post.get("title", "")}
+    titles.update({lang: row.get("title", "") for lang, row in post["i18n"].items()})
+    for lang in LANGS:
+        try:
+            code, body, _ = fetch(f"{site}/blog/{slug}?lang={lang}")
+            expected = titles.get(lang, "")[:10]
+            matched = bool(expected) and expected in body.decode("utf-8", "replace")
+            observations[lang] = {"http_status": code, "title_matched": matched}
+            if code != 200 or not matched:
+                failures.append(lang)
+        except Exception as exc:
+            observations[lang] = {"error": str(exc)}
+            failures.append(lang)
+    return failures, observations
+
+
+def _i18n_check(site, deployment_pending=False):
+    posts = _translated_posts()
+    if not posts:
+        return check("i18n", "五語頁", "critical", "找不到含五語翻譯的文章基準")
+
+    latest = posts[0]
+    # main 剛更新但 production 尚未切換時，repo 最新文章理應還是 404。
+    # 在部署寬限內依序找已上線基準，避免把部署等待誤判成路由故障；
+    # 版本同步後仍只驗最新文章，因此同步失敗不會被舊文章掩蓋。
+    candidates = posts[:5] if deployment_pending else posts[:1]
+    latest_failures = []
+    latest_observations = {}
+    for index, post in enumerate(candidates):
+        failures, observations = _probe_translated_post(site, post)
+        if index == 0:
+            latest_failures = failures
+            latest_observations = observations
+        if failures:
+            continue
+        if index == 0:
+            return check("i18n", "五語頁", "ok",
+                         f'{post["slug"]}：五語皆為 200 且標題正確',
+                         slug=post["slug"], languages=observations)
+        return check("i18n", "五語頁", "warning",
+                     f'{latest["slug"]} 尚待部署；已部署基準 {post["slug"]} 五語正常',
+                     slug=post["slug"], latest_slug=latest["slug"],
+                     languages=observations, deployment_pending=True)
+
+    summary = (f'{latest["slug"]}：失敗語言 {", ".join(latest_failures)}'
+               if latest_failures else f'{latest["slug"]}：找不到可驗證的五語頁')
+    return check("i18n", "五語頁", "critical", summary,
+                 slug=latest["slug"], languages=latest_observations,
+                 deployment_pending=deployment_pending)
 
 
 def public_checks(site, expected_sha=""):
@@ -103,30 +159,7 @@ def public_checks(site, expected_sha=""):
     except Exception as exc:
         results.append(check("tours", "行程頁／行程 API", "critical", str(exc)))
 
-    post = _translated_post()
-    if not post:
-        results.append(check("i18n", "五語頁", "critical", "找不到含五語翻譯的文章基準"))
-    else:
-        failures = []
-        observations = {}
-        slug = post["slug"]
-        titles = {"zh-tw": post.get("title", "")}
-        titles.update({lang: row.get("title", "") for lang, row in post["i18n"].items()})
-        for lang in LANGS:
-            try:
-                code, body, _ = fetch(f"{site}/blog/{slug}?lang={lang}")
-                expected = titles.get(lang, "")[:10]
-                matched = bool(expected) and expected in body.decode("utf-8", "replace")
-                observations[lang] = {"http_status": code, "title_matched": matched}
-                if code != 200 or not matched:
-                    failures.append(lang)
-            except Exception as exc:
-                observations[lang] = {"error": str(exc)}
-                failures.append(lang)
-        results.append(check("i18n", "五語頁", "critical" if failures else "ok",
-                             f"{slug}：" + (f"失敗語言 {', '.join(failures)}" if failures else "五語皆為 200 且標題正確"),
-                             slug=slug, languages=observations))
-
+    deployment_pending = False
     try:
         code, payload, ms = fetch_json(f"{site}/api/health")
         healthy = code == 200 and (payload or {}).get("ok") is True
@@ -136,6 +169,7 @@ def public_checks(site, expected_sha=""):
         elif expected_sha and release and not expected_sha.startswith(release) and not release.startswith(expected_sha):
             grace = _deploy_grace_minutes()
             if grace is not None and grace < 30:
+                deployment_pending = True
                 status = "warning"
                 summary = (f"正式站版本 {release[:7]} 不等於 main {expected_sha[:7]}；"
                            f"main 最新 commit 僅 {grace:.0f} 分鐘前，可能仍在部署中")
@@ -146,11 +180,13 @@ def public_checks(site, expected_sha=""):
             status, summary = "warning", "正式站正常，但 Railway 未提供部署 commit"
         else:
             status, summary = "ok", f"資料庫正常，部署版本 {release[:7] or '未提供'}，{ms} ms"
-        results.append(check("railway", "Railway deploy／應用健康", status, summary,
-                             http_status=code, latency_ms=ms, release_sha=release,
-                             expected_sha=expected_sha, health=payload))
+        railway_result = check("railway", "Railway deploy／應用健康", status, summary,
+                               http_status=code, latency_ms=ms, release_sha=release,
+                               expected_sha=expected_sha, health=payload)
     except Exception as exc:
-        results.append(check("railway", "Railway deploy／應用健康", "critical", str(exc)))
+        railway_result = check("railway", "Railway deploy／應用健康", "critical", str(exc))
+    results.append(_i18n_check(site, deployment_pending=deployment_pending))
+    results.append(railway_result)
     return results
 
 
