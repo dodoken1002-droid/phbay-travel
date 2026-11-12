@@ -102,3 +102,28 @@ def test_member_page_has_no_contradictory_hreflang():
     with open('member.html', encoding='utf-8') as f:
         html = f.read()
     assert 'penghu-100?lang=' not in html
+
+
+# ── 本次：不再產生重複的 ?lang= 網址 ──
+from test_tour_pages import make_tour  # noqa: E402
+import tour_pages  # noqa: E402
+
+
+def test_localized_index_links_untranslated_post_to_chinese(client):
+    html = client.get('/blog?lang=en').get_data(as_text=True)
+    assert 'href="/blog/plain-post"' in html
+    assert 'href="/blog/plain-post?lang=en"' not in html
+    assert 'href="/blog/translated-post?lang=en"' in html
+
+
+def test_untranslated_tour_canonical_to_chinese_and_nofollow_contact():
+    tour = make_tour()
+    _, _, canonical, body, _, _ = tour_pages.render_tour_page(tour, lang='en')
+    assert canonical == f'{SITE}/tours/{tour["id"]}'
+    assert 'rel="nofollow"' in body
+
+
+def test_translated_tour_keeps_lang_canonical():
+    tour = make_tour(i18n={'en': {'title': 'South Penghu Tour', 'description': 'Island hopping.'}})
+    _, _, canonical, _, _, _ = tour_pages.render_tour_page(tour, lang='en')
+    assert canonical == f'{SITE}/tours/{tour["id"]}?lang=en'
