@@ -1524,9 +1524,14 @@ def get_tours():
             r = dict(r)
             r['created_at'] = str(r.get('created_at', ''))
             r['updated_at'] = str(r.get('updated_at', ''))
+            tabs = list(r.get('tabs') or ['featured'])
+            r['sale_status'] = None
             if tour_pages.preorder_closed(r.get('preorder_slug')):
                 r['preorder_slug'] = None  # 預購已結束：行程卡不再顯示預購按鈕
-            for tab in (r.get('tabs') or ['featured']):
+                r['sale_status'] = 'ended'  # 前端顯示「活動已結束」
+                # 已結束的活動不放首頁精選；仍保留在天數分頁供查詢
+                tabs = [t for t in tabs if t != 'featured']
+            for tab in tabs:
                 if tab in grouped:
                     grouped[tab].append(r)
         return jsonify(ok=True, tours=grouped)
@@ -2580,6 +2585,9 @@ def get_slots():
         else:
             cur.execute("SELECT * FROM tour_slots WHERE is_active=TRUE ORDER BY tour_id, id")
         rows = [dict(r) for r in cur.fetchall()]
+        # 已過出發日的梯次不對外顯示，避免客人以為過期場次還有「剩餘名額」
+        today = tour_pages.today_taipei()
+        rows = [r for r in rows if not r.get('slot_date') or r['slot_date'] >= today]
 
         # 行程 → 預購產品對應
         cur.execute("""SELECT t.id AS tour_id, p.id AS product_id

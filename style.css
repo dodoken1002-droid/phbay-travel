@@ -697,6 +697,7 @@ ul { list-style: none; }
 }
 .tour-badge.popular   { background: #e85c3a; }
 .tour-badge.family    { background: #e87d2a; }
+.tour-badge.ended     { background: #6b7280; }
 .tour-badge.eco       { background: #2ea86e; }
 .tour-badge.adventure { background: #7c3aed; }
 .tour-badge.guild     { background: #1a6b9e; }
