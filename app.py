@@ -5668,7 +5668,8 @@ def blog_index():
         cover_url = _post_cover_url(lp)
         img = f'<img src="{_html.escape(cover_url)}" alt="{_html.escape(lp["title"])}" loading="lazy" width="1200" height="630"/>' if cover_url else ''
         tags = ''.join(f'<a class="post-tag" href="/blog?tag={_html.escape(t.strip())}{_tagq}">{_html.escape(t.strip())}</a>' for t in (lp.get('tags') or '').split(',') if t.strip())
-        cards += (f'<a class="post-card" href="/blog/{_html.escape(lp["slug"])}{_langq}">{img}'
+        _card_q = _langq if lang in _post_avail_langs(p) else ''   # 未翻譯文章連中文網址
+        cards += (f'<a class="post-card" href="/blog/{_html.escape(lp["slug"])}{_card_q}">{img}'
                   f'<div class="post-card-body"><h2>{_html.escape(lp["title"])}</h2>'
                   f'<p>{_html.escape((lp.get("summary") or "")[:80])}</p>'
                   f'<div class="post-tags">{tags}</div></div></a>')

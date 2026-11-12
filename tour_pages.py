@@ -356,6 +356,16 @@ def _url(path, lang='zh-tw', **params):
     return path + (('?' + urlencode(params)) if params else '')
 
 
+def post_has_lang(post, lang):
+    """文章是否有該語言的翻譯（標題或內文）；zh-tw 是原文，一律 True。"""
+    lang = normalize_lang(lang)
+    if lang == 'zh-tw':
+        return True
+    tr = post.get('i18n') if isinstance(post.get('i18n'), dict) else {}
+    tr = tr.get(lang) if isinstance(tr.get(lang), dict) else {}
+    return any(str(tr.get(k) or '').strip() for k in ('title', 'content'))
+
+
 def tour_url(tour, lang='zh-tw'):
     return _url(f'/tours/{int(tour["id"])}', lang)
 
@@ -629,10 +639,12 @@ def render_tours_index(tours, selected='', lang='zh-tw'):
 
 def _bottom_cta(lead, contact_href='/#contact', lang='zh-tw'):
     ui = _ui(lang)
+    # /?tour_id= 這類帶參數的詢問連結不讓 Google 追，避免產生首頁重複網址
+    rel = ' rel="nofollow"' if '?' in contact_href else ''
     return (f'<div class="tp-bottom"><h2>{_e(ui["cta_heading"])}</h2>'
             f'<p>{_e(lead)}</p>'
             f'<a href="{LINE_URL}" data-line-source="tour_page" target="_blank" rel="noopener noreferrer" class="btn btn-primary"><i class="fab fa-line"></i> LINE @phbay2018</a> '
-            f'<a href="{contact_href}" class="btn btn-outline" {_OUTLINE}><i class="fas fa-comment-dots"></i> {_e(ui["form"])}</a> '
+            f'<a href="{contact_href}"{rel} class="btn btn-outline" {_OUTLINE}><i class="fas fa-comment-dots"></i> {_e(ui["form"])}</a> '
             f'<a href="tel:06-9271288" class="btn btn-outline" {_OUTLINE}><i class="fas fa-phone"></i> 06-9271288</a>'
             '</div>')
 
@@ -668,7 +680,8 @@ def render_tour_page(tour, posts=(), siblings=(), today=None, lang='zh-tw'):
     md = _modal(tour)
     title = str(tour.get('title') or '')
     tid = int(tour['id'])
-    canonical = f'{SITE}{tour_url(tour, lang)}'
+    # 沒有該語言翻譯時內容是中文，canonical 指回中文行程頁，避免 GSC 判重複
+    canonical = f'{SITE}{tour_url(tour, lang if lang in available_languages(source_tour) else "zh-tw")}'
     contact_href = _url('/', lang, tour_id=tid) + '#contact'
     tab = primary_tab(tour)
     # Booking mapping is based on the canonical Chinese record/preorder_slug;
@@ -692,7 +705,7 @@ def render_tour_page(tour, posts=(), siblings=(), today=None, lang='zh-tw'):
     cta = '<div class="tp-cta">'
     if booking:
         cta += f'<a href="{booking}" class="btn btn-primary"><i class="fas fa-ticket"></i> {_e(ui["book"])}</a>'
-    cta += (f'<a href="{contact_href}" class="btn {"btn-outline" if booking else "btn-primary"}" {_OUTLINE if booking else ""}>'
+    cta += (f'<a href="{contact_href}" rel="nofollow" class="btn {"btn-outline" if booking else "btn-primary"}" {_OUTLINE if booking else ""}>'
             f'<i class="fas fa-comment-dots"></i> {_e(ui["ask"])}</a>'
             f'<a href="{LINE_URL}" data-line-source="tour_page" target="_blank" rel="noopener noreferrer" class="btn btn-outline" {_OUTLINE}><i class="fab fa-line"></i> {_e(ui["line"])}</a>'
             '</div>')
@@ -724,7 +737,7 @@ def render_tour_page(tour, posts=(), siblings=(), today=None, lang='zh-tw'):
                          f'<p style="margin-top:10px;font-size:.9rem;color:var(--text-light)">{_e(ui["availability"])}</p>')
     elif raw_dates:
         main += _section('fa-calendar-alt', ui['dates'],
-                         f'<p>{_e(ui["past_dates"])}<a href="{contact_href}">{_e(ui["online"])}</a>{_e(ui["or_line"])}</p>')
+                         f'<p>{_e(ui["past_dates"])}<a href="{contact_href}" rel="nofollow">{_e(ui["online"])}</a>{_e(ui["or_line"])}</p>')
 
     days = [d for d in (md.get('days') or []) if isinstance(d, dict)]
     highlights = [h for h in (md.get('highlights') or []) if str(h or '').strip()]
@@ -771,7 +784,7 @@ def render_tour_page(tour, posts=(), siblings=(), today=None, lang='zh-tw'):
         side += (f'<div class="tp-box"><h3>{_e(ui["provider"])}</h3><table class="tp-contact">{c_rows}</table>'
                  f'<p style="margin:10px 0 0">{_e(ui["assist"])}</p></div>')
 
-    links = ''.join(f'<a href="{_url("/blog/" + str(p["slug"]), lang)}">{_e(p.get("title"))}</a>' for p in posts)
+    links = ''.join(f'<a href="{_url("/blog/" + str(p["slug"]), lang if post_has_lang(p, lang) else "zh-tw")}">{_e(p.get("title"))}</a>' for p in posts)
     links += ''.join(f'<a href="{_url(href, lang)}">{_e(name)}<small>{_e(ui["related_guide"])}</small></a>' for href, name in guide_links(source_tour, lang))
     side += f'<div class="tp-box"><h3>{_e(ui["related"])}</h3><div class="tp-links">{links}</div></div>'
     if siblings:
