@@ -420,6 +420,9 @@ CLOSED_PREORDERS = {
 }
 
 
+_ENDED_LABEL = {'zh-tw': '活動已結束', 'zh-cn': '活动已结束', 'en': 'Event ended', 'ja': '催行終了', 'ko': '행사 종료'}
+
+
 def preorder_closed(slug, today=None):
     """預購已結束就回傳改導向網址，否則 None。"""
     rule = CLOSED_PREORDERS.get(str(slug or '').strip())
@@ -707,6 +710,8 @@ def render_tour_page(tour, posts=(), siblings=(), today=None, lang='zh-tw'):
             f'<a href="{LINE_URL}" data-line-source="tour_page" target="_blank" rel="noopener noreferrer" class="btn btn-outline" {_OUTLINE}><i class="fab fa-line"></i> {_e(ui["line"])}</a>'
             '</div>')
     badge = f'<span class="tp-tag">{_e(tour["badge_text"])}</span>' if tour.get('badge_text') else ''
+    if preorder_closed(source_tour.get('preorder_slug'), today):
+        badge = f'<span class="tp-tag" style="background:#6b7280">{_e(_ENDED_LABEL.get(lang, _ENDED_LABEL["zh-tw"]))}</span>'
     subtitle = f'<p class="tp-subtitle">{_e(md["subtitle"])}</p>' if md.get('subtitle') else ''
     crumb = f'<div class="tp-crumb"><a href="{_url("/", lang)}">{_e(ui["home"])}</a> › <a href="{_url("/tours", lang)}">{_e(ui["overview"])}</a>'
     if tab:
