@@ -244,6 +244,7 @@ def _page_3days():
         '並附上可以直接照走的範例動線。</p>'
         '<img class="pp-hero-image" src="/images/tours/t201.jpg" alt="澎湖三天兩夜行程中的漁翁島燈塔與旅客合照" width="768" height="512" loading="eager">'
         + _cta_row('<a href="/penghu-itinerary-recommendations" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-route"></i> 比較推薦行程</a>', _LINE_3DAYS, '3days')
+        + '<p><a href="/penghu-autumn-winter#autumn-slow-trip">秋冬慢旅行 3 天 2 夜｜查看行程與詢價</a></p>'
         + '<section class="pp-conclusion"><h2 style="margin:0 0 10px">先講結論</h2><p>'
         + conclusion + '</p></section>'
         + '<h2>快速決策表</h2>' + table
@@ -388,6 +389,7 @@ def _page_family():
         '照著排就能玩得輕鬆。</p>'
         '<img class="pp-hero-image" src="/images/tours/t102.jpg" alt="親子家庭在澎湖潮間帶觀察海洋生物" width="768" height="512" loading="eager">'
         + _cta_row('<a href="/penghu-itinerary-recommendations" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-route"></i> 比較親子推薦行程</a>', _LINE_FAMILY, 'family')
+        + '<p><a href="/penghu-autumn-winter#autumn-slow-trip">親子與長輩秋冬慢旅行｜查看行程與詢價</a></p>'
         + '<section class="pp-conclusion"><h2 style="margin:0 0 10px">先講結論</h2><p>'
         + conclusion + '</p></section>'
         + '<h2>快速決策表</h2>' + table
