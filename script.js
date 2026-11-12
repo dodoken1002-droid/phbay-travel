@@ -771,9 +771,12 @@ function renderTourCard(tour) {
     prices: getLocPrices(tour),
   };
 
-  const badgeText = getLoc(tour, 'badge_text');
+  const ENDED_LABEL = { 'zh-tw':'活動已結束', 'zh-cn':'活动已结束', en:'Event ended', ja:'催行終了', ko:'행사 종료' };
+  const isEnded = tour.sale_status === 'ended';
+  const badgeText = isEnded ? (ENDED_LABEL[window.__lang] || ENDED_LABEL['zh-tw']) : getLoc(tour, 'badge_text');
+  const badgeClass = isEnded ? 'ended' : (tour.badge_class || '');
   const badgeHtml = badgeText
-    ? `<div class="tour-badge ${tour.badge_class || ''}">${badgeText}</div>` : '';
+    ? `<div class="tour-badge ${badgeClass}">${badgeText}</div>` : '';
 
   // 沒有實拍照時用品牌預設封面，不再拿圖庫海景照充數（客人會以為是行程實景）
   const imgHtml = tour.image_url
