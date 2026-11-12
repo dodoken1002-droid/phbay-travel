@@ -39,6 +39,10 @@ PILLAR_STYLE = (
     '.pp-hero-image{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:14px;margin:4px 0 24px;box-shadow:0 4px 18px rgba(0,0,0,.10)}'
     '.pp-conclusion{background:var(--blue-pale);border-left:4px solid var(--blue-main);border-radius:10px;padding:18px 22px;margin:0 0 8px}'
     '.pp-conclusion p{margin:0;line-height:1.9}'
+    '.pp-season{background:#fff9ef;border:1px solid #f2d9a6;border-radius:14px;padding:18px 22px;margin:0 0 26px}'
+    '.pp-season-kicker{color:#b5482a;font-weight:800;font-size:.85rem;letter-spacing:.06em;margin:0 0 4px!important}'
+    '.pp-season p{margin:0 0 12px;line-height:1.8}'
+    '.pp-season a.btn{text-decoration:none;color:var(--blue-main);border-color:var(--blue-main)}'
     '.pp-table-scroll{overflow-x:auto;margin-bottom:8px}'
     '.pp-table{width:100%;border-collapse:collapse;font-size:.95rem;min-width:520px}'
     '.pp-table th{background:var(--blue-pale);color:var(--blue-dark);font-weight:800;text-align:left;padding:10px 14px;white-space:nowrap}'
@@ -75,6 +79,17 @@ def _cta_row(extra='', line_url=_LINE_URL, source='pillar'):
             f'<a href="{line_url}" data-line-source="{source}_cta" target="_blank" rel="noopener noreferrer" class="btn btn-primary"><i class="fab fa-line"></i> LINE 諮詢 @phbay2018</a>'
             '<a href="/tours" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-map-marked-alt"></i> 看推薦行程</a>'
             f'{extra}</div>')
+
+
+def _season_cta(title):
+    """攻略頁 → 秋冬專頁「秋冬慢旅行」詢價區塊的入口。
+    秋冬方案是個別報價的行程諮詢：不要寫售價、日期或成行人數，那些要等業務確認。"""
+    return ('<aside class="pp-season" aria-label="秋冬慢旅行行程諮詢">'
+            '<p class="pp-season-kicker">秋冬限定・行程諮詢</p>'
+            f'<p><strong>{title}</strong>：依日期、人數與需求個別報價，不適用本頁的套裝參考價。'
+            '內海巡禮冬季暫停預約，開放日以預購頁公告為準。</p>'
+            '<a href="/penghu-autumn-winter#autumn-slow-trip" class="btn btn-outline">'
+            '<i class="fas fa-leaf"></i> 查看秋冬參考行程與詢價</a></aside>')
 
 
 def _bottom_cta(lead, quiz_href='/#quiz', line_url=_LINE_URL, source='pillar'):
@@ -244,6 +259,7 @@ def _page_3days():
         '並附上可以直接照走的範例動線。</p>'
         '<img class="pp-hero-image" src="/images/tours/t201.jpg" alt="澎湖三天兩夜行程中的漁翁島燈塔與旅客合照" width="768" height="512" loading="eager">'
         + _cta_row('<a href="/penghu-itinerary-recommendations" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-route"></i> 比較推薦行程</a>', _LINE_3DAYS, '3days')
+        + _season_cta('秋冬慢旅行 3 天 2 夜')
         + '<section class="pp-conclusion"><h2 style="margin:0 0 10px">先講結論</h2><p>'
         + conclusion + '</p></section>'
         + '<h2>快速決策表</h2>' + table
@@ -375,7 +391,7 @@ def _page_family():
         ('親子去澎湖要玩幾天？',
          '3 天 2 夜是低標，能玩到潮間帶＋一段船遊＋北環；帶幼兒或三代同堂建議 4 天 3 夜，每天行程更鬆。'),
         ('內海巡禮適合帶小孩搭嗎？',
-         '適合。內海航線平穩、航程短，6 人成行、最多 13 人的小船不擁擠，時段固定好安排。詳情與訂位見內海巡禮預購頁。'),
+         '適合。內海航線平穩、航程短，6 人成行、最多 13 人的小船不擁擠，時段固定好安排。冬季暫停預約，開放日與訂位以內海巡禮預購頁公告為準。'),
         ('親子行程可以請旅行社客製嗎？',
          '可以。潮旅主打親子友善行程，會依孩子年齡調整節奏與內容，兩人即可成行；用 LINE @phbay2018 說明孩子年齡與天數，就能拿到建議行程。'),
     ]
@@ -388,6 +404,7 @@ def _page_family():
         '照著排就能玩得輕鬆。</p>'
         '<img class="pp-hero-image" src="/images/tours/t102.jpg" alt="親子家庭在澎湖潮間帶觀察海洋生物" width="768" height="512" loading="eager">'
         + _cta_row('<a href="/penghu-itinerary-recommendations" class="btn btn-outline" style="color:var(--blue-main);border-color:var(--blue-main)"><i class="fas fa-route"></i> 比較親子推薦行程</a>', _LINE_FAMILY, 'family')
+        + _season_cta('親子與長輩秋冬慢旅行')
         + '<section class="pp-conclusion"><h2 style="margin:0 0 10px">先講結論</h2><p>'
         + conclusion + '</p></section>'
         + '<h2>快速決策表</h2>' + table
