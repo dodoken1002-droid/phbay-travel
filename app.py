@@ -5644,6 +5644,14 @@ def blog_index():
             parts.append(_langp)
         return '/blog' + ('?' + '&'.join(parts) if parts else '')
 
+    def _blog_url_zh(n):
+        parts = []
+        if sel:
+            parts.append(f'tag={sel}')
+        if n > 1:
+            parts.append(f'page={n}')
+        return '/blog' + ('?' + '&'.join(parts) if parts else '')
+
     _langq = f'?lang={lang}' if lang != 'zh-tw' else ''
     _tagq = f'&lang={lang}' if lang != 'zh-tw' else ''
     cards = ''
@@ -5686,6 +5694,10 @@ def blog_index():
         desc = '潮旅國際旅行社的澎湖旅遊部落格：行程攻略、景點玩法、美食推薦、跳島與音樂節在地分享。'
         trail = [("首頁", f"{SITE}/"), ("部落格", f"{SITE}/blog")]
     canonical = f'{SITE}{_blog_url(page)}'
+    if sel and _langp:
+        # 分類頁的標題、描述、分類名都是中文，只有卡片標題會翻譯；外語版與中文版
+        # 幾乎相同，GSC 會判為「重複網頁」。外語分類頁一律 canonical 回中文分類頁。
+        canonical = f'{SITE}{_blog_url_zh(page)}'
 
     if pages > 1:
         prev_btn = (f'<a class="pager-btn" href="{_blog_url(page - 1)}">← 上一頁</a>'
@@ -5722,7 +5734,8 @@ def blog_index():
     if page > 1:
         _pnl_parts.append(f'page={page}')
     _path_no_lang = '/blog' + ('?' + '&'.join(_pnl_parts) if _pnl_parts else '')
-    alt_links = _blog_hreflang(_path_no_lang, list(BLOG_LANGS))
+    # 外語分類頁 canonical 回中文，就不能再宣告外語 hreflang（訊號互相矛盾）
+    alt_links = _blog_hreflang(_path_no_lang, [] if sel else list(BLOG_LANGS))
     head_extra = (rel_links
                   + _ld_script(_breadcrumb_ld(trail)) + _ld_script(item_list))
     return _render_blog(title, desc, canonical, body, head_extra, lang=lang, alt_links=alt_links)
@@ -5794,7 +5807,8 @@ def blog_post(slug):
     cover_url = _post_cover_url(p)
     cover = f'<img class="blog-cover" src="{_html.escape(cover_url)}" alt="{_html.escape(p["title"])}" width="1200" height="630"/>' if cover_url else ''
     tags = ''.join(f'<span class="post-tag">{_html.escape(t.strip())}</span>' for t in (p.get('tags') or '').split(',') if t.strip())
-    canonical = f'{SITE}/blog/{slug}' + (f'?lang={lang}' if lang != 'zh-tw' else '')
+    # 沒有該語言翻譯時內容其實是中文，canonical 指回中文原文，避免被判「重複網頁」
+    canonical = f'{SITE}/blog/{slug}' + (f'?lang={lang}' if lang in avail else '')
     ld = {
         "@context": "https://schema.org", "@type": "Article", "@id": f"{canonical}#article",
         "headline": p['title'], "description": desc,
